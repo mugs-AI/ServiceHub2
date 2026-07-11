@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiProxyRouteImport } from './routes/api/proxy'
+import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProxyRoute = ApiProxyRouteImport.update({
+  id: '/api/proxy',
+  path: '/api/proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthConnectRoute = ApiAuthConnectRouteImport.update({
+  id: '/api/auth/connect',
+  path: '/api/auth/connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/proxy': typeof ApiProxyRoute
+  '/api/auth/connect': typeof ApiAuthConnectRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/proxy': typeof ApiProxyRoute
+  '/api/auth/connect': typeof ApiAuthConnectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/proxy': typeof ApiProxyRoute
+  '/api/auth/connect': typeof ApiAuthConnectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/proxy' | '/api/auth/connect'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/proxy' | '/api/auth/connect'
+  id: '__root__' | '/' | '/api/proxy' | '/api/auth/connect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiProxyRoute: typeof ApiProxyRoute
+  ApiAuthConnectRoute: typeof ApiAuthConnectRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/proxy': {
+      id: '/api/proxy'
+      path: '/api/proxy'
+      fullPath: '/api/proxy'
+      preLoaderRoute: typeof ApiProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/connect': {
+      id: '/api/auth/connect'
+      path: '/api/auth/connect'
+      fullPath: '/api/auth/connect'
+      preLoaderRoute: typeof ApiAuthConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiProxyRoute: ApiProxyRoute,
+  ApiAuthConnectRoute: ApiAuthConnectRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
