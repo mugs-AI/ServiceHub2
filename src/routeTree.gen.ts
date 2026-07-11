@@ -9,38 +9,168 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsersRouteImport } from './routes/users'
+import { Route as StockRouteImport } from './routes/stock'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as InvoicesRouteImport } from './routes/invoices'
+import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiProxyRouteImport } from './routes/api/proxy'
+import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StockRoute = StockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvoicesRoute = InvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomersRoute = CustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProxyRoute = ApiProxyRouteImport.update({
+  id: '/api/proxy',
+  path: '/api/proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthConnectRoute = ApiAuthConnectRouteImport.update({
+  id: '/api/auth/connect',
+  path: '/api/auth/connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/customers': typeof CustomersRoute
+  '/invoices': typeof InvoicesRoute
+  '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
+  '/users': typeof UsersRoute
+  '/api/proxy': typeof ApiProxyRoute
+  '/api/auth/connect': typeof ApiAuthConnectRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/customers': typeof CustomersRoute
+  '/invoices': typeof InvoicesRoute
+  '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
+  '/users': typeof UsersRoute
+  '/api/proxy': typeof ApiProxyRoute
+  '/api/auth/connect': typeof ApiAuthConnectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/customers': typeof CustomersRoute
+  '/invoices': typeof InvoicesRoute
+  '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
+  '/users': typeof UsersRoute
+  '/api/proxy': typeof ApiProxyRoute
+  '/api/auth/connect': typeof ApiAuthConnectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/customers'
+    | '/invoices'
+    | '/settings'
+    | '/stock'
+    | '/users'
+    | '/api/proxy'
+    | '/api/auth/connect'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/customers'
+    | '/invoices'
+    | '/settings'
+    | '/stock'
+    | '/users'
+    | '/api/proxy'
+    | '/api/auth/connect'
+  id:
+    | '__root__'
+    | '/'
+    | '/customers'
+    | '/invoices'
+    | '/settings'
+    | '/stock'
+    | '/users'
+    | '/api/proxy'
+    | '/api/auth/connect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CustomersRoute: typeof CustomersRoute
+  InvoicesRoute: typeof InvoicesRoute
+  SettingsRoute: typeof SettingsRoute
+  StockRoute: typeof StockRoute
+  UsersRoute: typeof UsersRoute
+  ApiProxyRoute: typeof ApiProxyRoute
+  ApiAuthConnectRoute: typeof ApiAuthConnectRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stock': {
+      id: '/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invoices': {
+      id: '/invoices'
+      path: '/invoices'
+      fullPath: '/invoices'
+      preLoaderRoute: typeof InvoicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customers': {
+      id: '/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof CustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +178,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/proxy': {
+      id: '/api/proxy'
+      path: '/api/proxy'
+      fullPath: '/api/proxy'
+      preLoaderRoute: typeof ApiProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/connect': {
+      id: '/api/auth/connect'
+      path: '/api/auth/connect'
+      fullPath: '/api/auth/connect'
+      preLoaderRoute: typeof ApiAuthConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CustomersRoute: CustomersRoute,
+  InvoicesRoute: InvoicesRoute,
+  SettingsRoute: SettingsRoute,
+  StockRoute: StockRoute,
+  UsersRoute: UsersRoute,
+  ApiProxyRoute: ApiProxyRoute,
+  ApiAuthConnectRoute: ApiAuthConnectRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
