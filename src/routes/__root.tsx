@@ -79,14 +79,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "ServiceHub2 — N3 AI Cloud Accounting" },
+      {
+        name: "description",
+        content:
+          "Service maintenance console for N3 AI Cloud Accounting — track customer contract status, stock mappings and service jobs.",
+      },
+      { name: "author", content: "ServiceHub2" },
+      { property: "og:title", content: "ServiceHub2 — N3 AI Cloud Accounting" },
+      {
+        property: "og:description",
+        content:
+          "Service maintenance console for N3 AI Cloud Accounting — track customer contract status, stock mappings and service jobs.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
