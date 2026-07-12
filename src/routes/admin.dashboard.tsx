@@ -122,9 +122,10 @@ function AdminDashboard() {
           </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <HealthCard title="Customer Snapshots" row={healthMap.get("customers")} loading={loading} />
-          <HealthCard title="Stock Snapshots" row={healthMap.get("stock")} loading={loading} />
-          <HealthCard title="Contract Snapshots" row={healthMap.get("contracts")} loading={loading} />
+          <HealthCard title="Customer Snapshots" row={healthMap.get("Customers")} loading={loading} />
+          <HealthCard title="Stock Snapshots" row={healthMap.get("Stock")} loading={loading} />
+          <HealthCard title="Contract Snapshots" row={healthMap.get("Contract")} loading={loading} />
+
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <StatCard label="Last Synchronization" value={lastSyncLabel} tone="blue" />
