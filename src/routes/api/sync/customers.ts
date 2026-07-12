@@ -1,6 +1,5 @@
 // POST /api/sync/customers — CustomerSnapshotSync for the caller's tenant.
-// The tenant is resolved server-side from BasicInfo using the caller's JWT;
-// browser-supplied tenant values are ignored.
+// Administrator-only. Tenant resolved server-side from N3 BasicInfo/JWT.
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -8,16 +7,22 @@ export const Route = createFileRoute("/api/sync/customers")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { resolveTenantContext, UnauthorizedSyncError, syncCustomerSnapshots } =
-          await import("@/lib/qne/sync/index.server");
+        const { requireAdministrator, guardResponse } = await import(
+          "@/lib/qne/session/current-user.server"
+        );
+        const { syncCustomerSnapshots } = await import("@/lib/qne/sync/index.server");
         try {
-          const ctx = await resolveTenantContext(request);
-          const result = await syncCustomerSnapshots(ctx);
-          return Response.json({ tenantCode: ctx.tenantCode, ...result });
+          const user = await requireAdministrator(request);
+          const result = await syncCustomerSnapshots({
+            token: user.token,
+            tenantCode: user.tenantCode,
+            companyName: user.companyName,
+            email: user.email,
+          });
+          return Response.json({ tenantCode: user.tenantCode, ...result });
         } catch (err) {
-          if (err instanceof UnauthorizedSyncError) {
-            return Response.json({ error: err.message }, { status: 401 });
-          }
+          const resp = guardResponse(err);
+          if (resp) return resp;
           console.error("[sync/customers] failed", err);
           return Response.json(
             { error: err instanceof Error ? err.message : "Sync failed" },

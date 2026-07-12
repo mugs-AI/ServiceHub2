@@ -1,5 +1,5 @@
 // POST /api/sync/contracts — ContractSnapshotSync for the caller's tenant.
-// Optional body: { customerCodes?: string[] } to rebuild only affected customers.
+// Administrator-only. Tenant resolved server-side from N3 BasicInfo/JWT.
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -7,29 +7,39 @@ export const Route = createFileRoute("/api/sync/contracts")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { resolveTenantContext, UnauthorizedSyncError, syncContractSnapshots } =
-          await import("@/lib/qne/sync/index.server");
+        const { requireAdministrator, guardResponse } = await import(
+          "@/lib/qne/session/current-user.server"
+        );
+        const { syncContractSnapshots } = await import("@/lib/qne/sync/index.server");
         try {
-          const ctx = await resolveTenantContext(request);
+          const user = await requireAdministrator(request);
           let customerCodes: string[] | undefined;
           try {
             const raw = await request.text();
             if (raw) {
               const parsed = JSON.parse(raw) as { customerCodes?: unknown };
               if (Array.isArray(parsed.customerCodes)) {
-                customerCodes = parsed.customerCodes
-                  .filter((c): c is string => typeof c === "string" && c.trim().length > 0);
+                customerCodes = parsed.customerCodes.filter(
+                  (c): c is string => typeof c === "string" && c.trim().length > 0,
+                );
               }
             }
           } catch {
-            // ignore body parse errors — treat as full rebuild
+            // ignore body parse errors
           }
-          const result = await syncContractSnapshots(ctx, { customerCodes });
-          return Response.json({ tenantCode: ctx.tenantCode, ...result });
+          const result = await syncContractSnapshots(
+            {
+              token: user.token,
+              tenantCode: user.tenantCode,
+              companyName: user.companyName,
+              email: user.email,
+            },
+            { customerCodes },
+          );
+          return Response.json({ tenantCode: user.tenantCode, ...result });
         } catch (err) {
-          if (err instanceof UnauthorizedSyncError) {
-            return Response.json({ error: err.message }, { status: 401 });
-          }
+          const resp = guardResponse(err);
+          if (resp) return resp;
           console.error("[sync/contracts] failed", err);
           return Response.json(
             { error: err instanceof Error ? err.message : "Sync failed" },
