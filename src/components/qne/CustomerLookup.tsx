@@ -1,203 +1,198 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { qneGetList } from "@/lib/qne/client";
-import { loadStockMap, type StockMap } from "@/lib/qne/stock-map";
+import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
 
-interface Customer {
-  code?: string;
-  companyName?: string;
-  name?: string;
-  [k: string]: unknown;
+interface CustomerRow {
+  customer_code: string;
+  customer_name: string | null;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
+  last_synced_at: string | null;
 }
 
-interface Doc {
-  docNo?: string;
-  documentNo?: string;
-  docDate?: string;
-  date?: string;
-  customerCode?: string;
-  details?: Array<{ stockCode?: string; [k: string]: unknown }>;
-  [k: string]: unknown;
+interface SearchResponse {
+  query: string;
+  tenantHasSnapshots: boolean;
+  rows: CustomerRow[];
+  tooShort: boolean;
+  error?: string;
 }
 
-type Status = "Active" | "Due Soon" | "Overdue" | "Unknown";
+type Phase =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "results"; data: SearchResponse }
+  | { kind: "empty-tenant" }
+  | { kind: "no-match" }
+  | { kind: "error"; message: string };
 
 /**
- * Workspace Customer Lookup. Shared by Administrator and Normal User.
- * Uses live N3 data via the same-origin proxy — no fake customers.
+ * Workspace Customer Lookup — searches tenant-scoped `customer_snapshots`
+ * via the server. Never calls N3 OpenAPI or /api/proxy.
  */
 export function CustomerLookup() {
-  const { session } = useSession();
-  const tenant = session?.tenantCode ?? "";
+  const { currentUser } = useSession();
+  const isAdmin = !!currentUser?.isAdministrator;
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<Customer[]>([]);
-  const [selected, setSelected] = useState<Customer | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<{
-    status: Status;
-    docNo?: string;
-    docDate?: string;
-    expiry?: string;
-    daysLeft?: number;
-    matchedStock?: string;
-  } | null>(null);
+  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const [selected, setSelected] = useState<CustomerRow | null>(null);
+  const inflightRef = useRef<string | null>(null);
 
-  const stockMap: StockMap = useMemo(() => loadStockMap(tenant), [tenant]);
-  const maintenanceCodes = useMemo(
-    () =>
-      Object.entries(stockMap)
-        .filter(([, v]) => v.type === "maintenance")
-        .map(([code, v]) => ({ code, days: v.durationDays ?? 365 })),
-    [stockMap],
-  );
-
-  const search = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    setSelected(null);
-    setStatus(null);
-    try {
-      const { rows } = await qneGetList<Customer>("main", "/api/customer", {
-        pageNo: 1,
-        pageSize: 20,
-        search: q,
-      });
-      setResults(rows);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const computeStatus = async (customer: Customer) => {
-    setSelected(customer);
-    setStatus(null);
-    setError(null);
-    if (maintenanceCodes.length === 0) {
-      setStatus({ status: "Unknown" });
-      setError("No stock codes are mapped as Maintenance/Renewal in Settings.");
+  const runSearch = useCallback(async (term: string) => {
+    const trimmed = term.trim();
+    if (trimmed.length < 2) {
+      setPhase({ kind: "idle" });
       return;
     }
-    const code = customer.code ?? "";
-    if (!code) {
-      setStatus({ status: "Unknown" });
-      return;
-    }
-    setBusy(true);
+    if (inflightRef.current === trimmed) return;
+    inflightRef.current = trimmed;
+    setPhase({ kind: "loading" });
     try {
-      const [inv, dos] = await Promise.all([
-        qneGetList<Doc>("main", "/api/salesinvoice", {
-          pageNo: 1,
-          pageSize: 50,
-          customerCode: code,
-        }).catch(() => ({ rows: [] as Doc[], total: 0 })),
-        qneGetList<Doc>("main", "/api/deliveryorder", {
-          pageNo: 1,
-          pageSize: 50,
-          customerCode: code,
-        }).catch(() => ({ rows: [] as Doc[], total: 0 })),
-      ]);
-      const all = [...inv.rows, ...dos.rows];
-      const qualifying = all
-        .map((doc) => {
-          const lines = Array.isArray(doc.details) ? doc.details : [];
-          const match = lines
-            .map((l) => maintenanceCodes.find((m) => m.code === l.stockCode))
-            .find(Boolean);
-          if (!match) return null;
-          const date = doc.docDate ?? doc.date;
-          if (!date) return null;
-          const start = new Date(date);
-          if (Number.isNaN(start.getTime())) return null;
-          const expiry = new Date(start.getTime() + match.days * 86400000);
-          return { doc, match, start, expiry };
-        })
-        .filter(Boolean) as Array<{
-        doc: Doc;
-        match: { code: string; days: number };
-        start: Date;
-        expiry: Date;
-      }>;
-
-      if (qualifying.length === 0) {
-        setStatus({ status: "Unknown" });
+      const token = getStoredToken();
+      const res = await fetch(
+        `/api/workspace/customers?q=${encodeURIComponent(trimmed)}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      const body = (await res.json().catch(() => ({}))) as SearchResponse;
+      if (inflightRef.current !== trimmed) return;
+      if (!res.ok) {
+        setPhase({
+          kind: "error",
+          message:
+            body?.error ??
+            "Customer Lookup is temporarily unavailable. Please try again.",
+        });
         return;
       }
-      qualifying.sort((a, b) => b.start.getTime() - a.start.getTime());
-      const latest = qualifying[0];
-      const now = Date.now();
-      const daysLeft = Math.ceil((latest.expiry.getTime() - now) / 86400000);
-      const s: Status =
-        daysLeft < 0 ? "Overdue" : daysLeft <= 30 ? "Due Soon" : "Active";
-      setStatus({
-        status: s,
-        docNo: latest.doc.docNo ?? latest.doc.documentNo,
-        docDate: latest.start.toISOString().slice(0, 10),
-        expiry: latest.expiry.toISOString().slice(0, 10),
-        daysLeft,
-        matchedStock: latest.match.code,
+      if (!body.tenantHasSnapshots) {
+        setPhase({ kind: "empty-tenant" });
+        return;
+      }
+      if (body.rows.length === 0) {
+        setPhase({ kind: "no-match" });
+        return;
+      }
+      setPhase({ kind: "results", data: body });
+    } catch {
+      if (inflightRef.current !== trimmed) return;
+      setPhase({
+        kind: "error",
+        message:
+          "Customer Lookup is temporarily unavailable. Please try again.",
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(false);
+      if (inflightRef.current === trimmed) inflightRef.current = null;
     }
+  }, []);
+
+  useEffect(() => {
+    if (selected && phase.kind === "results") {
+      const stillThere = phase.data.rows.some(
+        (r) => r.customer_code === selected.customer_code,
+      );
+      if (!stillThere) setSelected(null);
+    }
+  }, [phase, selected]);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSelected(null);
+    runSearch(q);
   };
 
   return (
     <div className="space-y-4">
-      <form onSubmit={search} className="flex flex-wrap items-center gap-2">
+      <form onSubmit={onSubmit} className="flex flex-wrap items-center gap-2">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search customer by name or code…"
+          placeholder="Search by Customer name, code, contact person, phone or email."
           className="min-h-11 flex-1 min-w-64 rounded-lg border bg-background px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-primary/40"
         />
         <button
           type="submit"
-          disabled={busy}
+          disabled={phase.kind === "loading" || q.trim().length < 2}
           className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
         >
-          {busy ? "Searching…" : "Search"}
+          {phase.kind === "loading" ? "Searching…" : "Search"}
         </button>
       </form>
 
-      {error && (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-
-      {results.length === 0 && !busy && (
+      {phase.kind === "idle" && (
         <div className="rounded-lg border border-dashed bg-card/60 p-6 text-center text-sm text-muted-foreground">
-          Start by searching for a Customer above. Their contract status, snapshot
-          and service history will appear here.
+          Start by searching for a Customer.
         </div>
       )}
 
-      {results.length > 0 && (
+      {phase.kind === "loading" && (
+        <div className="flex items-center gap-2 rounded-lg border bg-card/60 px-3 py-2 text-sm text-muted-foreground">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          Searching Customer snapshots…
+        </div>
+      )}
+
+      {phase.kind === "no-match" && (
+        <div className="rounded-lg border bg-card/60 p-4 text-sm text-muted-foreground">
+          No Customer was found for this search.
+        </div>
+      )}
+
+      {phase.kind === "empty-tenant" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p>
+            Customer snapshots are empty for this Client. Ask an Administrator
+            to run Customer Snapshot Sync.
+          </p>
+          {isAdmin && (
+            <a
+              href="/admin/snapshots"
+              className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-950"
+            >
+              Open Snapshot Console →
+            </a>
+          )}
+        </div>
+      )}
+
+      {phase.kind === "error" && (
+        <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {phase.message}
+        </div>
+      )}
+
+      {phase.kind === "results" && (
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
             <div className="border-b bg-muted/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Results
+              Results ({phase.data.rows.length})
             </div>
             <ul className="max-h-96 overflow-y-auto">
-              {results.map((c, i) => (
-                <li key={i}>
+              {phase.data.rows.map((c) => (
+                <li key={c.customer_code}>
                   <button
-                    onClick={() => computeStatus(c)}
+                    onClick={() => setSelected(c)}
                     className={`flex w-full flex-col items-start border-b px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
-                      selected === c ? "bg-accent" : ""
+                      selected?.customer_code === c.customer_code
+                        ? "bg-accent"
+                        : ""
                     }`}
                   >
                     <span className="font-medium text-foreground">
-                      {c.companyName ?? c.name ?? "(no name)"}
+                      {c.customer_name ?? "(no name)"}
                     </span>
-                    <span className="text-xs text-muted-foreground">{c.code}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {c.customer_code}
+                      {c.contact_person ? ` · ${c.contact_person}` : ""}
+                    </span>
+                    {(c.phone || c.email) && (
+                      <span className="text-xs text-muted-foreground">
+                        {[c.phone, c.email].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}
@@ -211,72 +206,65 @@ export function CustomerLookup() {
               </div>
               {!selected ? (
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Select a customer to load their snapshot and contract status.
+                  Select a customer to view their snapshot details.
                 </p>
               ) : (
                 <div className="mt-2 space-y-3">
                   <div>
                     <div className="text-base font-semibold text-foreground">
-                      {selected.companyName ?? selected.name}
+                      {selected.customer_name ?? "(no name)"}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {selected.code}
+                      {selected.customer_code}
                     </div>
                   </div>
-                  {status && <StatusBadge status={status.status} />}
-                  {status?.docNo && (
-                    <dl className="grid grid-cols-2 gap-y-1 text-sm">
-                      <dt className="text-muted-foreground">Latest doc</dt>
-                      <dd>{status.docNo}</dd>
-                      <dt className="text-muted-foreground">Doc date</dt>
-                      <dd>{status.docDate}</dd>
-                      <dt className="text-muted-foreground">Expiry</dt>
-                      <dd>{status.expiry}</dd>
-                      <dt className="text-muted-foreground">Days remaining</dt>
-                      <dd>{status.daysLeft}</dd>
-                      <dt className="text-muted-foreground">Matched stock</dt>
-                      <dd className="font-mono text-xs">{status.matchedStock}</dd>
-                    </dl>
-                  )}
+                  <dl className="grid grid-cols-2 gap-y-1 text-sm">
+                    {selected.contact_person && (
+                      <>
+                        <dt className="text-muted-foreground">Contact</dt>
+                        <dd>{selected.contact_person}</dd>
+                      </>
+                    )}
+                    {selected.phone && (
+                      <>
+                        <dt className="text-muted-foreground">Phone</dt>
+                        <dd>{selected.phone}</dd>
+                      </>
+                    )}
+                    {selected.email && (
+                      <>
+                        <dt className="text-muted-foreground">Email</dt>
+                        <dd className="truncate">{selected.email}</dd>
+                      </>
+                    )}
+                    {selected.last_synced_at && (
+                      <>
+                        <dt className="text-muted-foreground">Snapshot synced</dt>
+                        <dd>
+                          {new Date(selected.last_synced_at).toLocaleString()}
+                        </dd>
+                      </>
+                    )}
+                  </dl>
                 </div>
               )}
             </div>
 
-            <div className="rounded-lg border border-dashed bg-card/60 p-4">
+            <div
+              className="rounded-lg border border-dashed bg-card/60 p-4"
+              data-extension="contract-status"
+            >
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Service history
+                Contract status
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Coming soon — Service Jobs, visits and follow-ups for this
-                customer will appear here in Phase 1.
+                Contract, expiry and remaining days will appear here once the
+                Contract Snapshot surface is wired in the next milestone.
               </p>
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: Status }) {
-  const cls: Record<Status, string> = {
-    Active: "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200",
-    "Due Soon": "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
-    Overdue: "bg-red-100 text-red-800 ring-1 ring-red-200",
-    Unknown: "bg-muted text-muted-foreground ring-1 ring-border",
-  };
-  const dot: Record<Status, string> = {
-    Active: "bg-emerald-500",
-    "Due Soon": "bg-amber-500",
-    Overdue: "bg-red-500",
-    Unknown: "bg-muted-foreground/60",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${cls[status]}`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${dot[status]}`} />
-      {status}
-    </span>
   );
 }
