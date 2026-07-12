@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 import { qneGetList } from "@/lib/qne/client";
@@ -6,8 +6,23 @@ import { loadStockMap, type StockMap } from "@/lib/qne/stock-map";
 import { useSession } from "@/lib/qne/session-context";
 
 export const Route = createFileRoute("/")({
-  component: ServiceConsole,
+  component: HomeRouter,
 });
+
+function HomeRouter() {
+  const { currentUser, currentUserReady } = useSession();
+  if (!currentUserReady) {
+    return (
+      <div className="rounded-md border bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
+        Loading workspace…
+      </div>
+    );
+  }
+  if (!currentUser?.isAdministrator) {
+    return <Navigate to="/support" replace />;
+  }
+  return <ServiceConsole />;
+}
 
 interface Customer {
   code?: string;

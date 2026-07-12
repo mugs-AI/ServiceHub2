@@ -224,6 +224,36 @@ export type Database = {
         }
         Relationships: []
       }
+      service_hub_admins: {
+        Row: {
+          created_at: string
+          email: string
+          granted_by: string | null
+          id: string
+          is_bootstrap: boolean
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          granted_by?: string | null
+          id?: string
+          is_bootstrap?: boolean
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          granted_by?: string | null
+          id?: string
+          is_bootstrap?: boolean
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       snapshot_health: {
         Row: {
           calculation_errors: number

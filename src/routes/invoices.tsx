@@ -1,10 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { AdminOnly } from "@/components/qne/AdminOnly";
 import { N3ListExplorer } from "@/components/qne/N3ListExplorer";
 
 export const Route = createFileRoute("/invoices")({
-  component: InvoicesPage,
+  component: () => (
+    <AdminOnly>
+      <InvoicesPage />
+    </AdminOnly>
+  ),
 });
 
 function InvoicesPage() {

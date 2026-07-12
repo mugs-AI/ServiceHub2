@@ -7,13 +7,13 @@ export const Route = createFileRoute("/api/diagnostics/preview")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { resolveTenantContext, UnauthorizedSyncError } = await import(
-          "@/lib/qne/sync/index.server"
+        const { requireAdministrator, guardResponse } = await import(
+          "@/lib/qne/session/current-user.server"
         );
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         try {
-          const ctx = await resolveTenantContext(request);
-          const tenant = ctx.tenantCode;
+          const user = await requireAdministrator(request);
+          const tenant = user.tenantCode;
 
           const [customersRes, stockRes, contractsRes, mappingsRes] = await Promise.all([
             supabaseAdmin
@@ -73,9 +73,8 @@ export const Route = createFileRoute("/api/diagnostics/preview")({
             },
           });
         } catch (err) {
-          if (err instanceof UnauthorizedSyncError) {
-            return Response.json({ error: err.message }, { status: 401 });
-          }
+          const resp = guardResponse(err);
+          if (resp) return resp;
           console.error("[diagnostics/preview] failed", err);
           return Response.json(
             { error: err instanceof Error ? err.message : "Preview failed" },

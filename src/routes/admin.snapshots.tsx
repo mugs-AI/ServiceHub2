@@ -1,11 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 
+import { AdminOnly } from "@/components/qne/AdminOnly";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 
 export const Route = createFileRoute("/admin/snapshots")({
-  component: AdminSnapshots,
+  component: () => (
+    <AdminOnly>
+      <AdminSnapshots />
+    </AdminOnly>
+  ),
 });
 
 type SnapshotKind = "customers" | "stock" | "contracts";
@@ -232,10 +237,10 @@ function AdminSnapshots() {
           All data on this page is scoped to your Client company only.
         </p>
         <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Administrator gate: N3 BasicInfo does not currently expose a role
-          claim, so this page is available to any authenticated user of your
-          tenant. Do not link this route publicly. A stricter role check will
-          be wired in when the official N3 role field is confirmed.
+          Interim administrator gate: N3 does not currently expose an official
+          ServiceHub role claim. Access to this page is controlled by the
+          tenant-scoped administrator allowlist managed in <strong>Settings</strong>.
+          Both this page and its APIs enforce the check server-side.
         </p>
       </div>
 

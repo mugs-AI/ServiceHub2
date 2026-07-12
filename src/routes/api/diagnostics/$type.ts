@@ -16,8 +16,8 @@ export const Route = createFileRoute("/api/diagnostics/$type")({
   server: {
     handlers: {
       GET: async ({ request, params }) => {
-        const { resolveTenantContext, UnauthorizedSyncError } = await import(
-          "@/lib/qne/sync/index.server"
+        const { requireAdministrator, guardResponse } = await import(
+          "@/lib/qne/session/current-user.server"
         );
         const { getSnapshotDiagnostics } = await import("@/lib/qne/diagnostics.server");
         const type = normaliseType(params.type);
@@ -28,13 +28,12 @@ export const Route = createFileRoute("/api/diagnostics/$type")({
           );
         }
         try {
-          const ctx = await resolveTenantContext(request);
-          const result = await getSnapshotDiagnostics(ctx.tenantCode, type);
+          const user = await requireAdministrator(request);
+          const result = await getSnapshotDiagnostics(user.tenantCode, type);
           return Response.json(result);
         } catch (err) {
-          if (err instanceof UnauthorizedSyncError) {
-            return Response.json({ error: err.message }, { status: 401 });
-          }
+          const resp = guardResponse(err);
+          if (resp) return resp;
           console.error("[diagnostics/$type] failed", err);
           return Response.json(
             { error: err instanceof Error ? err.message : "Diagnostics failed" },
