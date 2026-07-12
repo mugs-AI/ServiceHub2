@@ -11,13 +11,13 @@ interface NavItem {
 }
 
 const USER_NAV: NavItem[] = [
+  { to: "/dashboard", label: "Dashboard" },
   { to: "/support", label: "Workspace" },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard" },
   { to: "/support", label: "Workspace" },
-  { to: "/", label: "Service Console" },
 ];
 
 const ADMIN_TOOLS: NavItem[] = [
@@ -28,6 +28,7 @@ const ADMIN_TOOLS: NavItem[] = [
   { to: "/invoices", label: "N3 Sales & DO" },
   { to: "/users", label: "N3 Users" },
 ];
+
 
 export function AuthGate({ children }: { children?: ReactNode }) {
   const { ready, token, session, error } = useSession();
