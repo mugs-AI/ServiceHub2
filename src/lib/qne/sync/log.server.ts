@@ -75,5 +75,22 @@ export async function runWithSyncLog(
     })
     .eq("id", logRow.id);
 
+  // Snapshot Health & Diagnostics — monitoring layer only; must never
+  // affect synchronization outcomes.
+  try {
+    await updateHealthFromSync({
+      tenantCode: opts.tenantCode,
+      snapshotType: opts.snapshotType,
+      syncStatus: status,
+      syncErrorMessage: errorMessage,
+      counters,
+      lastAttempt: new Date(),
+      succeeded: status !== "failed",
+    });
+  } catch (err) {
+    console.error("[snapshot_health] update failed", err);
+  }
+
   return { ...counters, durationMs, logId: logRow.id, status, errorMessage };
 }
+
