@@ -1,12 +1,12 @@
 // Pure, side-effect-free helpers for resolving the current N3 user's
-// Administrator status from an official N3 /api/Users response.
+// Administrator status from the official N3 /api/Users response.
 //
-// Field names come from the official platform-v1 OpenAPI spec:
+// Field names come from the platform-v1 OpenAPI spec:
 //   UserDto: { userId, userName, email, displayName, isOwner, isSupport,
 //              isAccountant, roles: [{ id, name, displayName, isSystemRole }] }
 //
-// These helpers are intentionally free of Supabase, fetch, and env access
-// so they can be unit-tested in isolation.
+// These helpers are free of Supabase / fetch / env access so they can be
+// unit-tested in isolation.
 
 export interface N3RoleDto {
   id?: string | null;
@@ -24,7 +24,7 @@ export interface N3UserDto {
   isSupport?: boolean | null;
   isAccountant?: boolean | null;
   roles?: N3RoleDto[] | null;
-  // Some tenants expose active/disabled indicators under different names.
+  // Some tenants may expose these; treat missing as "active".
   isActive?: boolean | null;
   isDisabled?: boolean | null;
   deactivated?: boolean | null;
@@ -53,6 +53,10 @@ export function hasAdministratorRole(user: N3UserDto | null | undefined): boolea
   return roleNamesOf(user).some((n) => n.toLowerCase() === target);
 }
 
+/**
+ * Only treat a user as inactive when the DTO EXPLICITLY marks them so.
+ * When no active flag is present, treat as active (per Phase 0.9.4 rules).
+ */
 export function isUserActive(user: N3UserDto | null | undefined): boolean {
   if (!user) return false;
   if (user.isDisabled === true) return false;
@@ -62,9 +66,9 @@ export function isUserActive(user: N3UserDto | null | undefined): boolean {
 }
 
 /**
- * Match the current authenticated user (identified by BasicInfo) to an
- * entry from /api/Users. Prefers stable user id, then userName/email match
- * (both compared as normalised emails when they look like emails).
+ * Match the authenticated user (identified by BasicInfo) to an entry in
+ * /api/Users. Priority: userId → email → userName. Email and userName are
+ * cross-matched, trimmed and lowercased. displayName is never used.
  */
 export function matchCurrentUser(
   users: N3UserDto[],
@@ -87,34 +91,46 @@ export function matchCurrentUser(
 
 export type AdminGate = "n3_role" | "allowlist" | "bootstrap" | "none";
 
+export type UsersEndpointStatus = "ok" | "failed" | "unauthorized" | "forbidden";
+
+export type AdminDecisionReason =
+  | "matched_administrators_role"
+  | "matched_without_administrators_role"
+  | "role_data_missing"
+  | "no_matching_user"
+  | "users_endpoint_failed"
+  | "users_endpoint_unauthorized"
+  | "users_endpoint_forbidden"
+  | "no_email"
+  | "allowlist_fallback"
+  | "bootstrap_fallback";
+
 export interface AdminDecision {
   isAdministrator: boolean;
   adminGate: AdminGate;
   roleNames: string[];
   matchedUserId: string | null;
   matchedDisplayName: string | null;
-  reason:
-    | "role_administrators"
-    | "allowlist"
-    | "bootstrap"
-    | "no_email"
-    | "users_unavailable"
-    | "no_match"
-    | "no_roles"
-    | "not_admin";
+  reason: AdminDecisionReason;
+}
+
+export interface UsersLoad {
+  users: N3UserDto[] | null;
+  status: UsersEndpointStatus;
 }
 
 /**
  * Decide administrator status from official N3 data with a secure fallback
  * to the tenant-scoped ServiceHub allowlist.
  *
- * @param usersResponse - result of GET /api/Users, or `null` when the call
- *   failed / returned no data. Never pass browser-supplied lists.
- * @param identity - the current user resolved server-side from BasicInfo.
- * @param allowlist  - fallback checker for the current tenant.
+ * Precedence:
+ *   1. Official N3 "Administrators" role  → adminGate = "n3_role"
+ *   2. Tenant allowlist                    → adminGate = "allowlist"
+ *   3. Bootstrap (first user this tenant)  → adminGate = "bootstrap"
+ *   4. Otherwise                           → adminGate = "none"
  */
 export async function decideAdmin(
-  usersResponse: N3UserDto[] | null,
+  usersLoad: UsersLoad,
   identity: { userCode?: string | null; email?: string | null },
   allowlist: {
     isAllowlisted: (email: string) => Promise<boolean> | boolean;
@@ -124,14 +140,21 @@ export async function decideAdmin(
   const email = (identity.email ?? "").trim();
   let matched: N3UserDto | null = null;
   let roleNames: string[] = [];
-  let reason: AdminDecision["reason"] = "no_match";
+  let reason: AdminDecisionReason = "no_matching_user";
 
-  if (usersResponse === null) {
-    reason = "users_unavailable";
+  if (usersLoad.status !== "ok") {
+    reason =
+      usersLoad.status === "unauthorized"
+        ? "users_endpoint_unauthorized"
+        : usersLoad.status === "forbidden"
+          ? "users_endpoint_forbidden"
+          : "users_endpoint_failed";
   } else if (!email && !identity.userCode) {
     reason = "no_email";
+  } else if (!usersLoad.users || usersLoad.users.length === 0) {
+    reason = "no_matching_user";
   } else {
-    matched = matchCurrentUser(usersResponse, identity);
+    matched = matchCurrentUser(usersLoad.users, identity);
     if (matched) {
       roleNames = roleNamesOf(matched);
       if (isUserActive(matched) && hasAdministratorRole(matched)) {
@@ -141,16 +164,19 @@ export async function decideAdmin(
           roleNames,
           matchedUserId: (matched.userId ?? "").trim() || null,
           matchedDisplayName: (matched.displayName ?? "").trim() || null,
-          reason: "role_administrators",
+          reason: "matched_administrators_role",
         };
       }
-      reason = roleNames.length === 0 ? "no_roles" : "not_admin";
+      reason =
+        roleNames.length === 0
+          ? "role_data_missing"
+          : "matched_without_administrators_role";
     } else {
-      reason = "no_match";
+      reason = "no_matching_user";
     }
   }
 
-  // Fallback — secure, tenant-scoped ServiceHub allowlist.
+  // Fallback — tenant-scoped ServiceHub allowlist.
   if (email && (await allowlist.isAllowlisted(email))) {
     return {
       isAdministrator: true,
@@ -158,7 +184,7 @@ export async function decideAdmin(
       roleNames,
       matchedUserId: (matched?.userId ?? "").trim() || null,
       matchedDisplayName: (matched?.displayName ?? "").trim() || null,
-      reason: "allowlist",
+      reason: "allowlist_fallback",
     };
   }
   if (email && allowlist.tryBootstrap && (await allowlist.tryBootstrap(email))) {
@@ -168,7 +194,7 @@ export async function decideAdmin(
       roleNames,
       matchedUserId: (matched?.userId ?? "").trim() || null,
       matchedDisplayName: (matched?.displayName ?? "").trim() || null,
-      reason: "bootstrap",
+      reason: "bootstrap_fallback",
     };
   }
 
