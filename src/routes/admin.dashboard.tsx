@@ -16,17 +16,17 @@ export const Route = createFileRoute("/admin/dashboard")({
 });
 
 interface HealthRow {
-  snapshot_type: "customers" | "stock" | "contracts";
-  status: "healthy" | "warning" | "error" | "unknown";
-  last_success_at?: string | null;
-  last_error?: string | null;
-  metrics?: Record<string, unknown> | null;
+  snapshot_type: "Customers" | "Stock" | "Contract";
+  health_status: "Healthy" | "Warning" | "Error";
+  last_successful_sync?: string | null;
+  error_message?: string | null;
 }
 
 interface HealthResponse {
   tenantCode: string;
-  rows: HealthRow[];
+  snapshots: HealthRow[];
 }
+
 
 function AdminDashboard() {
   const { session, currentUser } = useSession();
