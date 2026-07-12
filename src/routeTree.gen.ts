@@ -16,6 +16,9 @@ import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiProxyRouteImport } from './routes/api/proxy'
+import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
+import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
+import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 
 const UsersRoute = UsersRouteImport.update({
@@ -53,6 +56,21 @@ const ApiProxyRoute = ApiProxyRouteImport.update({
   path: '/api/proxy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSyncStockRoute = ApiSyncStockRouteImport.update({
+  id: '/api/sync/stock',
+  path: '/api/sync/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSyncCustomersRoute = ApiSyncCustomersRouteImport.update({
+  id: '/api/sync/customers',
+  path: '/api/sync/customers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSyncContractsRoute = ApiSyncContractsRouteImport.update({
+  id: '/api/sync/contracts',
+  path: '/api/sync/contracts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthConnectRoute = ApiAuthConnectRouteImport.update({
   id: '/api/auth/connect',
   path: '/api/auth/connect',
@@ -68,6 +86,9 @@ export interface FileRoutesByFullPath {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/sync/contracts': typeof ApiSyncContractsRoute
+  '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/stock': typeof ApiSyncStockRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +99,9 @@ export interface FileRoutesByTo {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/sync/contracts': typeof ApiSyncContractsRoute
+  '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/stock': typeof ApiSyncStockRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,6 +113,9 @@ export interface FileRoutesById {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/sync/contracts': typeof ApiSyncContractsRoute
+  '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/stock': typeof ApiSyncStockRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +128,9 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/sync/contracts'
+    | '/api/sync/customers'
+    | '/api/sync/stock'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +141,9 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/sync/contracts'
+    | '/api/sync/customers'
+    | '/api/sync/stock'
   id:
     | '__root__'
     | '/'
@@ -121,6 +154,9 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/sync/contracts'
+    | '/api/sync/customers'
+    | '/api/sync/stock'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,6 +168,9 @@ export interface RootRouteChildren {
   UsersRoute: typeof UsersRoute
   ApiProxyRoute: typeof ApiProxyRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
+  ApiSyncContractsRoute: typeof ApiSyncContractsRoute
+  ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
+  ApiSyncStockRoute: typeof ApiSyncStockRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -185,6 +224,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProxyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sync/stock': {
+      id: '/api/sync/stock'
+      path: '/api/sync/stock'
+      fullPath: '/api/sync/stock'
+      preLoaderRoute: typeof ApiSyncStockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sync/customers': {
+      id: '/api/sync/customers'
+      path: '/api/sync/customers'
+      fullPath: '/api/sync/customers'
+      preLoaderRoute: typeof ApiSyncCustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sync/contracts': {
+      id: '/api/sync/contracts'
+      path: '/api/sync/contracts'
+      fullPath: '/api/sync/contracts'
+      preLoaderRoute: typeof ApiSyncContractsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/connect': {
       id: '/api/auth/connect'
       path: '/api/auth/connect'
@@ -204,6 +264,9 @@ const rootRouteChildren: RootRouteChildren = {
   UsersRoute: UsersRoute,
   ApiProxyRoute: ApiProxyRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
+  ApiSyncContractsRoute: ApiSyncContractsRoute,
+  ApiSyncCustomersRoute: ApiSyncCustomersRoute,
+  ApiSyncStockRoute: ApiSyncStockRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
