@@ -12,6 +12,7 @@ const NAV = [
   { to: "/invoices", label: "Sales & DO" },
   { to: "/users", label: "N3 Users" },
   { to: "/settings", label: "Settings" },
+  { to: "/admin/snapshots", label: "Admin · Snapshots" },
 ] as const;
 
 export function AuthGate({ children }: { children?: ReactNode }) {
