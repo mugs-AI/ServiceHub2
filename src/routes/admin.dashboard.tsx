@@ -58,17 +58,20 @@ function AdminDashboard() {
     };
   }, []);
 
-  const healthMap = new Map(health?.rows.map((r) => [r.snapshot_type, r]) ?? []);
+  const healthMap = new Map<HealthRow["snapshot_type"], HealthRow>(
+    (health?.snapshots ?? []).map((r) => [r.snapshot_type, r]),
+  );
   const failedCount =
-    health?.rows.filter((r) => r.status === "error").length ?? 0;
-  const lastSyncs = health?.rows
-    .map((r) => r.last_success_at)
+    health?.snapshots.filter((r) => r.health_status === "Error").length ?? 0;
+  const lastSyncs = (health?.snapshots ?? [])
+    .map((r) => r.last_successful_sync ?? null)
     .filter((x): x is string => !!x)
     .sort()
     .reverse();
-  const lastSyncLabel = lastSyncs && lastSyncs.length > 0
+  const lastSyncLabel = lastSyncs.length > 0
     ? new Date(lastSyncs[0]).toLocaleString()
     : "—";
+
 
   return (
     <div className="space-y-6">
