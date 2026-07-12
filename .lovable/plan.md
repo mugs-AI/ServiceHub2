@@ -1,65 +1,84 @@
-## ServiceHub2 — N3 AI Cloud Accounting integration
 
-The brief describes a full multi-tenant ServiceHub with jobs, approvals, roles, reports, mobile flows, attachments and more. That is several weeks of work. I'll build it in phases and start with **Phase 1 (foundation + auth + read-only N3 data)** so you can verify the integration end-to-end before we invest in the Jobs domain.
+# Investigation: N3 Role Membership Availability
 
-### Stack mapping (satisfies brief's architecture rule)
+**Scope:** read-only inspection of the official N3 OpenAPI (`platform-v1`) already referenced by this project, plus the existing same-origin proxy behaviour. **No code changes proposed.**
 
-The brief says "React + Vite + TS frontend, Node + Express backend". This project is TanStack Start on Cloudflare Workers, which is functionally equivalent:
-- **Frontend**: React + Vite + TS SPA under `src/routes/*` (browser talks only to same-origin `/api/*`).
-- **Backend**: TanStack **server routes** under `src/routes/api/*` — same-origin, holds N3 base URLs in `process.env`, forwards `Authorization: Bearer <jwt>` to N3. This is the required proxy layer; the browser never calls `openapi.account.qne.cloud`.
-- **Persistence for Jobs/Settings/Approvals**: Lovable Cloud (Postgres + RLS), keyed by N3 `tenantCode` for multi-tenant isolation.
+Note on runtime inspection: I attempted to call `/api/CompanyProfile/BasicInfo` and `/api/Users` through the live proxy from the current preview viewer, but that viewer has no `qne_access_token` in `localStorage` (only `__lovable_session` / `__lovable_anonymous_id`) — the authenticated `lks.mugs@gmail.com` session is in the other viewer, which did not respond in time. Because `/api/session/me` exposes diagnostics only when `isAdministrator === true`, the chicken-and-egg means we can't yet see *why* the current user resolves as Normal. Findings below are therefore based on the authoritative OpenAPI spec at `https://openapi.account.qne.cloud/doc/platform-v1.json`.
 
-### Phase 1 (this build)
+---
 
-1. **Env + proxy backbone**
-   - `OPEN_API_BASE_URL`, `OPEN_API_REPORTING_BASE_URL` server-only env with sane defaults.
-   - `POST /api/proxy/main/*` and `POST /api/proxy/reporting/*` — forward method, path, query, body, and the caller's Bearer token to N3. Return the raw JSON response.
-   - Shared `unwrapApiResponse` and `unwrapPageList` helpers used on both server and client.
+### 1. Does `GET /api/user` include role membership?
 
-2. **Auth (Paths A + B)**
-   - On app load: read `?token=` → save to `localStorage['qne_access_token']` → `history.replaceState` to strip it.
-   - Else: use JWT from localStorage.
-   - Else in **dev only** (`import.meta.env.DEV`): show API-key connect form → `POST /api/auth/connect` (dev-only server route; returns 404 when `process.env.NODE_ENV === 'production'`) → proxies `GET /api/auth/connect?api-key=…` → persists returned JWT.
-   - Else in prod: "Open from My Apps" screen.
-   - 401 anywhere → clear token, prompt relaunch (prod) or re-connect (dev).
+**NO.** There is no `/api/user` (singular) operation in `platform-v1`. Verified endpoint list containing the string `user`:
 
-3. **Session header**
-   - On every authenticated load, call `GET /api/companyprofile/BasicInfo` via the proxy and show **company name / tenant code / user email** in the app chrome. Refreshed on load, not cached in sessionStorage.
+- `GET /api/Users` — `Users_GetUsers_GET` (list, returns `UserDtoIEnumerableApiResponse`)
+- `GET /api/Users/{id}` — `Users_GetById_GET`
+- `GET /api/Users/Lookup`, `/SimpleLookup`, `/users-in-company`, `/GetAccountants`, `/GetSupports`
+- `POST /api/Users/AttachRole`, `/DetachRole`, `/Invite`, `/Deactivate`, …
+- `GET/POST /api/UserData`, `/api/UserDefaultSettings*`, `/api/UserTenantData`
 
-4. **Scope discovery**
-   - Fetch `/doc/index.json` once server-side, cache, and expose a `/api/scopes` route the frontend uses to know which N3 scopes are available. README documents the specific scopes we implemented.
+No `/api/user`, `/api/users/me`, `/api/users/current`, or `/api/me` operation exists.
 
-5. **Read-only N3 data screens** (proof the proxy works, feeds later phases)
-   - **Customers list** (search + paginate) from N3.
-   - **Stock codes list** (search + paginate) from N3.
-   - **Sales Invoices** and **Delivery Orders** list for a selected customer.
-   - **N3 Users** list (`platform-v1`) — used later for Assignee pickers.
-   - All lists parse `PageQueryResult` correctly (`data.value` / `data.count`).
+### 2. JSON structure (from `UserDto` schema in `platform-v1.json`)
 
-6. **Settings shell (Administrator only)**
-   - Stock-code mapping UI: mark N3 stock codes as **Maintenance/Renewal** (with duration days: 365 / 183 / custom) or **Ad Hoc Service**. Stored in Lovable Cloud, scoped by tenantCode.
-   - No admin role invention — "Administrator" gate = a Lovable Cloud `tenant_admins` table seeded on first login of a given tenant with the current user email (bootstrap). Documented so you can revise once N3 exposes an official admin claim.
+```
+{
+  "userId": "...",
+  "userName": "...",
+  "email": "...",
+  "displayName": "...",
+  "pictureUrl": "...",
+  "isOwner": true,
+  "isSupport": false,
+  "isAccountant": false,
+  "phoneNumber": "...",
+  "roles": [
+    { "id": "...", "name": "...", "displayName": "...", "isSystemRole": true }
+  ]
+}
+```
 
-7. **Customer Service Console (read-only status)**
-   - Search customer → show latest qualifying Invoice/DO based on mapped Maintenance stock codes → compute Active / Due Soon / Overdue / Unknown + expiry date + remaining days. No job creation yet.
+Envelope: `UserDtoIEnumerableApiResponse` (`ApiResponse<IEnumerable<UserDto>>`), unwrap `data`.
 
-8. **Docs**
-   - `README.md` with: Local development (Path B, JWT persistence, key never committed), Production (My Apps launch only), list of N3 scopes used and endpoints called.
+### 3. Exact field path for role names
 
-### Explicitly deferred (later phases, on your go-ahead)
+`data[].roles[].name` (on `GET /api/Users`) — equivalently `UserDto.roles[].name` (`RoleDto.name`, required, max 100 chars).
 
-- Service Job CRUD, job number generator, workflow states, comments, attachments, reassignment, vendor referral, approval rules.
-- Quick Job mobile flow.
-- Reports workspace + Excel export.
-- Fine-grained role experience beyond Admin vs Support.
-- Suspended status (needs official N3 signal).
+### 4. Does `lks.mugs@gmail.com` appear inside the role-carrying response?
 
-### Assumptions (flag now if wrong)
+**Cannot be confirmed from this session** — the authenticated viewer did not respond, so a live `GET /api/Users` dump is not available. This is exactly the value that `/api/session/me → diagnostics.matchedN3UserId / matchedDisplayName / reason` is designed to reveal, but those are gated to administrators only.
 
-- Lovable Cloud (Postgres) is acceptable for the ServiceHub-owned tables (Jobs, settings, approvals). Alternative is to store them via a separate service, but Cloud keeps everything one deploy.
-- "Administrator" bootstrap = first user of a tenant; you can grant more admins from Settings. No N3-side admin claim is assumed.
-- Cloudflare Worker runtime is fine as the "backend" since it's same-origin and holds env server-side — this matches the brief's intent even though it isn't literally Node+Express.
+### 5. Does the returned data contain `Administrators` / `Owner`?
 
-### Confirm to proceed
+**Cannot be confirmed** for the same reason as #4. `RoleDto.name` is the field to check; ServiceHub's `hasAdministratorRole()` does an exact, case-insensitive match on the literal string `"Administrators"` (see `src/lib/qne/session/role-resolution.ts`).
 
-Reply "go" and I'll build Phase 1. If you want a different starting slice (e.g. skip Cloud and jobs entirely, or start with Jobs skeleton first), say so and I'll re-plan.
+### 6. Alternative documented endpoints exposing roles / permissions
+
+Within `platform-v1` only these operations touch role data:
+
+- `GET /api/Users` — includes `roles[]` per user (as above).
+- `GET /api/Users/{id}` — same shape, single user.
+- `POST /api/Users/AttachRole` (`UserRoleLinkModel`) — mutation only.
+- `POST /api/Users/DetachRole` (`UserRoleLinkModel`) — mutation only.
+
+There is **no** dedicated `/api/Roles`, `/api/Permissions`, `/api/UserRoles`, or "current user roles" endpoint in `platform-v1`. Other scopes (`gl-v1`, `sales-v1`, `purchase-v1`, `stock-v1`, `pos-v1`, `einvoice-v1`, `integration-v1`, `bir-v1`, `reports-v1`) are business-domain scopes and, per the Development Brief, do not host identity/role endpoints.
+
+### 7. Statement
+
+Role **membership** is exposed — via `GET /api/Users` (`UserDto.roles[].name`). What is *not* exposed by the public N3 OpenAPI is a dedicated "current authenticated user" endpoint; the caller must self-identify from `BasicInfo` (or JWT claims) and match against the `/api/Users` list.
+
+### 8. Recommendation
+
+**A. Administrator detection should use official N3 role data.**
+
+The public OpenAPI does expose role membership on `UserDto.roles[].name`, which is exactly what the existing `role-resolution.ts` already consumes. Given `lks.mugs@gmail.com` is a real `Owner` + `Administrators` user in the N3 Web UI but ServiceHub shows "Normal user", the most likely causes are operational, not spec gaps:
+
+- The `/api/Users` call is failing for this session (401/403/empty envelope) — `decideAdmin` then returns `reason: "users_unavailable"` and falls through to the allowlist.
+- `BasicInfo` for this user surfaces a `userName`/`email` that doesn't match any `UserDto.email` / `UserDto.userName` after normalisation (edge cases: whitespace, different casing paths, or `email: null` on the matching `UserDto` with a non-email `userName`).
+- `isUserActive(matched)` false-negatives on a tenant that uses a non-standard active/disabled field name.
+
+The allowlist should remain **only** as the documented fallback it already is. To make the root cause visible without another investigation round, consider (in a future change, not now) surfacing `adminGate` + `reason` + `diagnostics` from `/api/session/me` to any authenticated user, not just administrators — that alone would let us tell #4/#5 immediately from the browser.
+
+---
+
+**No files modified. No patches produced. Report only.**
