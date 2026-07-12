@@ -91,17 +91,28 @@ later phases.
 
 ## Phase roadmap
 
-Phase 1 (this build):
+Phase 1 (shipped):
 - Same-origin proxy + Path A/B auth + session header
 - Read-only Customers / Stock / Invoices / DO / Users explorers
 - Stock-code mapping (Maintenance / Ad-hoc) in Settings
 - Customer Service Console: search + contract status (Active / Due
   Soon / Overdue / Unknown) using latest qualifying Invoice or DO
 
+Phase 0.5 – 0.8 (shipped):
+- Lovable Cloud persistent foundation with tenant-scoped tables and
+  deny-default RLS
+- Snapshot Synchronization Engine (`CustomerSnapshotSync`,
+  `StockSnapshotSync`, `ContractSnapshotSync`) with audit logging in
+  `snapshot_sync_logs`
+- Snapshot Health & Diagnostics service (`snapshot_health`) with
+  freshness thresholds and validation helpers
+- Admin console at `/admin/snapshots` for manual synchronization,
+  health monitoring, diagnostics drill-down and a tenant-scoped
+  read-only preview of the first 10 rows per snapshot
+
 Deferred to later phases:
 - Service Jobs (workflow, comments, attachments, reassignment,
   vendor referral, approvals)
 - Quick Job mobile flow
 - Reports workspace + Excel export
-- Fine-grained role experience
-- Lovable Cloud migration for tenant-scoped storage
+- Fine-grained role experience (pending an official N3 role claim)
