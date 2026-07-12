@@ -89,7 +89,8 @@ export async function getSnapshotDiagnostics(
       "id, snapshot_type, status, started_at, completed_at, duration_ms, inserted_count, updated_count, skipped_count, failed_count, error_message",
     )
     .eq("tenant_code", tenantCode)
-    .eq("snapshot_type", publicType.toLowerCase().replace(/s$/, "")) // "Customers" -> "customer"
+    .eq("snapshot_type", ({ Customers: "customer", Stock: "stock", Contract: "contract" } as const)[publicType])
+
     .order("started_at", { ascending: false })
     .limit(10);
 
