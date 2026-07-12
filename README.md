@@ -14,9 +14,13 @@ delivery orders and N3 users through a same-origin backend proxy.
   Base URLs live in server-side env vars only and never ship to the
   browser bundle. This is functionally equivalent to the "Node + Express
   proxy" pattern from the N3 development brief.
-- **Persistence** (Phase 1): stock-code mappings are stored in
-  `localStorage` keyed by N3 `tenantCode`. Phase 2 will migrate this
-  to Lovable Cloud with per-tenant RLS.
+- **Persistence**: Lovable Cloud (Postgres) hosts tenant-scoped snapshot
+  tables (`customer_snapshots`, `stock_snapshots`,
+  `customer_contract_snapshots`, `renewal_stock_mappings`,
+  `general_settings`, `notifications`, `snapshot_sync_logs`,
+  `snapshot_health`). All rows carry `tenant_code`; RLS is deny-default
+  and every read/write goes through server routes that resolve the
+  tenant from the authenticated N3 session.
 
 ## Environment (server-side only)
 
@@ -87,17 +91,28 @@ later phases.
 
 ## Phase roadmap
 
-Phase 1 (this build):
+Phase 1 (shipped):
 - Same-origin proxy + Path A/B auth + session header
 - Read-only Customers / Stock / Invoices / DO / Users explorers
 - Stock-code mapping (Maintenance / Ad-hoc) in Settings
 - Customer Service Console: search + contract status (Active / Due
   Soon / Overdue / Unknown) using latest qualifying Invoice or DO
 
+Phase 0.5 – 0.8 (shipped):
+- Lovable Cloud persistent foundation with tenant-scoped tables and
+  deny-default RLS
+- Snapshot Synchronization Engine (`CustomerSnapshotSync`,
+  `StockSnapshotSync`, `ContractSnapshotSync`) with audit logging in
+  `snapshot_sync_logs`
+- Snapshot Health & Diagnostics service (`snapshot_health`) with
+  freshness thresholds and validation helpers
+- Admin console at `/admin/snapshots` for manual synchronization,
+  health monitoring, diagnostics drill-down and a tenant-scoped
+  read-only preview of the first 10 rows per snapshot
+
 Deferred to later phases:
 - Service Jobs (workflow, comments, attachments, reassignment,
   vendor referral, approvals)
 - Quick Job mobile flow
 - Reports workspace + Excel export
-- Fine-grained role experience
-- Lovable Cloud migration for tenant-scoped storage
+- Fine-grained role experience (pending an official N3 role claim)
