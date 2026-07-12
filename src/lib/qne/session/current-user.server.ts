@@ -1,12 +1,22 @@
 // Server-only current-user resolution & access guards.
 // Tenant + user identity are ALWAYS resolved from the authenticated N3
 // session (BasicInfo + JWT payload fallback). Browser-supplied values are
-// ignored. Administrator status is resolved via the interim allowlist
-// (see service_hub_admins) documented in the Phase 0.9 brief.
+// ignored.
+//
+// Administrator status is resolved from the official N3 /api/Users role
+// attachments (see role-resolution.ts). The tenant-scoped ServiceHub
+// allowlist (service_hub_admins) remains only as a secure fallback when
+// official N3 role data cannot be obtained.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { n3Get } from "@/lib/qne/sync/n3.server";
 import { decodeJwtPayload } from "@/lib/qne/jwt";
+import {
+  decideAdmin,
+  type AdminDecision,
+  type AdminGate,
+  type N3UserDto,
+} from "@/lib/qne/session/role-resolution";
 
 export interface CurrentUserContext {
   token: string;
@@ -16,13 +26,17 @@ export interface CurrentUserContext {
   displayName: string;
   userCode: string | null;
   isAdministrator: boolean;
-  /** How isAdministrator was decided — for audit/debug. Never surfaced to Normal Users. */
-  adminSource:
-    | "env_allowlist"
-    | "db_allowlist"
-    | "db_bootstrap"
-    | "not_admin"
-    | "no_email";
+  adminGate: AdminGate;
+  roleNames: string[];
+  /** Structured diagnostics — never surfaced to Normal Users. */
+  diagnostics: {
+    basicInfoUserIdentifier: string | null;
+    matchedN3UserId: string | null;
+    matchedDisplayName: string | null;
+    reason: AdminDecision["reason"];
+    usersEndpointOk: boolean;
+    usersEndpointError: string | null;
+  };
 }
 
 export class UnauthorizedError extends Error {
@@ -57,40 +71,48 @@ function envAllowlist(): Set<string> {
   );
 }
 
-async function resolveAdmin(
-  tenantCode: string,
-  email: string,
-): Promise<CurrentUserContext["adminSource"]> {
-  if (!email) return "no_email";
-  const emailLc = email.toLowerCase();
-
-  if (envAllowlist().has(emailLc)) return "env_allowlist";
-
-  const { data: existing } = await supabaseAdmin
+async function isAllowlisted(tenantCode: string, email: string): Promise<boolean> {
+  const emailLc = email.trim().toLowerCase();
+  if (!emailLc) return false;
+  if (envAllowlist().has(emailLc)) return true;
+  const { data } = await supabaseAdmin
     .from("service_hub_admins")
     .select("id")
     .eq("tenant_code", tenantCode)
     .ilike("email", email)
     .maybeSingle();
-  if (existing) return "db_allowlist";
+  return !!data;
+}
 
-  // Bootstrap: if no admins exist for this tenant yet, promote the first
-  // authenticated user. This is an interim gate — see Phase 0.9 brief.
+async function tryBootstrap(tenantCode: string, email: string): Promise<boolean> {
   const { count } = await supabaseAdmin
     .from("service_hub_admins")
     .select("id", { count: "exact", head: true })
     .eq("tenant_code", tenantCode);
-  if ((count ?? 0) === 0) {
-    const { error } = await supabaseAdmin.from("service_hub_admins").insert({
-      tenant_code: tenantCode,
-      email,
-      granted_by: "bootstrap",
-      is_bootstrap: true,
-    });
-    if (!error) return "db_bootstrap";
-  }
+  if ((count ?? 0) !== 0) return false;
+  const { error } = await supabaseAdmin.from("service_hub_admins").insert({
+    tenant_code: tenantCode,
+    email,
+    granted_by: "bootstrap",
+    is_bootstrap: true,
+  });
+  return !error;
+}
 
-  return "not_admin";
+async function fetchN3Users(
+  token: string,
+): Promise<{ users: N3UserDto[] | null; error: string | null }> {
+  try {
+    const raw = await n3Get<unknown>(token, "main", "/api/Users");
+    if (Array.isArray(raw)) return { users: raw as N3UserDto[], error: null };
+    // Some envelopes may wrap {data: [...]} at the outer layer; n3Get already unwraps.
+    return { users: [], error: null };
+  } catch (err) {
+    return {
+      users: null,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 /**
@@ -110,7 +132,6 @@ export async function requireAuthenticatedN3User(
   try {
     basic = ((await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo")) ?? {}) as Record<string, unknown>;
   } catch (err) {
-    // Some tenants may 401 on BasicInfo if the token is expired — surface as 401.
     if (err instanceof Error && /401|unauth/i.test(err.message)) {
       throw new UnauthorizedError(err.message);
     }
@@ -140,21 +161,42 @@ export async function requireAuthenticatedN3User(
     );
   }
 
-  const adminSource = await resolveAdmin(tenantCode, email);
-  const isAdministrator =
-    adminSource === "env_allowlist" ||
-    adminSource === "db_allowlist" ||
-    adminSource === "db_bootstrap";
+  const { users, error: usersError } = await fetchN3Users(token);
+
+  const decision = await decideAdmin(
+    users,
+    { userCode, email },
+    {
+      isAllowlisted: (e) => isAllowlisted(tenantCode, e),
+      tryBootstrap: (e) => tryBootstrap(tenantCode, e),
+    },
+  );
+
+  // Prefer the display name N3 has on file for the matched user when
+  // BasicInfo did not surface a friendlier value.
+  const effectiveDisplayName =
+    decision.matchedDisplayName && !pick(basic, "displayName", "fullName", "userDisplayName")
+      ? decision.matchedDisplayName
+      : displayName;
 
   return {
     token,
     tenantCode,
     companyName,
     email,
-    displayName,
+    displayName: effectiveDisplayName,
     userCode,
-    isAdministrator,
-    adminSource,
+    isAdministrator: decision.isAdministrator,
+    adminGate: decision.adminGate,
+    roleNames: decision.roleNames,
+    diagnostics: {
+      basicInfoUserIdentifier: userCode || email || null,
+      matchedN3UserId: decision.matchedUserId,
+      matchedDisplayName: decision.matchedDisplayName,
+      reason: decision.reason,
+      usersEndpointOk: users !== null,
+      usersEndpointError: usersError,
+    },
   };
 }
 
