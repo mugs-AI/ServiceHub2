@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as InvoicesRouteImport } from './routes/invoices'
@@ -17,17 +18,25 @@ import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
+import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
+import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
 import { Route as ApiDiagnosticsPreviewRouteImport } from './routes/api/diagnostics/preview'
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
+import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StockRoute = StockRouteImport.update({
@@ -65,6 +74,11 @@ const AdminSnapshotsRoute = AdminSnapshotsRouteImport.update({
   path: '/admin/snapshots',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/admin/dashboard',
+  path: '/admin/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSyncStockRoute = ApiSyncStockRouteImport.update({
   id: '/api/sync/stock',
   path: '/api/sync/stock',
@@ -78,6 +92,11 @@ const ApiSyncCustomersRoute = ApiSyncCustomersRouteImport.update({
 const ApiSyncContractsRoute = ApiSyncContractsRouteImport.update({
   id: '/api/sync/contracts',
   path: '/api/sync/contracts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionMeRoute = ApiSessionMeRouteImport.update({
+  id: '/api/session/me',
+  path: '/api/session/me',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDiagnosticsPreviewRoute = ApiDiagnosticsPreviewRouteImport.update({
@@ -100,6 +119,11 @@ const ApiAuthConnectRoute = ApiAuthConnectRouteImport.update({
   path: '/api/auth/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminAllowlistRoute = ApiAdminAllowlistRouteImport.update({
+  id: '/api/admin/allowlist',
+  path: '/api/admin/allowlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -107,13 +131,17 @@ export interface FileRoutesByFullPath {
   '/invoices': typeof InvoicesRoute
   '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
+  '/support': typeof SupportRoute
   '/users': typeof UsersRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
+  '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/session/me': typeof ApiSessionMeRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -124,13 +152,17 @@ export interface FileRoutesByTo {
   '/invoices': typeof InvoicesRoute
   '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
+  '/support': typeof SupportRoute
   '/users': typeof UsersRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
+  '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/session/me': typeof ApiSessionMeRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -142,13 +174,17 @@ export interface FileRoutesById {
   '/invoices': typeof InvoicesRoute
   '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
+  '/support': typeof SupportRoute
   '/users': typeof UsersRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
+  '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/session/me': typeof ApiSessionMeRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -161,13 +197,17 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/settings'
     | '/stock'
+    | '/support'
     | '/users'
+    | '/admin/dashboard'
     | '/admin/snapshots'
     | '/api/proxy'
+    | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/session/me'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -178,13 +218,17 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/settings'
     | '/stock'
+    | '/support'
     | '/users'
+    | '/admin/dashboard'
     | '/admin/snapshots'
     | '/api/proxy'
+    | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/session/me'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -195,13 +239,17 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/settings'
     | '/stock'
+    | '/support'
     | '/users'
+    | '/admin/dashboard'
     | '/admin/snapshots'
     | '/api/proxy'
+    | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/session/me'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -213,13 +261,17 @@ export interface RootRouteChildren {
   InvoicesRoute: typeof InvoicesRoute
   SettingsRoute: typeof SettingsRoute
   StockRoute: typeof StockRoute
+  SupportRoute: typeof SupportRoute
   UsersRoute: typeof UsersRoute
+  AdminDashboardRoute: typeof AdminDashboardRoute
   AdminSnapshotsRoute: typeof AdminSnapshotsRoute
   ApiProxyRoute: typeof ApiProxyRoute
+  ApiAdminAllowlistRoute: typeof ApiAdminAllowlistRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
   ApiDiagnosticsPreviewRoute: typeof ApiDiagnosticsPreviewRoute
+  ApiSessionMeRoute: typeof ApiSessionMeRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
@@ -232,6 +284,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/stock': {
@@ -283,6 +342,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSnapshotsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sync/stock': {
       id: '/api/sync/stock'
       path: '/api/sync/stock'
@@ -302,6 +368,13 @@ declare module '@tanstack/react-router' {
       path: '/api/sync/contracts'
       fullPath: '/api/sync/contracts'
       preLoaderRoute: typeof ApiSyncContractsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/session/me': {
+      id: '/api/session/me'
+      path: '/api/session/me'
+      fullPath: '/api/session/me'
+      preLoaderRoute: typeof ApiSessionMeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/diagnostics/preview': {
@@ -332,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/allowlist': {
+      id: '/api/admin/allowlist'
+      path: '/api/admin/allowlist'
+      fullPath: '/api/admin/allowlist'
+      preLoaderRoute: typeof ApiAdminAllowlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -341,13 +421,17 @@ const rootRouteChildren: RootRouteChildren = {
   InvoicesRoute: InvoicesRoute,
   SettingsRoute: SettingsRoute,
   StockRoute: StockRoute,
+  SupportRoute: SupportRoute,
   UsersRoute: UsersRoute,
+  AdminDashboardRoute: AdminDashboardRoute,
   AdminSnapshotsRoute: AdminSnapshotsRoute,
   ApiProxyRoute: ApiProxyRoute,
+  ApiAdminAllowlistRoute: ApiAdminAllowlistRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
   ApiDiagnosticsPreviewRoute: ApiDiagnosticsPreviewRoute,
+  ApiSessionMeRoute: ApiSessionMeRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,

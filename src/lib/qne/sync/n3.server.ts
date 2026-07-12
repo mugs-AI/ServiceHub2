@@ -97,8 +97,13 @@ function normaliseBasicInfo(raw: unknown): { tenantCode: string; companyName: st
 
 /**
  * Resolve the current tenant from the authenticated N3 session.
- * NEVER trust a tenant value supplied by the browser — always fetch it
- * from BasicInfo using the presented JWT.
+ * NEVER trust a tenant value supplied by the browser.
+ *
+ * Tenant resolution order (per the N3 Development Brief):
+ *   1. BasicInfo (`/api/companyprofile/BasicInfo`) — preferred when exposed.
+ *   2. JWT payload `tenantCode` claim (display-only fallback the brief
+ *      explicitly permits). Signature is NOT verified here — N3 already
+ *      validated it upstream when the request came back with 200.
  */
 export async function resolveTenantContext(request: Request): Promise<N3TenantContext> {
   const auth = request.headers.get("authorization") ?? "";
@@ -107,9 +112,35 @@ export async function resolveTenantContext(request: Request): Promise<N3TenantCo
     throw new UnauthorizedSyncError("Missing Authorization bearer");
   }
   const token = match[1].trim();
-  const info = normaliseBasicInfo(await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo"));
+
+  let info: { tenantCode: string; companyName: string; email: string };
+  try {
+    info = normaliseBasicInfo(await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo"));
+  } catch (err) {
+    if (err instanceof Error && /401|unauth/i.test(err.message)) {
+      throw new UnauthorizedSyncError(err.message);
+    }
+    throw err;
+  }
+
+  if (!info.tenantCode || !info.email || !info.companyName) {
+    const { decodeJwtPayload } = await import("@/lib/qne/jwt");
+    const claims = decodeJwtPayload(token);
+    if (!info.tenantCode && typeof claims.tenantCode === "string") {
+      info.tenantCode = claims.tenantCode.trim();
+    }
+    if (!info.email && typeof claims.email === "string") {
+      info.email = claims.email.trim();
+    }
+    if (!info.companyName && typeof claims.company === "string") {
+      info.companyName = (claims.company as string).trim();
+    }
+  }
+
   if (!info.tenantCode) {
-    throw new UnauthorizedSyncError("N3 session did not return a tenantCode");
+    throw new UnauthorizedSyncError(
+      "Unable to resolve tenant from N3 session (BasicInfo and JWT payload both missing tenantCode)",
+    );
   }
   return { token, ...info };
 }

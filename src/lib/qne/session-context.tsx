@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { qneGet, UnauthorizedError } from "@/lib/qne/client";
+import { decodeJwtPayload } from "@/lib/qne/jwt";
 import {
   clearStoredToken,
   consumeTokenFromUrl,
@@ -14,10 +15,22 @@ export interface SessionInfo {
   email: string;
 }
 
+export interface CurrentUserInfo {
+  tenantCode: string;
+  companyName: string;
+  email: string;
+  displayName: string;
+  userCode: string | null;
+  isAdministrator: boolean;
+  adminGate: "env" | "allowlist" | "bootstrap" | "none";
+}
+
 interface SessionContextValue {
-  ready: boolean; // finished the initial token+session bootstrap
+  ready: boolean;
   token: string | null;
   session: SessionInfo | null;
+  currentUser: CurrentUserInfo | null;
+  currentUserReady: boolean;
   error: string | null;
   refresh: () => Promise<void>;
   applyToken: (token: string, session?: Partial<SessionInfo>) => Promise<void>;
@@ -26,11 +39,7 @@ interface SessionContextValue {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-/**
- * The BasicInfo payload uses a few possible field spellings depending on
- * the N3 tenant configuration; normalise them into a single shape.
- */
-function normaliseBasicInfo(raw: unknown): SessionInfo {
+function normaliseBasicInfo(raw: unknown, token: string | null): SessionInfo {
   const r = (raw ?? {}) as Record<string, unknown>;
   const pick = (...keys: string[]): string => {
     for (const k of keys) {
@@ -39,37 +48,70 @@ function normaliseBasicInfo(raw: unknown): SessionInfo {
     }
     return "";
   };
+  const claims = decodeJwtPayload(token);
+  const claim = (k: keyof typeof claims): string => {
+    const v = claims[k];
+    return typeof v === "string" ? v.trim() : "";
+  };
   return {
-    companyName: pick("companyName", "company", "name", "companyDisplayName"),
-    tenantCode: pick("tenantCode", "tenant", "tenantId", "code"),
-    email: pick("email", "userEmail", "loginEmail", "userName"),
+    companyName:
+      pick("companyName", "company", "name", "companyDisplayName") ||
+      (typeof claims.company === "string" ? (claims.company as string).trim() : ""),
+    tenantCode:
+      pick("tenantCode", "tenant", "tenantId", "code") || claim("tenantCode"),
+    email:
+      pick("email", "userEmail", "loginEmail", "userName") || claim("email"),
   };
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [session, setSession] = useState<SessionInfo | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
+  const [currentUserReady, setCurrentUserReady] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadSession = async () => {
+  const loadCurrentUser = useCallback(async (tok: string) => {
+    setCurrentUserReady(false);
+    try {
+      const res = await fetch("/api/session/me", {
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      if (res.ok) {
+        setCurrentUser((await res.json()) as CurrentUserInfo);
+      } else {
+        setCurrentUser(null);
+      }
+    } catch {
+      setCurrentUser(null);
+    } finally {
+      setCurrentUserReady(true);
+    }
+  }, []);
+
+  const loadSession = useCallback(async () => {
     setError(null);
+    const activeToken = getStoredToken();
     try {
       const raw = await qneGet<unknown>("main", "/api/companyprofile/BasicInfo");
-      setSession(normaliseBasicInfo(raw));
+      setSession(normaliseBasicInfo(raw, activeToken));
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         setToken(null);
         setSession(null);
+        setCurrentUser(null);
+        setCurrentUserReady(true);
         return;
       }
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
-      setSession(null);
+      // Even if BasicInfo failed, we can still derive display fields from JWT.
+      setSession(normaliseBasicInfo({}, activeToken));
     }
-  };
+    if (activeToken) await loadCurrentUser(activeToken);
+  }, [loadCurrentUser]);
 
-  // Initial bootstrap: consume ?token=, else use localStorage, else stay unauthenticated.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -78,20 +120,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (stored) {
         setToken(stored);
         await loadSession();
+      } else {
+        setCurrentUserReady(true);
       }
       if (!cancelled) setReady(true);
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadSession]);
 
-  // Global 401 handler dispatched from the HTTP client.
   useEffect(() => {
     const onUnauthorized = () => {
       setToken(null);
       setSession(null);
+      setCurrentUser(null);
+      setCurrentUserReady(true);
     };
     window.addEventListener("qne:unauthorized", onUnauthorized);
     return () => window.removeEventListener("qne:unauthorized", onUnauthorized);
@@ -102,6 +146,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ready,
       token,
       session,
+      currentUser,
+      currentUserReady,
       error,
       refresh: loadSession,
       applyToken: async (newToken, hint) => {
@@ -114,16 +160,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             email: hint.email ?? "",
           });
         }
-        // Always re-fetch from N3 so the session header is authoritative.
         await loadSession();
       },
       signOut: () => {
         clearStoredToken();
         setToken(null);
         setSession(null);
+        setCurrentUser(null);
+        setCurrentUserReady(true);
       },
     }),
-    [ready, token, session, error],
+    [ready, token, session, currentUser, currentUserReady, error, loadSession],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
