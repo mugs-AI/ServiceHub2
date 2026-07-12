@@ -1,11 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 
+import { AdminOnly } from "@/components/qne/AdminOnly";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 
 export const Route = createFileRoute("/admin/snapshots")({
-  component: AdminSnapshots,
+  component: () => (
+    <AdminOnly>
+      <AdminSnapshots />
+    </AdminOnly>
+  ),
 });
 
 type SnapshotKind = "customers" | "stock" | "contracts";

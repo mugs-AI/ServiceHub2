@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { AdminOnly } from "@/components/qne/AdminOnly";
 import { qneGetList } from "@/lib/qne/client";
 import { useSession } from "@/lib/qne/session-context";
+import { getStoredToken } from "@/lib/qne/tokens";
 import {
   loadStockMap,
   setMapping,
@@ -11,7 +13,11 @@ import {
 } from "@/lib/qne/stock-map";
 
 export const Route = createFileRoute("/settings")({
-  component: Settings,
+  component: () => (
+    <AdminOnly>
+      <Settings />
+    </AdminOnly>
+  ),
 });
 
 interface Stock {
