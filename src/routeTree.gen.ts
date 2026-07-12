@@ -20,6 +20,7 @@ import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
+import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 
 const UsersRoute = UsersRouteImport.update({
@@ -77,6 +78,11 @@ const ApiDiagnosticsHealthRoute = ApiDiagnosticsHealthRouteImport.update({
   path: '/api/diagnostics/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDiagnosticsTypeRoute = ApiDiagnosticsTypeRouteImport.update({
+  id: '/api/diagnostics/$type',
+  path: '/api/diagnostics/$type',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthConnectRoute = ApiAuthConnectRouteImport.update({
   id: '/api/auth/connect',
   path: '/api/auth/connect',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/sync/contracts'
     | '/api/sync/customers'
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/sync/contracts'
     | '/api/sync/customers'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/sync/contracts'
     | '/api/sync/customers'
@@ -180,6 +192,7 @@ export interface RootRouteChildren {
   UsersRoute: typeof UsersRoute
   ApiProxyRoute: typeof ApiProxyRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
+  ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
@@ -265,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDiagnosticsHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/diagnostics/$type': {
+      id: '/api/diagnostics/$type'
+      path: '/api/diagnostics/$type'
+      fullPath: '/api/diagnostics/$type'
+      preLoaderRoute: typeof ApiDiagnosticsTypeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/connect': {
       id: '/api/auth/connect'
       path: '/api/auth/connect'
@@ -284,6 +304,7 @@ const rootRouteChildren: RootRouteChildren = {
   UsersRoute: UsersRoute,
   ApiProxyRoute: ApiProxyRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
+  ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
