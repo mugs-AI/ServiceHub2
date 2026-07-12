@@ -15,21 +15,30 @@ export interface SessionInfo {
   email: string;
 }
 
+export type CurrentUserReason =
+  | "matched_administrators_role"
+  | "matched_without_administrators_role"
+  | "role_data_missing"
+  | "no_matching_user"
+  | "users_endpoint_failed"
+  | "users_endpoint_unauthorized"
+  | "users_endpoint_forbidden"
+  | "no_email"
+  | "allowlist_fallback"
+  | "bootstrap_fallback";
+
 export interface CurrentUserDiagnostics {
   basicInfoUserIdentifier: string | null;
   matchedN3UserId: string | null;
   matchedDisplayName: string | null;
-  reason:
-    | "role_administrators"
-    | "allowlist"
-    | "bootstrap"
-    | "no_email"
-    | "users_unavailable"
-    | "no_match"
-    | "no_roles"
-    | "not_admin";
-  usersEndpointOk: boolean;
-  usersEndpointError: string | null;
+  reason: CurrentUserReason;
+  usersEndpoint: {
+    status: "ok" | "failed" | "unauthorized" | "forbidden";
+    httpStatus: number | null;
+    shape: string;
+    count: number;
+    error: string | null;
+  };
 }
 
 export interface CurrentUserInfo {

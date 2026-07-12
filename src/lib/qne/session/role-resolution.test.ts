@@ -5,6 +5,7 @@ import {
   matchCurrentUser,
   normaliseEmail,
   type N3UserDto,
+  type UsersLoad,
 } from "./role-resolution";
 
 const jonas: N3UserDto = {
@@ -44,6 +45,7 @@ const support: N3UserDto = {
 };
 
 const neverAllow = { isAllowlisted: () => false, tryBootstrap: () => false };
+const ok = (users: N3UserDto[]): UsersLoad => ({ users, status: "ok" });
 
 describe("email normalisation & matching", () => {
   it("matches lowercase BasicInfo email to uppercase N3 username", () => {
@@ -76,45 +78,45 @@ describe("hasAdministratorRole", () => {
 
 describe("decideAdmin", () => {
   it("returns n3_role for exact Administrators role", async () => {
-    const d = await decideAdmin([jonas, support], { email: "LKS.MUGS@GMAIL.COM" }, neverAllow);
+    const d = await decideAdmin(ok([jonas, support]), { email: "LKS.MUGS@GMAIL.COM" }, neverAllow);
     expect(d).toMatchObject({
       isAdministrator: true,
       adminGate: "n3_role",
       matchedUserId: "u-jonas",
       matchedDisplayName: "JONAS",
+      reason: "matched_administrators_role",
     });
     expect(d.roleNames).toContain("Administrators");
   });
   it("returns none for Billing Administrators only", async () => {
-    const d = await decideAdmin([billing], { email: "billing@acme.co" }, neverAllow);
+    const d = await decideAdmin(ok([billing]), { email: "billing@acme.co" }, neverAllow);
     expect(d.isAdministrator).toBe(false);
     expect(d.adminGate).toBe("none");
-    expect(d.reason).toBe("not_admin");
+    expect(d.reason).toBe("matched_without_administrators_role");
   });
   it("returns none for Co-Administrators only", async () => {
-    const d = await decideAdmin([coAdmin], { email: "co@acme.co" }, neverAllow);
+    const d = await decideAdmin(ok([coAdmin]), { email: "co@acme.co" }, neverAllow);
     expect(d.isAdministrator).toBe(false);
     expect(d.adminGate).toBe("none");
   });
-  it("falls back to allowlist when /api/Users is unavailable", async () => {
+  it("falls back to allowlist when /api/Users failed", async () => {
     const d = await decideAdmin(
-      null,
+      { users: null, status: "failed" },
       { email: "someone@acme.co" },
       { isAllowlisted: (e) => e.toLowerCase() === "someone@acme.co" },
     );
     expect(d.adminGate).toBe("allowlist");
     expect(d.isAdministrator).toBe(true);
+    expect(d.reason).toBe("allowlist_fallback");
   });
   it("allowlist matching is case-insensitive", async () => {
     const seen: string[] = [];
     const d = await decideAdmin(
-      [],
+      ok([]),
       { email: "MiXeD@Acme.CO" },
       { isAllowlisted: (e) => { seen.push(e); return true; } },
     );
     expect(d.isAdministrator).toBe(true);
-    // helper receives the original email; case-insensitive comparison is the
-    // caller's responsibility — verify the allowlist implementation lowercases.
     expect(seen[0]).toBe("MiXeD@Acme.CO");
   });
   it("handles multiple roles correctly", async () => {
@@ -123,14 +125,19 @@ describe("decideAdmin", () => {
       email: "m@x.co",
       roles: [{ name: "Accountant" }, { name: "Owner" }, { name: "Administrators" }],
     };
-    const d = await decideAdmin([multi], { email: "m@x.co" }, neverAllow);
+    const d = await decideAdmin(ok([multi]), { email: "m@x.co" }, neverAllow);
     expect(d.isAdministrator).toBe(true);
     expect(d.adminGate).toBe("n3_role");
     expect(d.roleNames).toEqual(["Accountant", "Owner", "Administrators"]);
   });
-  it("returns users_unavailable reason when /api/Users failed and no fallback", async () => {
-    const d = await decideAdmin(null, { email: "x@y.co" }, neverAllow);
+  it("returns users_endpoint_unauthorized when endpoint 401s and no fallback", async () => {
+    const d = await decideAdmin({ users: null, status: "unauthorized" }, { email: "x@y.co" }, neverAllow);
     expect(d.isAdministrator).toBe(false);
-    expect(d.reason).toBe("users_unavailable");
+    expect(d.reason).toBe("users_endpoint_unauthorized");
+  });
+  it("returns users_endpoint_failed when endpoint errors and no fallback", async () => {
+    const d = await decideAdmin({ users: null, status: "failed" }, { email: "x@y.co" }, neverAllow);
+    expect(d.isAdministrator).toBe(false);
+    expect(d.reason).toBe("users_endpoint_failed");
   });
 });

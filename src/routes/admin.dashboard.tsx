@@ -161,15 +161,23 @@ function RoleDiagnostics() {
     none: "Not an administrator",
   };
   const reasonLabel: Record<string, string> = {
-    role_administrators: "Matched N3 user has the Administrators role",
-    allowlist: "Present on tenant allowlist",
-    bootstrap: "First user promoted for this tenant",
+    matched_administrators_role: "Matched N3 user has the Administrators role",
+    matched_without_administrators_role: "Matched N3 user does not have the Administrators role",
+    role_data_missing: "Matched N3 user has no roles attached",
+    no_matching_user: "No matching N3 user in /api/Users",
+    users_endpoint_failed: "/api/Users request failed",
+    users_endpoint_unauthorized: "/api/Users returned 401 Unauthorized",
+    users_endpoint_forbidden: "/api/Users returned 403 Forbidden",
     no_email: "BasicInfo user identifier missing",
-    users_unavailable: "/api/Users unavailable",
-    no_match: "No matching N3 user found",
-    no_roles: "Matched N3 user has no roles attached",
-    not_admin: "Administrators role not attached",
+    allowlist_fallback: "Granted via tenant allowlist (fallback)",
+    bootstrap_fallback: "Granted as first user of this tenant (bootstrap)",
   };
+  const ep = d?.usersEndpoint;
+  const endpointText = ep
+    ? ep.status === "ok"
+      ? `ok — ${ep.count} users (${ep.shape})`
+      : `${ep.status}${ep.httpStatus ? ` (${ep.httpStatus})` : ""} — ${ep.error ?? "unknown"}`
+    : "—";
   return (
     <div className="rounded-xl border bg-card p-4 text-xs shadow-sm">
       <dl className="grid gap-2 sm:grid-cols-2">
@@ -185,11 +193,8 @@ function RoleDiagnostics() {
           v={currentUser?.isAdministrator ? "true" : "false"}
         />
         <Row k="Admin gate" v={gateLabel[currentUser?.adminGate ?? "none"]} />
-        <Row k="Reason" v={reasonLabel[d?.reason ?? "not_admin"]} />
-        <Row
-          k="/api/Users reachable"
-          v={d ? (d.usersEndpointOk ? "yes" : `no — ${d.usersEndpointError ?? "unknown error"}`) : "—"}
-        />
+        <Row k="Reason" v={reasonLabel[d?.reason ?? "no_matching_user"] ?? d?.reason ?? "—"} />
+        <Row k="/api/Users" v={endpointText} />
       </dl>
     </div>
   );
