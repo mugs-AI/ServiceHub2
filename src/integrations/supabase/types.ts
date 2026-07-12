@@ -224,6 +224,54 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_sync_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          failed_count: number
+          id: string
+          inserted_count: number
+          skipped_count: number
+          snapshot_type: string
+          started_at: string
+          status: string
+          tenant_code: string
+          updated_count: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          failed_count?: number
+          id?: string
+          inserted_count?: number
+          skipped_count?: number
+          snapshot_type: string
+          started_at?: string
+          status?: string
+          tenant_code: string
+          updated_count?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          failed_count?: number
+          id?: string
+          inserted_count?: number
+          skipped_count?: number
+          snapshot_type?: string
+          started_at?: string
+          status?: string
+          tenant_code?: string
+          updated_count?: number
+        }
+        Relationships: []
+      }
       stock_snapshots: {
         Row: {
           created_at: string
