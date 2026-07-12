@@ -15,14 +15,33 @@ export interface SessionInfo {
   email: string;
 }
 
+export interface CurrentUserDiagnostics {
+  basicInfoUserIdentifier: string | null;
+  matchedN3UserId: string | null;
+  matchedDisplayName: string | null;
+  reason:
+    | "role_administrators"
+    | "allowlist"
+    | "bootstrap"
+    | "no_email"
+    | "users_unavailable"
+    | "no_match"
+    | "no_roles"
+    | "not_admin";
+  usersEndpointOk: boolean;
+  usersEndpointError: string | null;
+}
+
 export interface CurrentUserInfo {
   tenantCode: string;
   companyName: string;
   email: string;
   displayName: string;
   userCode: string | null;
+  roleNames: string[];
   isAdministrator: boolean;
-  adminGate: "env" | "allowlist" | "bootstrap" | "none";
+  adminGate: "n3_role" | "allowlist" | "bootstrap" | "none";
+  diagnostics: CurrentUserDiagnostics | null;
 }
 
 interface SessionContextValue {

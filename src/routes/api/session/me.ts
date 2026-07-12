@@ -1,6 +1,8 @@
 // GET /api/session/me — resolves the authenticated N3 user server-side.
-// Returns tenantCode, display name, email, and isAdministrator for the shell.
-// Never trusts browser-supplied values.
+// Returns tenantCode, display name, email, role names and isAdministrator
+// (resolved from official N3 /api/Users role attachments, with the
+// tenant-scoped ServiceHub allowlist as a secure fallback).
+// Diagnostics fields are Administrator-only.
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -19,16 +21,11 @@ export const Route = createFileRoute("/api/session/me")({
             email: user.email,
             displayName: user.displayName,
             userCode: user.userCode,
+            roleNames: user.roleNames,
             isAdministrator: user.isAdministrator,
-            // Only expose the general source label; never expose env values.
-            adminGate:
-              user.adminSource === "env_allowlist"
-                ? "env"
-                : user.adminSource === "db_allowlist"
-                  ? "allowlist"
-                  : user.adminSource === "db_bootstrap"
-                    ? "bootstrap"
-                    : "none",
+            adminGate: user.adminGate,
+            // Diagnostics are only exposed to administrators.
+            diagnostics: user.isAdministrator ? user.diagnostics : null,
           });
         } catch (err) {
           const resp = guardResponse(err);

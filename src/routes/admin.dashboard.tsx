@@ -138,11 +138,70 @@ function AdminDashboard() {
         </div>
       </Section>
 
+      <Section title="Role diagnostics">
+        <RoleDiagnostics />
+      </Section>
+
       <p className="rounded-lg border bg-card px-4 py-3 text-xs text-muted-foreground shadow-sm">
         Full operational KPIs, approvals and reports arrive with Phase 1
         business modules. System-health tiles are already live and read from
         this tenant's diagnostics API.
       </p>
+    </div>
+  );
+}
+
+function RoleDiagnostics() {
+  const { currentUser } = useSession();
+  const d = currentUser?.diagnostics;
+  const gateLabel: Record<string, string> = {
+    n3_role: "Official N3 Administrators role",
+    allowlist: "Tenant-scoped ServiceHub allowlist (fallback)",
+    bootstrap: "First-user bootstrap (fallback)",
+    none: "Not an administrator",
+  };
+  const reasonLabel: Record<string, string> = {
+    role_administrators: "Matched N3 user has the Administrators role",
+    allowlist: "Present on tenant allowlist",
+    bootstrap: "First user promoted for this tenant",
+    no_email: "BasicInfo user identifier missing",
+    users_unavailable: "/api/Users unavailable",
+    no_match: "No matching N3 user found",
+    no_roles: "Matched N3 user has no roles attached",
+    not_admin: "Administrators role not attached",
+  };
+  return (
+    <div className="rounded-xl border bg-card p-4 text-xs shadow-sm">
+      <dl className="grid gap-2 sm:grid-cols-2">
+        <Row k="BasicInfo identifier" v={d?.basicInfoUserIdentifier ?? "—"} />
+        <Row k="Matched N3 user id" v={d?.matchedN3UserId ?? "—"} />
+        <Row k="Matched display name" v={d?.matchedDisplayName ?? "—"} />
+        <Row
+          k="Role names"
+          v={currentUser?.roleNames?.length ? currentUser.roleNames.join(", ") : "—"}
+        />
+        <Row
+          k="isAdministrator"
+          v={currentUser?.isAdministrator ? "true" : "false"}
+        />
+        <Row k="Admin gate" v={gateLabel[currentUser?.adminGate ?? "none"]} />
+        <Row k="Reason" v={reasonLabel[d?.reason ?? "not_admin"]} />
+        <Row
+          k="/api/Users reachable"
+          v={d ? (d.usersEndpointOk ? "yes" : `no — ${d.usersEndpointError ?? "unknown error"}`) : "—"}
+        />
+      </dl>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {k}
+      </dt>
+      <dd className="mt-0.5 break-words text-foreground">{v}</dd>
     </div>
   );
 }
