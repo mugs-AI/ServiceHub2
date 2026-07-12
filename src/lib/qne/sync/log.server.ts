@@ -1,6 +1,8 @@
 // snapshot_sync_logs helpers. Server-only.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { updateHealthFromSync } from "./health.server";
+
 
 export type SnapshotType = "customer" | "stock" | "contract";
 export type SyncStatus = "success" | "partial" | "failed";
