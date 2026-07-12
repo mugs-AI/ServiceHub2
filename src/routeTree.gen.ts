@@ -19,6 +19,7 @@ import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
+import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 
 const UsersRoute = UsersRouteImport.update({
@@ -71,6 +72,11 @@ const ApiSyncContractsRoute = ApiSyncContractsRouteImport.update({
   path: '/api/sync/contracts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDiagnosticsHealthRoute = ApiDiagnosticsHealthRouteImport.update({
+  id: '/api/diagnostics/health',
+  path: '/api/diagnostics/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthConnectRoute = ApiAuthConnectRouteImport.update({
   id: '/api/auth/connect',
   path: '/api/auth/connect',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/users': typeof UsersRoute
   '/api/proxy': typeof ApiProxyRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/diagnostics/health'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/diagnostics/health'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/api/proxy'
     | '/api/auth/connect'
+    | '/api/diagnostics/health'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -168,6 +180,7 @@ export interface RootRouteChildren {
   UsersRoute: typeof UsersRoute
   ApiProxyRoute: typeof ApiProxyRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
+  ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSyncContractsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/diagnostics/health': {
+      id: '/api/diagnostics/health'
+      path: '/api/diagnostics/health'
+      fullPath: '/api/diagnostics/health'
+      preLoaderRoute: typeof ApiDiagnosticsHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/connect': {
       id: '/api/auth/connect'
       path: '/api/auth/connect'
@@ -264,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   UsersRoute: UsersRoute,
   ApiProxyRoute: ApiProxyRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
+  ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
