@@ -224,6 +224,63 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_health: {
+        Row: {
+          calculation_errors: number
+          created_at: string
+          error_message: string | null
+          health_status: string
+          id: string
+          last_attempt: string | null
+          last_successful_sync: string | null
+          records_failed: number
+          records_inserted: number
+          records_total: number
+          records_updated: number
+          snapshot_type: string
+          stale_records: number
+          tenant_code: string
+          updated_at: string
+          warning_message: string | null
+        }
+        Insert: {
+          calculation_errors?: number
+          created_at?: string
+          error_message?: string | null
+          health_status?: string
+          id?: string
+          last_attempt?: string | null
+          last_successful_sync?: string | null
+          records_failed?: number
+          records_inserted?: number
+          records_total?: number
+          records_updated?: number
+          snapshot_type: string
+          stale_records?: number
+          tenant_code: string
+          updated_at?: string
+          warning_message?: string | null
+        }
+        Update: {
+          calculation_errors?: number
+          created_at?: string
+          error_message?: string | null
+          health_status?: string
+          id?: string
+          last_attempt?: string | null
+          last_successful_sync?: string | null
+          records_failed?: number
+          records_inserted?: number
+          records_total?: number
+          records_updated?: number
+          snapshot_type?: string
+          stale_records?: number
+          tenant_code?: string
+          updated_at?: string
+          warning_message?: string | null
+        }
+        Relationships: []
+      }
       snapshot_sync_logs: {
         Row: {
           completed_at: string | null
