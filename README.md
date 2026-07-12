@@ -14,9 +14,13 @@ delivery orders and N3 users through a same-origin backend proxy.
   Base URLs live in server-side env vars only and never ship to the
   browser bundle. This is functionally equivalent to the "Node + Express
   proxy" pattern from the N3 development brief.
-- **Persistence** (Phase 1): stock-code mappings are stored in
-  `localStorage` keyed by N3 `tenantCode`. Phase 2 will migrate this
-  to Lovable Cloud with per-tenant RLS.
+- **Persistence**: Lovable Cloud (Postgres) hosts tenant-scoped snapshot
+  tables (`customer_snapshots`, `stock_snapshots`,
+  `customer_contract_snapshots`, `renewal_stock_mappings`,
+  `general_settings`, `notifications`, `snapshot_sync_logs`,
+  `snapshot_health`). All rows carry `tenant_code`; RLS is deny-default
+  and every read/write goes through server routes that resolve the
+  tenant from the authenticated N3 session.
 
 ## Environment (server-side only)
 
