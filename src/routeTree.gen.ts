@@ -20,6 +20,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
+import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspace/customers'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
@@ -83,6 +84,11 @@ const AdminSnapshotsRoute = AdminSnapshotsRouteImport.update({
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/admin/dashboard',
   path: '/admin/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkspaceCustomersRoute = ApiWorkspaceCustomersRouteImport.update({
+  id: '/api/workspace/customers',
+  path: '/api/workspace/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSyncStockRoute = ApiSyncStockRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
+  '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
+  '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
+  '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
+    | '/api/workspace/customers'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
+    | '/api/workspace/customers'
   id:
     | '__root__'
     | '/'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
+    | '/api/workspace/customers'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -288,6 +300,7 @@ export interface RootRouteChildren {
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
+  ApiWorkspaceCustomersRoute: typeof ApiWorkspaceCustomersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -367,6 +380,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/dashboard'
       fullPath: '/admin/dashboard'
       preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/customers': {
+      id: '/api/workspace/customers'
+      path: '/api/workspace/customers'
+      fullPath: '/api/workspace/customers'
+      preLoaderRoute: typeof ApiWorkspaceCustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sync/stock': {
@@ -456,6 +476,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
+  ApiWorkspaceCustomersRoute: ApiWorkspaceCustomersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
