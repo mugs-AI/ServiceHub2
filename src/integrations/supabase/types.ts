@@ -224,6 +224,48 @@ export type Database = {
         }
         Relationships: []
       }
+      report_access_rules: {
+        Row: {
+          allow_excel: boolean
+          allow_print: boolean
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          report_code: string
+          report_name: string
+          tenant_code: string
+          updated_at: string
+          visible_to_normal_users: boolean
+        }
+        Insert: {
+          allow_excel?: boolean
+          allow_print?: boolean
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          report_code: string
+          report_name: string
+          tenant_code: string
+          updated_at?: string
+          visible_to_normal_users?: boolean
+        }
+        Update: {
+          allow_excel?: boolean
+          allow_print?: boolean
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          report_code?: string
+          report_name?: string
+          tenant_code?: string
+          updated_at?: string
+          visible_to_normal_users?: boolean
+        }
+        Relationships: []
+      }
       service_hub_admins: {
         Row: {
           created_at: string
