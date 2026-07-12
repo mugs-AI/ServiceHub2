@@ -232,7 +232,10 @@ export async function syncContractSnapshots(
     // 6. Upsert in batches.
     const BATCH = 200;
     for (let i = 0; i < toUpsert.length; i += BATCH) {
-      const chunk = toUpsert.slice(i, i + BATCH);
+      const chunk = toUpsert.slice(i, i + BATCH) as unknown as Array<{
+        tenant_code: string;
+        customer_code: string;
+      }>;
       const { error } = await supabaseAdmin
         .from("customer_contract_snapshots")
         .upsert(chunk, { onConflict: "tenant_code,customer_code" });
