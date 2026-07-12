@@ -167,21 +167,21 @@ function HealthCard({
   row?: HealthRow;
   loading: boolean;
 }) {
-  const status = row?.status ?? "unknown";
+  const status = row?.health_status ?? "Unknown";
   const tone =
-    status === "healthy"
+    status === "Healthy"
       ? "bg-emerald-100 text-emerald-800 ring-emerald-200"
-      : status === "warning"
+      : status === "Warning"
         ? "bg-amber-100 text-amber-800 ring-amber-200"
-        : status === "error"
+        : status === "Error"
           ? "bg-red-100 text-red-800 ring-red-200"
           : "bg-muted text-muted-foreground ring-border";
   const dot =
-    status === "healthy"
+    status === "Healthy"
       ? "bg-emerald-500"
-      : status === "warning"
+      : status === "Warning"
         ? "bg-amber-500"
-        : status === "error"
+        : status === "Error"
           ? "bg-red-500"
           : "bg-muted-foreground/60";
   return (
@@ -197,17 +197,18 @@ function HealthCard({
       </div>
       <div className="mt-2 text-xs text-muted-foreground">
         Last success:{" "}
-        {row?.last_success_at
-          ? new Date(row.last_success_at).toLocaleString()
+        {row?.last_successful_sync
+          ? new Date(row.last_successful_sync).toLocaleString()
           : "—"}
       </div>
-      {row?.last_error && (
+      {row?.error_message && (
         <div className="mt-1 line-clamp-2 text-xs text-red-700">
-          {row.last_error}
+          {row.error_message}
         </div>
       )}
     </div>
   );
+
 }
 
 function QuickLink({ to, label, primary }: { to: string; label: string; primary?: boolean }) {
