@@ -5,17 +5,21 @@
 //
 // Administrator status is resolved from the official N3 /api/Users role
 // attachments (see role-resolution.ts). The tenant-scoped ServiceHub
-// allowlist (service_hub_admins) remains only as a secure fallback when
-// official N3 role data cannot be obtained.
+// allowlist (service_hub_admins) remains only as a secure fallback.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { buildN3Url } from "@/lib/qne/server-config";
+import { unwrapApiResponse } from "@/lib/qne/envelope";
 import { n3Get } from "@/lib/qne/sync/n3.server";
 import { decodeJwtPayload } from "@/lib/qne/jwt";
 import {
   decideAdmin,
   type AdminDecision,
+  type AdminDecisionReason,
   type AdminGate,
   type N3UserDto,
+  type UsersEndpointStatus,
+  type UsersLoad,
 } from "@/lib/qne/session/role-resolution";
 
 export interface CurrentUserContext {
@@ -34,8 +38,13 @@ export interface CurrentUserContext {
     matchedN3UserId: string | null;
     matchedDisplayName: string | null;
     reason: AdminDecision["reason"];
-    usersEndpointOk: boolean;
-    usersEndpointError: string | null;
+    usersEndpoint: {
+      status: UsersEndpointStatus;
+      httpStatus: number | null;
+      shape: string;
+      count: number;
+      error: string | null;
+    };
   };
 }
 
@@ -99,20 +108,119 @@ async function tryBootstrap(tenantCode: string, email: string): Promise<boolean>
   return !error;
 }
 
-async function fetchN3Users(
-  token: string,
-): Promise<{ users: N3UserDto[] | null; error: string | null }> {
+/**
+ * Fetch /api/Users through the same-origin path (direct upstream call from
+ * the server). Accepts multiple response shapes documented in the OpenAPI:
+ *   { code, message, data: UserDto[] }
+ *   { code, message, data: { value: UserDto[], count } }   // paged
+ *   { code, message, data: { data: UserDto[] } }           // occasional wrap
+ * Records structured diagnostics so a stuck resolution is never silent.
+ */
+async function fetchN3Users(token: string): Promise<UsersLoad & {
+  httpStatus: number | null;
+  shape: string;
+  count: number;
+  error: string | null;
+}> {
+  const url = buildN3Url("main", "/api/Users");
+  let res: Response;
   try {
-    const raw = await n3Get<unknown>(token, "main", "/api/Users");
-    if (Array.isArray(raw)) return { users: raw as N3UserDto[], error: null };
-    // Some envelopes may wrap {data: [...]} at the outer layer; n3Get already unwraps.
-    return { users: [], error: null };
+    res = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
   } catch (err) {
     return {
       users: null,
+      status: "failed",
+      httpStatus: null,
+      shape: "network_error",
+      count: 0,
       error: err instanceof Error ? err.message : String(err),
     };
   }
+
+  const text = await res.text();
+  if (!res.ok) {
+    const status: UsersEndpointStatus =
+      res.status === 401 ? "unauthorized" : res.status === 403 ? "forbidden" : "failed";
+    return {
+      users: null,
+      status,
+      httpStatus: res.status,
+      shape: "http_error",
+      count: 0,
+      error: text.slice(0, 300),
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch (err) {
+    return {
+      users: null,
+      status: "failed",
+      httpStatus: res.status,
+      shape: "invalid_json",
+      count: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  let data: unknown = parsed;
+  try {
+    data = unwrapApiResponse(parsed as { code: string; data: unknown });
+  } catch (err) {
+    return {
+      users: null,
+      status: "failed",
+      httpStatus: res.status,
+      shape: "envelope_error",
+      count: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  // Accept: array, {value: []}, {items: []}, {data: []}.
+  let users: N3UserDto[] | null = null;
+  let shape = "unknown";
+  if (Array.isArray(data)) {
+    users = data as N3UserDto[];
+    shape = "array";
+  } else if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    if (Array.isArray(o.value)) {
+      users = o.value as N3UserDto[];
+      shape = "paged_value";
+    } else if (Array.isArray(o.items)) {
+      users = o.items as N3UserDto[];
+      shape = "items";
+    } else if (Array.isArray(o.data)) {
+      users = o.data as N3UserDto[];
+      shape = "wrapped_data";
+    }
+  }
+
+  if (!users) {
+    return {
+      users: null,
+      status: "failed",
+      httpStatus: res.status,
+      shape: `unrecognised:${shape}`,
+      count: 0,
+      error: "Unable to locate user array in /api/Users response",
+    };
+  }
+
+  return {
+    users,
+    status: "ok",
+    httpStatus: res.status,
+    shape,
+    count: users.length,
+    error: null,
+  };
 }
 
 /**
@@ -161,10 +269,10 @@ export async function requireAuthenticatedN3User(
     );
   }
 
-  const { users, error: usersError } = await fetchN3Users(token);
+  const load = await fetchN3Users(token);
 
   const decision = await decideAdmin(
-    users,
+    { users: load.users, status: load.status },
     { userCode, email },
     {
       isAllowlisted: (e) => isAllowlisted(tenantCode, e),
@@ -172,8 +280,7 @@ export async function requireAuthenticatedN3User(
     },
   );
 
-  // Prefer the display name N3 has on file for the matched user when
-  // BasicInfo did not surface a friendlier value.
+  // Prefer the display name N3 has on file when BasicInfo didn't surface one.
   const effectiveDisplayName =
     decision.matchedDisplayName && !pick(basic, "displayName", "fullName", "userDisplayName")
       ? decision.matchedDisplayName
@@ -193,9 +300,14 @@ export async function requireAuthenticatedN3User(
       basicInfoUserIdentifier: userCode || email || null,
       matchedN3UserId: decision.matchedUserId,
       matchedDisplayName: decision.matchedDisplayName,
-      reason: decision.reason,
-      usersEndpointOk: users !== null,
-      usersEndpointError: usersError,
+      reason: decision.reason satisfies AdminDecisionReason,
+      usersEndpoint: {
+        status: load.status,
+        httpStatus: load.httpStatus,
+        shape: load.shape,
+        count: load.count,
+        error: load.error,
+      },
     },
   };
 }
