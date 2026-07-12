@@ -19,6 +19,7 @@ import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
+import { Route as ApiDiagnosticsPreviewRouteImport } from './routes/api/diagnostics/preview'
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
@@ -73,6 +74,11 @@ const ApiSyncContractsRoute = ApiSyncContractsRouteImport.update({
   path: '/api/sync/contracts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDiagnosticsPreviewRoute = ApiDiagnosticsPreviewRouteImport.update({
+  id: '/api/diagnostics/preview',
+  path: '/api/diagnostics/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDiagnosticsHealthRoute = ApiDiagnosticsHealthRouteImport.update({
   id: '/api/diagnostics/health',
   path: '/api/diagnostics/health',
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
+  '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
+  '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
+  '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
@@ -148,6 +157,7 @@ export interface FileRouteTypes {
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
+    | '/api/diagnostics/preview'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
+    | '/api/diagnostics/preview'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -178,6 +189,7 @@ export interface FileRouteTypes {
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
+    | '/api/diagnostics/preview'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
@@ -194,6 +206,7 @@ export interface RootRouteChildren {
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
+  ApiDiagnosticsPreviewRoute: typeof ApiDiagnosticsPreviewRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSyncContractsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/diagnostics/preview': {
+      id: '/api/diagnostics/preview'
+      path: '/api/diagnostics/preview'
+      fullPath: '/api/diagnostics/preview'
+      preLoaderRoute: typeof ApiDiagnosticsPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/diagnostics/health': {
       id: '/api/diagnostics/health'
       path: '/api/diagnostics/health'
@@ -306,6 +326,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthConnectRoute: ApiAuthConnectRoute,
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
+  ApiDiagnosticsPreviewRoute: ApiDiagnosticsPreviewRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
@@ -313,13 +334,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
