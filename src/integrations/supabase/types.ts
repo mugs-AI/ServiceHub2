@@ -14,7 +14,252 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      customer_contract_snapshots: {
+        Row: {
+          calculation_error: string | null
+          contract_days: number | null
+          contract_start_date: string | null
+          contract_status: string
+          created_at: string
+          customer_code: string
+          expiry_date: string | null
+          id: string
+          is_stale: boolean
+          last_calculated_at: string | null
+          latest_document_date: string | null
+          latest_document_no: string | null
+          latest_document_type: string | null
+          remaining_days: number | null
+          renewal_stock_code: string | null
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          calculation_error?: string | null
+          contract_days?: number | null
+          contract_start_date?: string | null
+          contract_status?: string
+          created_at?: string
+          customer_code: string
+          expiry_date?: string | null
+          id?: string
+          is_stale?: boolean
+          last_calculated_at?: string | null
+          latest_document_date?: string | null
+          latest_document_no?: string | null
+          latest_document_type?: string | null
+          remaining_days?: number | null
+          renewal_stock_code?: string | null
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          calculation_error?: string | null
+          contract_days?: number | null
+          contract_start_date?: string | null
+          contract_status?: string
+          created_at?: string
+          customer_code?: string
+          expiry_date?: string | null
+          id?: string
+          is_stale?: boolean
+          last_calculated_at?: string | null
+          latest_document_date?: string | null
+          latest_document_no?: string | null
+          latest_document_type?: string | null
+          remaining_days?: number | null
+          renewal_stock_code?: string | null
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customer_snapshots: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          created_at: string
+          customer_code: string
+          customer_name: string | null
+          email: string | null
+          id: string
+          last_synced_at: string | null
+          n3_status: string | null
+          phone: string | null
+          sync_status: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          customer_code: string
+          customer_name?: string | null
+          email?: string | null
+          id?: string
+          last_synced_at?: string | null
+          n3_status?: string | null
+          phone?: string | null
+          sync_status?: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          customer_code?: string
+          customer_name?: string | null
+          email?: string | null
+          id?: string
+          last_synced_at?: string | null
+          n3_status?: string | null
+          phone?: string | null
+          sync_status?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      general_settings: {
+        Row: {
+          assigned_user_label: string
+          created_at: string
+          default_assignment_mode: string
+          due_soon_days: number
+          extra: Json
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_user_label?: string
+          created_at?: string
+          default_assignment_mode?: string
+          due_soon_days?: number
+          extra?: Json
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_user_label?: string
+          created_at?: string
+          default_assignment_mode?: string
+          due_soon_days?: number
+          extra?: Json
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string | null
+          notification_type: string
+          related_id: string | null
+          related_module: string | null
+          tenant_code: string
+          title: string
+          user_email: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string | null
+          notification_type: string
+          related_id?: string | null
+          related_module?: string | null
+          tenant_code: string
+          title: string
+          user_email: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string | null
+          notification_type?: string
+          related_id?: string | null
+          related_module?: string | null
+          tenant_code?: string
+          title?: string
+          user_email?: string
+        }
+        Relationships: []
+      }
+      renewal_stock_mappings: {
+        Row: {
+          contract_days: number | null
+          created_at: string
+          id: string
+          is_active: boolean
+          service_type: string
+          stock_code: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          contract_days?: number | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          service_type: string
+          stock_code: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          contract_days?: number | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          service_type?: string
+          stock_code?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stock_snapshots: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          last_synced_at: string | null
+          stock_code: string
+          stock_name: string | null
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          stock_code: string
+          stock_name?: string | null
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          stock_code?: string
+          stock_name?: string | null
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
