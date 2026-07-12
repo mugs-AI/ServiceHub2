@@ -247,7 +247,7 @@ function UserMenu({ user }: { user: CurrentUserInfo | null }) {
                 </span>
               ) : (
                 <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Support user
+                  Normal user
                 </span>
               )}
             </div>
