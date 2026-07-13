@@ -269,17 +269,12 @@ function AdminSnapshots() {
           </button>
           <button
             disabled={busy}
-            onClick={() => runSync("contracts")}
-            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {running === "contracts" ? "Recalculating…" : "Recalculate Contracts"}
-          </button>
-          <button
-            disabled={busy}
             onClick={() => runSync("subscriptions")}
             className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {running === "subscriptions" ? "Recalculating…" : "Recalculate Subscriptions"}
+            {running === "subscriptions"
+              ? "Syncing…"
+              : "Sync Transaction Details & Recalculate Subscriptions"}
           </button>
           <button
             disabled={busy}
