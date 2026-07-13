@@ -17,19 +17,19 @@ export interface SessionInfo {
 }
 
 export type CurrentUserReason =
-  | "matched_administrators_role"
-  | "matched_without_administrators_role"
-  | "role_data_missing"
+  | "matched_owner"
+  | "matched_not_owner"
   | "no_matching_user"
   | "users_endpoint_failed"
   | "users_endpoint_unauthorized"
   | "users_endpoint_forbidden"
-  | "basicinfo_user_identifier_missing"
+  | "identity_missing"
   | "allowlist_fallback"
   | "bootstrap_fallback";
 
 export interface CurrentUserDiagnostics {
-  basicInfoUserIdentifier: string | null;
+  identitySource: "n3_jwt" | "n3_jwt+basicinfo" | "unknown";
+  identityUserIdentifier: string | null;
   matchedN3UserId: string | null;
   matchedDisplayName: string | null;
   reason: CurrentUserReason;
@@ -50,9 +50,11 @@ export interface CurrentUserInfo {
   userCode: string | null;
   roleNames: string[];
   isAdministrator: boolean;
-  adminGate: "n3_role" | "allowlist" | "bootstrap" | "none";
+  isOwner: boolean;
+  adminGate: "n3_owner" | "allowlist" | "bootstrap" | "none";
   diagnostics: CurrentUserDiagnostics | null;
 }
+
 
 interface SessionContextValue {
   ready: boolean;
