@@ -88,7 +88,8 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
             });
           }
 
-          const eventBySourceLine = new Map<string, (typeof evRes.data)[number]>();
+          type RenewalEventRow = NonNullable<typeof evRes.data>[number];
+          const eventBySourceLine = new Map<string, RenewalEventRow>();
           for (const e of evRes.data ?? []) {
             eventBySourceLine.set(`${e.source_line_id}`, e);
           }
