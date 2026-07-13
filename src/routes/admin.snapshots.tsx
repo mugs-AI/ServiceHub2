@@ -535,30 +535,9 @@ function AdminSnapshots() {
           emptyHint="No stock snapshots yet. Run Sync Stock."
         />
 
-        <PreviewTable
-          title="Contract snapshots"
-          total={preview?.contracts.total ?? 0}
-          error={preview?.contracts.error ?? null}
-          rows={preview?.contracts.rows ?? []}
-          columns={[
-            ["customer_code", "Customer"],
-            ["latest_document_no", "Doc No"],
-            ["latest_document_type", "Doc Type"],
-            ["latest_document_date", "Doc Date"],
-            ["renewal_stock_code", "Renewal Stock"],
-            ["contract_days", "Days"],
-            ["contract_start_date", "Start"],
-            ["expiry_date", "Expiry"],
-            ["remaining_days", "Remaining"],
-            ["contract_status", "Status"],
-            ["tenant_code", "Tenant"],
-          ]}
-          emptyHint={
-            mappingCount === 0
-              ? "No renewal stock mappings — every contract will be Unknown until mappings exist."
-              : "No contract snapshots yet. Run Recalculate Contracts."
-          }
-        />
+        {/* Legacy per-customer Contract preview removed in Phase 1.0.3 —
+            entitlements now live in Subscription snapshots below. */}
+
       </section>
 
       <TransactionDetailDiagnostics tenant={tenant} />
