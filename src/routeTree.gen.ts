@@ -21,6 +21,7 @@ import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspace/customers'
+import { Route as ApiWorkspaceCustomerSubscriptionsRouteImport } from './routes/api/workspace/customer-subscriptions'
 import { Route as ApiSyncSubscriptionsRouteImport } from './routes/api/sync/subscriptions'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
@@ -96,6 +97,12 @@ const ApiWorkspaceCustomersRoute = ApiWorkspaceCustomersRouteImport.update({
   path: '/api/workspace/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceCustomerSubscriptionsRoute =
+  ApiWorkspaceCustomerSubscriptionsRouteImport.update({
+    id: '/api/workspace/customer-subscriptions',
+    path: '/api/workspace/customer-subscriptions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSyncSubscriptionsRoute = ApiSyncSubscriptionsRouteImport.update({
   id: '/api/sync/subscriptions',
   path: '/api/sync/subscriptions',
@@ -197,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRoutesByTo {
@@ -225,6 +233,7 @@ export interface FileRoutesByTo {
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRoutesById {
@@ -254,6 +263,7 @@ export interface FileRoutesById {
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRouteTypes {
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
     | '/api/sync/customers'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/api/sync/customers'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
   id:
     | '__root__'
@@ -340,6 +352,7 @@ export interface FileRouteTypes {
     | '/api/sync/customers'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
   fileRoutesById: FileRoutesById
 }
@@ -369,6 +382,7 @@ export interface RootRouteChildren {
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
   ApiSyncSubscriptionsRoute: typeof ApiSyncSubscriptionsRoute
+  ApiWorkspaceCustomerSubscriptionsRoute: typeof ApiWorkspaceCustomerSubscriptionsRoute
   ApiWorkspaceCustomersRoute: typeof ApiWorkspaceCustomersRoute
 }
 
@@ -456,6 +470,13 @@ declare module '@tanstack/react-router' {
       path: '/api/workspace/customers'
       fullPath: '/api/workspace/customers'
       preLoaderRoute: typeof ApiWorkspaceCustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/customer-subscriptions': {
+      id: '/api/workspace/customer-subscriptions'
+      path: '/api/workspace/customer-subscriptions'
+      fullPath: '/api/workspace/customer-subscriptions'
+      preLoaderRoute: typeof ApiWorkspaceCustomerSubscriptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sync/subscriptions': {
@@ -586,6 +607,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
   ApiSyncSubscriptionsRoute: ApiSyncSubscriptionsRoute,
+  ApiWorkspaceCustomerSubscriptionsRoute:
+    ApiWorkspaceCustomerSubscriptionsRoute,
   ApiWorkspaceCustomersRoute: ApiWorkspaceCustomersRoute,
 }
 export const routeTree = rootRouteImport
