@@ -13,7 +13,7 @@ export const Route = createFileRoute("/admin/snapshots")({
   ),
 });
 
-type SnapshotKind = "customers" | "stock" | "contracts";
+type SnapshotKind = "customers" | "stock" | "contracts" | "subscriptions";
 type HealthType = "Customers" | "Stock" | "Contract";
 type HealthStatus = "Healthy" | "Warning" | "Error";
 
