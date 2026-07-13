@@ -69,14 +69,7 @@ interface SessionContextValue {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 function normaliseBasicInfo(raw: unknown, token: string | null): SessionInfo {
-  const r = (raw ?? {}) as Record<string, unknown>;
-  const pick = (...keys: string[]): string => {
-    for (const k of keys) {
-      const v = r[k];
-      if (typeof v === "string" && v.trim()) return v;
-    }
-    return "";
-  };
+  const n = normalizeBasicInfo(raw);
   const claims = decodeJwtPayload(token);
   const claim = (k: keyof typeof claims): string => {
     const v = claims[k];
@@ -84,12 +77,12 @@ function normaliseBasicInfo(raw: unknown, token: string | null): SessionInfo {
   };
   return {
     companyName:
-      pick("companyName", "company", "name", "companyDisplayName") ||
+      n.companyName ||
       (typeof claims.company === "string" ? (claims.company as string).trim() : ""),
-    tenantCode:
-      pick("tenantCode", "tenant", "tenantId", "code") || claim("tenantCode"),
-    email:
-      pick("email", "userEmail", "loginEmail", "userName") || claim("email"),
+    tenantCode: n.tenantCode || claim("tenantCode"),
+    // Header displays whichever official identifier BasicInfo surfaced —
+    // same value the server-side matcher receives.
+    email: n.email || n.userName || claim("email"),
   };
 }
 
