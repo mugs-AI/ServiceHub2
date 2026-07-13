@@ -36,17 +36,18 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
             supabaseAdmin
               .from("sales_invoice_line_snapshots")
               .select(
-                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void",
+                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void, line_type, has_stock_code, parent_line_id",
               )
               .eq("tenant_code", tenant)
               .eq("document_no", docNo),
             supabaseAdmin
               .from("delivery_order_line_snapshots")
               .select(
-                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void",
+                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void, line_type, has_stock_code, parent_line_id",
               )
               .eq("tenant_code", tenant)
               .eq("document_no", docNo),
+
             supabaseAdmin
               .from("renewal_stock_mappings")
               .select(
