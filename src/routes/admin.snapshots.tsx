@@ -183,7 +183,7 @@ function AdminSnapshots() {
   const runAll = useCallback(async () => {
     if (running) return;
     setRunning("all");
-    for (const kind of ["customers", "stock", "contracts"] as SnapshotKind[]) {
+    for (const kind of ["customers", "stock", "contracts", "subscriptions"] as SnapshotKind[]) {
       try {
         const res = await authFetch(`/api/sync/${kind}`, { method: "POST" });
         const json = (await res.json()) as SyncResult;
