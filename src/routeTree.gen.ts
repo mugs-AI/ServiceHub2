@@ -28,6 +28,7 @@ import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contract
 import { Route as ApiSettingsSubscriptionCategoriesRouteImport } from './routes/api/settings/subscription-categories'
 import { Route as ApiSettingsStockMappingsRouteImport } from './routes/api/settings/stock-mappings'
 import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
+import { Route as ApiDiagnosticsSubscriptionRunRouteImport } from './routes/api/diagnostics/subscription-run'
 import { Route as ApiDiagnosticsPreviewRouteImport } from './routes/api/diagnostics/preview'
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
@@ -131,6 +132,12 @@ const ApiSessionMeRoute = ApiSessionMeRouteImport.update({
   path: '/api/session/me',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDiagnosticsSubscriptionRunRoute =
+  ApiDiagnosticsSubscriptionRunRouteImport.update({
+    id: '/api/diagnostics/subscription-run',
+    path: '/api/diagnostics/subscription-run',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDiagnosticsPreviewRoute = ApiDiagnosticsPreviewRouteImport.update({
   id: '/api/diagnostics/preview',
   path: '/api/diagnostics/preview',
@@ -174,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
@@ -200,6 +208,7 @@ export interface FileRoutesByTo {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
@@ -227,6 +236,7 @@ export interface FileRoutesById {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-run'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
@@ -281,6 +292,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-run'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
@@ -307,6 +319,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-run'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
@@ -334,6 +347,7 @@ export interface RootRouteChildren {
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
   ApiDiagnosticsPreviewRoute: typeof ApiDiagnosticsPreviewRoute
+  ApiDiagnosticsSubscriptionRunRoute: typeof ApiDiagnosticsSubscriptionRunRoute
   ApiSessionMeRoute: typeof ApiSessionMeRoute
   ApiSettingsStockMappingsRoute: typeof ApiSettingsStockMappingsRoute
   ApiSettingsSubscriptionCategoriesRoute: typeof ApiSettingsSubscriptionCategoriesRoute
@@ -479,6 +493,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionMeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/diagnostics/subscription-run': {
+      id: '/api/diagnostics/subscription-run'
+      path: '/api/diagnostics/subscription-run'
+      fullPath: '/api/diagnostics/subscription-run'
+      preLoaderRoute: typeof ApiDiagnosticsSubscriptionRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/diagnostics/preview': {
       id: '/api/diagnostics/preview'
       path: '/api/diagnostics/preview'
@@ -534,6 +555,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
   ApiDiagnosticsPreviewRoute: ApiDiagnosticsPreviewRoute,
+  ApiDiagnosticsSubscriptionRunRoute: ApiDiagnosticsSubscriptionRunRoute,
   ApiSessionMeRoute: ApiSessionMeRoute,
   ApiSettingsStockMappingsRoute: ApiSettingsStockMappingsRoute,
   ApiSettingsSubscriptionCategoriesRoute:
