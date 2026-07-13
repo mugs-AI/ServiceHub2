@@ -19,7 +19,8 @@ export const Route = createFileRoute("/api/admin/allowlist")({
             .eq("tenant_code", user.tenantCode)
             .order("created_at", { ascending: true });
           if (error) throw error;
-          return Response.json({ tenantCode: user.tenantCode, admins: data ?? [] });
+          const fallbackEnabled = process.env.SERVICEHUB_ALLOWLIST_FALLBACK === "1";
+          return Response.json({ tenantCode: user.tenantCode, admins: data ?? [], fallbackEnabled });
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;
