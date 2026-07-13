@@ -135,9 +135,23 @@ describe("decideAdmin", () => {
     expect(d.isAdministrator).toBe(false);
     expect(d.reason).toBe("users_endpoint_unauthorized");
   });
+  it("returns basicinfo_user_identifier_missing when identity is empty", async () => {
+    const d = await decideAdmin(ok([jonas]), {}, neverAllow);
+    expect(d.isAdministrator).toBe(false);
+    expect(d.reason).toBe("basicinfo_user_identifier_missing");
+  });
   it("returns users_endpoint_failed when endpoint errors and no fallback", async () => {
     const d = await decideAdmin({ users: null, status: "failed" }, { email: "x@y.co" }, neverAllow);
     expect(d.isAdministrator).toBe(false);
     expect(d.reason).toBe("users_endpoint_failed");
+  });
+  it("matches by userName when email missing", async () => {
+    const d = await decideAdmin(ok([jonas]), { userName: "LKS.MUGS@GMAIL.COM" }, neverAllow);
+    expect(d.isAdministrator).toBe(true);
+    expect(d.matchedUserId).toBe("u-jonas");
+  });
+  it("does not mistake tenant code for user identity (matcher receives cleaned identity)", async () => {
+    const d = await decideAdmin(ok([jonas]), { email: null, userName: null, userId: null, userCode: null }, neverAllow);
+    expect(d.reason).toBe("basicinfo_user_identifier_missing");
   });
 });
