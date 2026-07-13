@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/workspace/customer-subscriptions")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAuthenticatedUser, guardResponse } = await import(
+        const { requireAuthenticatedN3User, guardResponse } = await import(
           "@/lib/qne/session/current-user.server"
         );
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
