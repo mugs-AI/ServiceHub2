@@ -915,6 +915,7 @@ function DocumentVerifier() {
                   <thead className="bg-muted uppercase text-muted-foreground">
                     <tr>
                       <th className="px-2 py-1 text-left">Line</th>
+                      <th className="px-2 py-1 text-left">Type</th>
                       <th className="px-2 py-1 text-left">Stock</th>
                       <th className="px-2 py-1 text-left">Description</th>
                       <th className="px-2 py-1 text-right">Qty</th>
@@ -929,6 +930,7 @@ function DocumentVerifier() {
                     {result.lines.map((l, i) => (
                       <tr key={i} className="border-t">
                         <td className="px-2 py-1">{String(l.line_no ?? "")}</td>
+                        <td className="px-2 py-1">{String(l.line_type ?? "—")}</td>
                         <td className="px-2 py-1 font-mono">{String(l.stock_code ?? "")}</td>
                         <td className="px-2 py-1">{String(l.description ?? l.stock_name ?? "")}</td>
                         <td className="px-2 py-1 text-right">{String(l.quantity ?? "")}</td>
@@ -939,6 +941,7 @@ function DocumentVerifier() {
                         <td className="px-2 py-1">{l.renewal_event ? "yes" : "no"}</td>
                       </tr>
                     ))}
+
                   </tbody>
                 </table>
               </div>
