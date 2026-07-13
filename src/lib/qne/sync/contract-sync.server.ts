@@ -93,8 +93,8 @@ export async function syncContractSnapshots(
 ): Promise<SyncResult> {
   const { tenantCode } = ctx;
   return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters) => {
-    // 1. Load renewal_stock_mappings for this tenant. If none, mark all
-    //    known customers as Unknown and exit — we can't compute anything.
+    // 1. Load renewal_stock_mappings for this tenant. If none, refuse to
+    //    produce Unknown-spam snapshots — surface a Warning and stop.
     const { data: mappingRows, error: mapErr } = await supabaseAdmin
       .from("renewal_stock_mappings")
       .select("stock_code, contract_days, is_active")
@@ -104,6 +104,11 @@ export async function syncContractSnapshots(
     const mappings = new Map<string, Mapping>();
     for (const m of mappingRows ?? []) {
       mappings.set(m.stock_code, { stock_code: m.stock_code, contract_days: m.contract_days });
+    }
+    if (mappings.size === 0) {
+      throw new SyncNotReadyError(
+        "Contract calculation not ready — configure Renewal Stock Mapping.",
+      );
     }
 
     // 2. Load general_settings for due_soon_days threshold (default 30).
@@ -125,10 +130,15 @@ export async function syncContractSnapshots(
       const filter = new Set(options.customerCodes);
       customerCodes = customerCodes.filter((c) => filter.has(c));
     }
-    if (customerCodes.length === 0) return;
+    if (customerCodes.length === 0) {
+      throw new SyncNotReadyError(
+        "Contract calculation not ready — no Customer Snapshots. Run Customer Sync first.",
+      );
+    }
 
     // 4. Gather latest qualifying candidate per customer from N3 (server-side).
-    //    We stream Invoices + DOs once and keep the latest qualifying doc per customer.
+    //    Invoice and DO are INDEPENDENT sources. We stream each list once
+    //    and keep the latest qualifying doc per customer, regardless of type.
     const latestByCustomer = new Map<string, Candidate>();
     const targetCustomers = new Set(customerCodes);
 
@@ -141,32 +151,42 @@ export async function syncContractSnapshots(
       }
     };
 
-    // If mappings is empty, skip N3 fetching entirely — everything will be Unknown.
-    if (mappings.size > 0) {
-      try {
-        for await (const doc of n3IterateList<N3Doc>(ctx.token, "main", "/api/salesinvoice")) {
-          consider(extractCandidates(doc, "invoice", mappings));
-        }
-      } catch (err) {
-        counters.failed += 1;
-        throw new Error(`Fetch salesinvoice failed: ${err instanceof Error ? err.message : String(err)}`);
+    const invoicesEp = N3_ENDPOINTS["salesInvoices.list"];
+    const dosEp = N3_ENDPOINTS["deliveryOrders.list"];
+    try {
+      for await (const doc of n3IterateList<N3Doc>(ctx.token, invoicesEp.target, invoicesEp.path)) {
+        consider(extractCandidates(doc, "invoice", mappings));
       }
-      try {
-        for await (const doc of n3IterateList<N3Doc>(ctx.token, "main", "/api/deliveryorder")) {
-          consider(extractCandidates(doc, "delivery_order", mappings));
-        }
-      } catch (err) {
-        counters.failed += 1;
-        throw new Error(`Fetch deliveryorder failed: ${err instanceof Error ? err.message : String(err)}`);
+    } catch (err) {
+      throw new Error(
+        `Fetch ${invoicesEp.resource} (${invoicesEp.path}) failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    try {
+      for await (const doc of n3IterateList<N3Doc>(ctx.token, dosEp.target, dosEp.path)) {
+        consider(extractCandidates(doc, "delivery_order", mappings));
       }
+    } catch (err) {
+      throw new Error(
+        `Fetch ${dosEp.resource} (${dosEp.path}) failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
-    // 5. Load existing snapshots for change detection.
+    if (latestByCustomer.size === 0) {
+      throw new SyncNotReadyError(
+        "No qualifying Sales Invoices or Delivery Orders found for the configured Renewal Stock Mappings.",
+      );
+    }
+
+    // 5. Load existing snapshots for change detection — only for customers
+    //    that actually have a qualifying document. We NEVER manufacture
+    //    Unknown rows for customers without qualifying documents.
+    const targetKeys = Array.from(latestByCustomer.keys());
     const { data: existingRows, error: existingErr } = await supabaseAdmin
       .from("customer_contract_snapshots")
       .select("customer_code, latest_document_no, latest_document_date, expiry_date, contract_status")
       .eq("tenant_code", tenantCode)
-      .in("customer_code", customerCodes);
+      .in("customer_code", targetKeys);
     if (existingErr) throw new Error(`Load existing contracts failed: ${existingErr.message}`);
     const existingByCode = new Map<string, Record<string, unknown>>();
     for (const r of existingRows ?? []) existingByCode.set(r.customer_code, r as Record<string, unknown>);
@@ -174,47 +194,27 @@ export async function syncContractSnapshots(
     const now = Date.now();
     const toUpsert: Array<Record<string, unknown>> = [];
 
-    for (const customerCode of customerCodes) {
-      const latest = latestByCustomer.get(customerCode);
+    for (const customerCode of targetKeys) {
+      const latest = latestByCustomer.get(customerCode)!;
       const existing = existingByCode.get(customerCode);
-      let row: Record<string, unknown>;
-      if (!latest) {
-        row = {
-          tenant_code: tenantCode,
-          customer_code: customerCode,
-          latest_document_no: null,
-          latest_document_date: null,
-          latest_document_type: null,
-          renewal_stock_code: null,
-          contract_days: null,
-          contract_start_date: null,
-          expiry_date: null,
-          remaining_days: null,
-          contract_status: "Unknown" as ContractStatus,
-          last_calculated_at: new Date().toISOString(),
-          is_stale: false,
-          calculation_error: null,
-        };
-      } else {
-        const expiry = new Date(latest.docDate.getTime() + latest.contractDays * 86400000);
-        const daysLeft = Math.ceil((expiry.getTime() - now) / 86400000);
-        row = {
-          tenant_code: tenantCode,
-          customer_code: customerCode,
-          latest_document_no: latest.docNo || null,
-          latest_document_date: latest.docDate.toISOString().slice(0, 10),
-          latest_document_type: latest.docType,
-          renewal_stock_code: latest.stockCode,
-          contract_days: latest.contractDays,
-          contract_start_date: latest.docDate.toISOString().slice(0, 10),
-          expiry_date: expiry.toISOString().slice(0, 10),
-          remaining_days: daysLeft,
-          contract_status: computeStatus(daysLeft, dueSoonDays),
-          last_calculated_at: new Date().toISOString(),
-          is_stale: false,
-          calculation_error: null,
-        };
-      }
+      const expiry = new Date(latest.docDate.getTime() + latest.contractDays * 86400000);
+      const daysLeft = Math.ceil((expiry.getTime() - now) / 86400000);
+      const row: Record<string, unknown> = {
+        tenant_code: tenantCode,
+        customer_code: customerCode,
+        latest_document_no: latest.docNo || null,
+        latest_document_date: latest.docDate.toISOString().slice(0, 10),
+        latest_document_type: latest.docType,
+        renewal_stock_code: latest.stockCode,
+        contract_days: latest.contractDays,
+        contract_start_date: latest.docDate.toISOString().slice(0, 10),
+        expiry_date: expiry.toISOString().slice(0, 10),
+        remaining_days: daysLeft,
+        contract_status: computeStatus(daysLeft, dueSoonDays),
+        last_calculated_at: new Date().toISOString(),
+        is_stale: false,
+        calculation_error: null,
+      };
 
       if (!existing) {
         counters.inserted += 1;
