@@ -250,18 +250,11 @@ export function CustomerLookup() {
               )}
             </div>
 
-            <div
-              className="rounded-lg border border-dashed bg-card/60 p-4"
-              data-extension="contract-status"
-            >
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Contract status
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Contract, expiry and remaining days will appear here once the
-                Contract Snapshot surface is wired in the next milestone.
-              </p>
-            </div>
+            <CustomerSubscriptionsPanel
+              key={selected?.customer_code ?? "none"}
+              customerCode={selected?.customer_code ?? null}
+            />
+
           </div>
         </div>
       )}
