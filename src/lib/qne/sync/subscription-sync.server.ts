@@ -331,10 +331,20 @@ interface SourceMetrics {
   detailLinesStored: number;
   mappedRenewalLines: number;
   mappedAdHocLines: number;
+  unmappedStockLines: number;
   unmappedLinesIgnored: number;
   voidedDocuments: number;
+  voidedSourceLines: number;
   renewalEventsInserted: number;
   renewalEventsSkipped: number;
+  lineTypeCounts: {
+    stock: number;
+    description: number;
+    serial_or_reference: number;
+    child_detail: number;
+    unknown: number;
+  };
+  linesWithoutStockIgnored: number;
 }
 
 async function syncSourceDetails(args: {
@@ -370,11 +380,22 @@ async function syncSourceDetails(args: {
     detailLinesStored: 0,
     mappedRenewalLines: 0,
     mappedAdHocLines: 0,
+    unmappedStockLines: 0,
     unmappedLinesIgnored: 0,
     voidedDocuments: 0,
+    voidedSourceLines: 0,
     renewalEventsInserted: 0,
     renewalEventsSkipped: 0,
+    lineTypeCounts: {
+      stock: 0,
+      description: 0,
+      serial_or_reference: 0,
+      child_detail: 0,
+      unknown: 0,
+    },
+    linesWithoutStockIgnored: 0,
   };
+
 
   const headers: N3DocHeader[] = [];
   try {
