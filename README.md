@@ -69,25 +69,40 @@ called through the proxy and the returned company name, tenant code,
 and user email are shown in the app header. This is refreshed on each
 load — not cached in sessionStorage — as required by the N3 brief.
 
-## N3 Open API scopes used (Phase 1)
+## N3 Open API endpoints (official)
 
-Discovered via `GET /doc/index.json` on the two Open API hosts. The
-initial slice touches:
+All endpoint strings live in the server-side registry at
+`src/lib/qne/endpoints.ts`. Explorers and snapshot sync workers must import
+from that registry rather than hard-coding paths. Every list endpoint uses
+OData paging (`$top` / `$skip`) and returns the standard
+`ApiResponse<PageQueryResult<T>>` envelope (rows in `data.value`, total in
+`data.count`).
 
-- **`platform-v1`** — company profile, users
-  - `GET /api/companyprofile/BasicInfo`
-  - `GET /api/user`
-- **Subsidiary / master data**
-  - `GET /api/customer` — customers list
-  - `GET /api/stock` — stock master
-- **Sales transactions**
-  - `GET /api/salesinvoice`
-  - `GET /api/deliveryorder`
+| Logical key           | Method | Path                     |
+| --------------------- | ------ | ------------------------ |
+| `customers.list`      | GET    | `/api/Customers/List`    |
+| `stock.list`          | GET    | `/api/Stocks/List`       |
+| `salesInvoices.list`  | GET    | `/api/SalesInvoices/List`|
+| `deliveryOrders.list` | GET    | `/api/DeliveryOrders/List`|
+| `users.list`          | GET    | `/api/Users/Lookup`      |
 
-Endpoint paths are user-editable in the list explorer UI so different
-tenant configurations can be probed without a code change. Additional
-scopes will be added as Jobs, Approvals and Reporting features land in
-later phases.
+The legacy singular paths (`/api/customer`, `/api/stock`,
+`/api/salesinvoice`, `/api/deliveryorder`, `/api/user`) are **not**
+documented and return 404 — do not use them.
+
+## Access model
+
+- **ServiceHub Administrator** — the current N3 company Owner
+  (`UserDto.isOwner === true` for the authenticated user). Owners can access
+  `/admin/*`, Settings, and manual sync.
+- **Normal User** — every other authenticated N3 user. Access is limited to
+  operational surfaces (`/dashboard`, `/support`, Jobs, Reports).
+- **Emergency Administrator Fallback** — the tenant-scoped allowlist is
+  disabled by default and only consulted when
+  `SERVICEHUB_ALLOWLIST_FALLBACK=1` is set in the server environment. The
+  Settings UI hides the allowlist manager unless the fallback is enabled.
+
+
 
 ## Phase roadmap
 
