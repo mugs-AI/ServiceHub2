@@ -21,6 +21,7 @@ import {
   type UsersEndpointStatus,
   type UsersLoad,
 } from "@/lib/qne/session/role-resolution";
+import { normalizeBasicInfo, type NormalizedBasicInfo } from "@/lib/qne/session/basic-info";
 
 export interface CurrentUserContext {
   token: string;
@@ -62,13 +63,6 @@ export class ForbiddenError extends Error {
   }
 }
 
-function pick(obj: Record<string, unknown>, ...keys: string[]): string {
-  for (const k of keys) {
-    const v = obj[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  return "";
-}
 
 function envAllowlist(): Set<string> {
   const raw = process.env.SERVICEHUB_BOOTSTRAP_ADMIN_EMAILS ?? "";
@@ -236,9 +230,9 @@ export async function requireAuthenticatedN3User(
   if (!match) throw new UnauthorizedError("Missing Authorization bearer");
   const token = match[1].trim();
 
-  let basic: Record<string, unknown> = {};
+  let basic: unknown = {};
   try {
-    basic = ((await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo")) ?? {}) as Record<string, unknown>;
+    basic = (await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo")) ?? {};
   } catch (err) {
     if (err instanceof Error && /401|unauth/i.test(err.message)) {
       throw new UnauthorizedError(err.message);
@@ -246,22 +240,30 @@ export async function requireAuthenticatedN3User(
     throw err;
   }
 
+  // One shared BasicInfo parser — same code the browser SessionProvider uses.
+  const normalized: NormalizedBasicInfo = normalizeBasicInfo(basic);
   const claims = decodeJwtPayload(token);
 
+  // Tenant fallback to JWT claim is display-only per the brief.
   const tenantCode =
-    pick(basic, "tenantCode", "tenant", "tenantId", "code") ||
+    normalized.tenantCode ||
     (typeof claims.tenantCode === "string" ? claims.tenantCode.trim() : "");
   const companyName =
-    pick(basic, "companyName", "company", "name", "companyDisplayName") ||
+    normalized.companyName ||
     (typeof claims.company === "string" ? (claims.company as string).trim() : "");
+  // JWT `email` / `name` remain a display-only fallback — never trusted as
+  // the sole user identifier for role matching (only BasicInfo is).
   const email =
-    pick(basic, "email", "userEmail", "loginEmail", "userName") ||
-    (typeof claims.email === "string" ? claims.email.trim() : "");
+    normalized.email ??
+    (typeof claims.email === "string" && claims.email.trim() ? claims.email.trim() : "");
+  const displayNameFromBasic = normalized.displayName;
   const displayName =
-    pick(basic, "displayName", "fullName", "userDisplayName", "name") ||
+    displayNameFromBasic ||
     (typeof claims.name === "string" ? claims.name.trim() : "") ||
     email;
-  const userCode = pick(basic, "userCode", "userId", "userName") || null;
+  const userCode = normalized.userCode;
+  const userId = normalized.userId;
+  const userName = normalized.userName;
 
   if (!tenantCode) {
     throw new UnauthorizedError(
@@ -273,7 +275,12 @@ export async function requireAuthenticatedN3User(
 
   const decision = await decideAdmin(
     { users: load.users, status: load.status },
-    { userCode, email },
+    {
+      userId,
+      userCode,
+      email: normalized.email,
+      userName,
+    },
     {
       isAllowlisted: (e) => isAllowlisted(tenantCode, e),
       tryBootstrap: (e) => tryBootstrap(tenantCode, e),
@@ -282,7 +289,7 @@ export async function requireAuthenticatedN3User(
 
   // Prefer the display name N3 has on file when BasicInfo didn't surface one.
   const effectiveDisplayName =
-    decision.matchedDisplayName && !pick(basic, "displayName", "fullName", "userDisplayName")
+    decision.matchedDisplayName && !displayNameFromBasic
       ? decision.matchedDisplayName
       : displayName;
 
@@ -297,7 +304,7 @@ export async function requireAuthenticatedN3User(
     adminGate: decision.adminGate,
     roleNames: decision.roleNames,
     diagnostics: {
-      basicInfoUserIdentifier: userCode || email || null,
+      basicInfoUserIdentifier: normalized.primaryUserIdentifier,
       matchedN3UserId: decision.matchedUserId,
       matchedDisplayName: decision.matchedDisplayName,
       reason: decision.reason satisfies AdminDecisionReason,

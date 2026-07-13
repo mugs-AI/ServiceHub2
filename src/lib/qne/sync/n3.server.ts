@@ -79,19 +79,14 @@ export async function* n3IterateList<T>(
   }
 }
 
-function normaliseBasicInfo(raw: unknown): { tenantCode: string; companyName: string; email: string } {
-  const r = (raw ?? {}) as Record<string, unknown>;
-  const pick = (...keys: string[]): string => {
-    for (const k of keys) {
-      const v = r[k];
-      if (typeof v === "string" && v.trim()) return v;
-    }
-    return "";
-  };
+import { normalizeBasicInfo } from "@/lib/qne/session/basic-info";
+
+function extractBasicInfo(raw: unknown): { tenantCode: string; companyName: string; email: string } {
+  const n = normalizeBasicInfo(raw);
   return {
-    tenantCode: pick("tenantCode", "tenant", "tenantId", "code"),
-    companyName: pick("companyName", "company", "name", "companyDisplayName"),
-    email: pick("email", "userEmail", "loginEmail", "userName"),
+    tenantCode: n.tenantCode,
+    companyName: n.companyName,
+    email: n.email ?? n.userName ?? "",
   };
 }
 
@@ -115,7 +110,7 @@ export async function resolveTenantContext(request: Request): Promise<N3TenantCo
 
   let info: { tenantCode: string; companyName: string; email: string };
   try {
-    info = normaliseBasicInfo(await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo"));
+    info = extractBasicInfo(await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo"));
   } catch (err) {
     if (err instanceof Error && /401|unauth/i.test(err.message)) {
       throw new UnauthorizedSyncError(err.message);

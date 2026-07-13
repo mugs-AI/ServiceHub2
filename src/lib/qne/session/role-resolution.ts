@@ -65,26 +65,39 @@ export function isUserActive(user: N3UserDto | null | undefined): boolean {
   return true;
 }
 
+export interface IdentityLookup {
+  userId?: string | null;
+  userCode?: string | null;
+  email?: string | null;
+  userName?: string | null;
+}
+
 /**
  * Match the authenticated user (identified by BasicInfo) to an entry in
- * /api/Users. Priority: userId → email → userName. Email and userName are
- * cross-matched, trimmed and lowercased. displayName is never used.
+ * /api/Users. Priority: stable id → email → userName. Email and userName
+ * are cross-matched against `UserDto.email` AND `UserDto.userName`, always
+ * trimmed and lowercased. displayName is never used.
  */
 export function matchCurrentUser(
   users: N3UserDto[],
-  identity: { userCode?: string | null; email?: string | null },
+  identity: IdentityLookup,
 ): N3UserDto | null {
-  const wantId = (identity.userCode ?? "").trim();
+  const wantId = (identity.userId ?? identity.userCode ?? "").trim();
   if (wantId) {
     for (const u of users) {
       if ((u.userId ?? "").trim() === wantId) return u;
     }
   }
   const wantEmail = normaliseEmail(identity.email);
-  if (!wantEmail) return null;
+  const wantUserName = normaliseEmail(identity.userName);
+  if (!wantEmail && !wantUserName) return null;
   for (const u of users) {
-    if (normaliseEmail(u.email) === wantEmail) return u;
-    if (normaliseEmail(u.userName) === wantEmail) return u;
+    const uEmail = normaliseEmail(u.email);
+    const uUser = normaliseEmail(u.userName);
+    if (wantEmail && (uEmail === wantEmail || uUser === wantEmail)) return u;
+    if (wantUserName && (uEmail === wantUserName || uUser === wantUserName)) {
+      return u;
+    }
   }
   return null;
 }
@@ -101,7 +114,7 @@ export type AdminDecisionReason =
   | "users_endpoint_failed"
   | "users_endpoint_unauthorized"
   | "users_endpoint_forbidden"
-  | "no_email"
+  | "basicinfo_user_identifier_missing"
   | "allowlist_fallback"
   | "bootstrap_fallback";
 
@@ -131,13 +144,17 @@ export interface UsersLoad {
  */
 export async function decideAdmin(
   usersLoad: UsersLoad,
-  identity: { userCode?: string | null; email?: string | null },
+  identity: IdentityLookup,
   allowlist: {
     isAllowlisted: (email: string) => Promise<boolean> | boolean;
     tryBootstrap?: (email: string) => Promise<boolean> | boolean;
   },
 ): Promise<AdminDecision> {
   const email = (identity.email ?? "").trim();
+  const userName = (identity.userName ?? "").trim();
+  const userId = (identity.userId ?? "").trim();
+  const userCode = (identity.userCode ?? "").trim();
+  const hasIdentity = Boolean(email || userName || userId || userCode);
   let matched: N3UserDto | null = null;
   let roleNames: string[] = [];
   let reason: AdminDecisionReason = "no_matching_user";
@@ -149,8 +166,8 @@ export async function decideAdmin(
         : usersLoad.status === "forbidden"
           ? "users_endpoint_forbidden"
           : "users_endpoint_failed";
-  } else if (!email && !identity.userCode) {
-    reason = "no_email";
+  } else if (!hasIdentity) {
+    reason = "basicinfo_user_identifier_missing";
   } else if (!usersLoad.users || usersLoad.users.length === 0) {
     reason = "no_matching_user";
   } else {
