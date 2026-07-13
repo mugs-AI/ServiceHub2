@@ -311,7 +311,7 @@ function AdminSnapshots() {
                 </tr>
               </thead>
               <tbody>
-                {(["customers", "stock", "contracts"] as SnapshotKind[]).map((k) => {
+                {(["customers", "stock", "contracts", "subscriptions"] as SnapshotKind[]).map((k) => {
                   const r = lastResults[k];
                   if (!r) return null;
                   return (
