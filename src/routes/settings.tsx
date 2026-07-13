@@ -42,9 +42,9 @@ function Settings() {
     setBusy(true);
     setError(null);
     try {
-      const { rows } = await qneGetList<Stock>("main", "/api/stock", {
-        pageNo: 1,
-        pageSize: 50,
+      const { rows } = await qneGetList<Stock>("main", "/api/Stocks/List", {
+        $top: 50,
+        $skip: 0,
         search: q,
       });
       setRows(rows);
