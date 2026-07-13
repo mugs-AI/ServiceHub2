@@ -31,6 +31,7 @@ import { Route as ApiSettingsStockMappingsRouteImport } from './routes/api/setti
 import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
 import { Route as ApiDiagnosticsVerifyDocumentRouteImport } from './routes/api/diagnostics/verify-document'
 import { Route as ApiDiagnosticsSubscriptionRunRouteImport } from './routes/api/diagnostics/subscription-run'
+import { Route as ApiDiagnosticsSubscriptionPreviewRouteImport } from './routes/api/diagnostics/subscription-preview'
 import { Route as ApiDiagnosticsPreviewRouteImport } from './routes/api/diagnostics/preview'
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
@@ -152,6 +153,12 @@ const ApiDiagnosticsSubscriptionRunRoute =
     path: '/api/diagnostics/subscription-run',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDiagnosticsSubscriptionPreviewRoute =
+  ApiDiagnosticsSubscriptionPreviewRouteImport.update({
+    id: '/api/diagnostics/subscription-preview',
+    path: '/api/diagnostics/subscription-preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDiagnosticsPreviewRoute = ApiDiagnosticsPreviewRouteImport.update({
   id: '/api/diagnostics/preview',
   path: '/api/diagnostics/preview',
@@ -195,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
@@ -224,6 +232,7 @@ export interface FileRoutesByTo {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
@@ -254,6 +263,7 @@ export interface FileRoutesById {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
@@ -314,6 +325,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
@@ -343,6 +355,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
@@ -373,6 +386,7 @@ export interface RootRouteChildren {
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
   ApiDiagnosticsPreviewRoute: typeof ApiDiagnosticsPreviewRoute
+  ApiDiagnosticsSubscriptionPreviewRoute: typeof ApiDiagnosticsSubscriptionPreviewRoute
   ApiDiagnosticsSubscriptionRunRoute: typeof ApiDiagnosticsSubscriptionRunRoute
   ApiDiagnosticsVerifyDocumentRoute: typeof ApiDiagnosticsVerifyDocumentRoute
   ApiSessionMeRoute: typeof ApiSessionMeRoute
@@ -542,6 +556,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDiagnosticsSubscriptionRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/diagnostics/subscription-preview': {
+      id: '/api/diagnostics/subscription-preview'
+      path: '/api/diagnostics/subscription-preview'
+      fullPath: '/api/diagnostics/subscription-preview'
+      preLoaderRoute: typeof ApiDiagnosticsSubscriptionPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/diagnostics/preview': {
       id: '/api/diagnostics/preview'
       path: '/api/diagnostics/preview'
@@ -597,6 +618,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
   ApiDiagnosticsPreviewRoute: ApiDiagnosticsPreviewRoute,
+  ApiDiagnosticsSubscriptionPreviewRoute:
+    ApiDiagnosticsSubscriptionPreviewRoute,
   ApiDiagnosticsSubscriptionRunRoute: ApiDiagnosticsSubscriptionRunRoute,
   ApiDiagnosticsVerifyDocumentRoute: ApiDiagnosticsVerifyDocumentRoute,
   ApiSessionMeRoute: ApiSessionMeRoute,
