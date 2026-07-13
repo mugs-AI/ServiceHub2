@@ -63,13 +63,6 @@ export class ForbiddenError extends Error {
   }
 }
 
-function pick(obj: Record<string, unknown>, ...keys: string[]): string {
-  for (const k of keys) {
-    const v = obj[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  return "";
-}
 
 function envAllowlist(): Set<string> {
   const raw = process.env.SERVICEHUB_BOOTSTRAP_ADMIN_EMAILS ?? "";
