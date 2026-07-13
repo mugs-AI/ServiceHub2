@@ -114,7 +114,7 @@ export type AdminDecisionReason =
   | "users_endpoint_failed"
   | "users_endpoint_unauthorized"
   | "users_endpoint_forbidden"
-  | "no_email"
+  | "basicinfo_user_identifier_missing"
   | "allowlist_fallback"
   | "bootstrap_fallback";
 
