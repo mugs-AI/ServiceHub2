@@ -72,24 +72,21 @@ function SessionRoleDiagnostics() {
   const { currentUser, currentUserReady } = useSession();
   const d = currentUser?.diagnostics ?? null;
   const gateLabel: Record<string, string> = {
-    n3_role: "Official N3 Administrators role",
-    allowlist: "Tenant-scoped ServiceHub allowlist (fallback)",
-    bootstrap: "First-user bootstrap (fallback)",
+    n3_owner: "Official N3 tenant Owner (isOwner=true)",
+    allowlist: "Tenant-scoped ServiceHub allowlist (emergency fallback)",
+    bootstrap: "First-user bootstrap (emergency fallback)",
     none: "Not an administrator",
   };
   const reasonLabel: Record<string, string> = {
-    matched_administrators_role: "Matched N3 user has the Administrators role",
-    matched_without_administrators_role: "Matched N3 user does not have the Administrators role",
+    matched_owner: "Matched N3 user has isOwner = true",
+    matched_not_owner: "Matched N3 user has isOwner = false",
     users_endpoint_unauthorized: "/api/Users returned 401 Unauthorized",
     users_endpoint_forbidden: "/api/Users returned 403 Forbidden",
     users_endpoint_failed: "/api/Users request failed",
-    users_response_empty: "/api/Users returned no users",
     no_matching_user: "No matching N3 user in /api/Users",
-    role_data_missing: "Matched N3 user has no roles attached",
-    allowlist_fallback: "Granted via tenant allowlist (fallback)",
-    bootstrap_fallback: "Granted as first user of this tenant (bootstrap)",
-    no_admin_access: "No administrator access granted",
-    basicinfo_user_identifier_missing: "BasicInfo user identifier missing",
+    identity_missing: "N3 JWT did not carry a user identifier",
+    allowlist_fallback: "Granted via tenant allowlist (emergency fallback)",
+    bootstrap_fallback: "Granted as first user of this tenant (emergency fallback)",
   };
   const ep = d?.usersEndpoint;
   const endpointText = ep
@@ -107,7 +104,7 @@ function SessionRoleDiagnostics() {
           Why am I resolved as {currentUser?.isAdministrator ? "Administrator" : "Normal user"}?
         </summary>
         <p className="mt-2 text-muted-foreground">
-          Temporary Phase 0.9.5 panel. Shows the live reason for the current
+          Temporary diagnostics panel. Shows the live reason for the current
           session only. No tokens, headers, or other users' data are exposed.
         </p>
         {!currentUserReady && (
@@ -118,7 +115,8 @@ function SessionRoleDiagnostics() {
         )}
         {currentUser && (
           <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-            <DRow k="BasicInfo identifier" v={d?.basicInfoUserIdentifier ?? "—"} />
+            <DRow k="Identity source" v={d?.identitySource ?? "—"} />
+            <DRow k="Identity identifier" v={d?.identityUserIdentifier ?? "—"} />
             <DRow k="/api/Users HTTP status" v={ep?.httpStatus ? String(ep.httpStatus) : "—"} />
             <DRow k="Response shape" v={ep?.shape ?? "—"} />
             <DRow k="Users returned" v={ep ? String(ep.count) : "—"} />
@@ -126,8 +124,9 @@ function SessionRoleDiagnostics() {
             <DRow k="Matched user" v={matched} />
             <DRow k="Matched N3 user id" v={d?.matchedN3UserId ?? "—"} />
             <DRow k="Matched display name" v={d?.matchedDisplayName ?? "—"} />
+            <DRow k="isOwner" v={currentUser.isOwner ? "true" : "false"} />
             <DRow
-              k="Role names"
+              k="Role names (informational)"
               v={currentUser.roleNames?.length ? currentUser.roleNames.join(", ") : "—"}
             />
             <DRow k="isAdministrator" v={currentUser.isAdministrator ? "true" : "false"} />
@@ -142,6 +141,7 @@ function SessionRoleDiagnostics() {
     </section>
   );
 }
+
 
 function DRow({ k, v }: { k: string; v: string }) {
   return (
