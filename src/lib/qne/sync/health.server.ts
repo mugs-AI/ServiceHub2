@@ -175,6 +175,9 @@ export interface HealthUpdateInput {
   counters: { inserted: number; updated: number; skipped: number; failed: number };
   lastAttempt: Date;
   succeeded: boolean;
+  /** When set, the sync could not produce a valid outcome (e.g. missing
+   * mapping). Forces a Warning even when validation issues are zero. */
+  notReadyReason?: string;
 }
 
 /**
@@ -209,6 +212,10 @@ export async function updateHealthFromSync(input: HealthUpdateInput): Promise<vo
   if (input.syncStatus === "failed") {
     health = "Error";
     error = input.syncErrorMessage ?? "Synchronization failed";
+  } else if (input.notReadyReason) {
+    // Sync did not fail but produced no valid outcome — must never be Healthy.
+    health = "Warning";
+    warning = input.notReadyReason;
   } else if (
     input.counters.failed > 0 ||
     input.syncStatus === "partial" ||
