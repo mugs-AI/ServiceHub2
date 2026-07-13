@@ -89,7 +89,7 @@ function SessionRoleDiagnostics() {
     allowlist_fallback: "Granted via tenant allowlist (fallback)",
     bootstrap_fallback: "Granted as first user of this tenant (bootstrap)",
     no_admin_access: "No administrator access granted",
-    no_email: "BasicInfo user identifier missing",
+    basicinfo_user_identifier_missing: "BasicInfo user identifier missing",
   };
   const ep = d?.usersEndpoint;
   const endpointText = ep
