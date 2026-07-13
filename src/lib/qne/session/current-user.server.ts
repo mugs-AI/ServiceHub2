@@ -394,5 +394,16 @@ export function guardResponse(err: unknown): Response | null {
       { status: 403, headers: { "Content-Type": "application/json" } },
     );
   }
+  // Sync concurrency lock — translate to 409.
+  if (err && typeof err === "object" && (err as { name?: string }).name === "SyncLockedError") {
+    return new Response(
+      JSON.stringify({
+        error:
+          (err as { userMessage?: string }).userMessage ??
+          "A synchronization run is already in progress for this Client.",
+      }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
+  }
   return null;
 }
