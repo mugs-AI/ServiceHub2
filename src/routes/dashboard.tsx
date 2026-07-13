@@ -58,10 +58,98 @@ function UserDashboard() {
         </div>
       </section>
 
+      <SessionRoleDiagnostics />
+
       <p className="rounded-lg border bg-card px-4 py-3 text-xs text-muted-foreground shadow-sm">
         Your daily workspace fills in as job features ship in Phase 1. No
         example data is created — all counts read from your real tenant.
       </p>
+    </div>
+  );
+}
+
+function SessionRoleDiagnostics() {
+  const { currentUser, currentUserReady } = useSession();
+  const d = currentUser?.diagnostics ?? null;
+  const gateLabel: Record<string, string> = {
+    n3_role: "Official N3 Administrators role",
+    allowlist: "Tenant-scoped ServiceHub allowlist (fallback)",
+    bootstrap: "First-user bootstrap (fallback)",
+    none: "Not an administrator",
+  };
+  const reasonLabel: Record<string, string> = {
+    matched_administrators_role: "Matched N3 user has the Administrators role",
+    matched_without_administrators_role: "Matched N3 user does not have the Administrators role",
+    users_endpoint_unauthorized: "/api/Users returned 401 Unauthorized",
+    users_endpoint_forbidden: "/api/Users returned 403 Forbidden",
+    users_endpoint_failed: "/api/Users request failed",
+    users_response_empty: "/api/Users returned no users",
+    no_matching_user: "No matching N3 user in /api/Users",
+    role_data_missing: "Matched N3 user has no roles attached",
+    allowlist_fallback: "Granted via tenant allowlist (fallback)",
+    bootstrap_fallback: "Granted as first user of this tenant (bootstrap)",
+    no_admin_access: "No administrator access granted",
+    no_email: "BasicInfo user identifier missing",
+  };
+  const ep = d?.usersEndpoint;
+  const endpointText = ep
+    ? ep.status === "ok"
+      ? `ok — ${ep.count} users (${ep.shape})`
+      : `${ep.status}${ep.httpStatus ? ` (${ep.httpStatus})` : ""} — ${ep.error ?? "unknown"}`
+    : "—";
+  const matched = d?.matchedN3UserId ? "Yes" : "No";
+
+  return (
+    <section>
+      <SectionTitle>Session &amp; role diagnostics</SectionTitle>
+      <details className="mt-3 rounded-xl border bg-card p-4 text-xs shadow-sm">
+        <summary className="cursor-pointer select-none text-sm font-semibold text-foreground">
+          Why am I resolved as {currentUser?.isAdministrator ? "Administrator" : "Normal user"}?
+        </summary>
+        <p className="mt-2 text-muted-foreground">
+          Temporary Phase 0.9.5 panel. Shows the live reason for the current
+          session only. No tokens, headers, or other users' data are exposed.
+        </p>
+        {!currentUserReady && (
+          <p className="mt-3 text-muted-foreground">Loading session…</p>
+        )}
+        {currentUserReady && !currentUser && (
+          <p className="mt-3 text-muted-foreground">No session available.</p>
+        )}
+        {currentUser && (
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+            <DRow k="BasicInfo identifier" v={d?.basicInfoUserIdentifier ?? "—"} />
+            <DRow k="/api/Users HTTP status" v={ep?.httpStatus ? String(ep.httpStatus) : "—"} />
+            <DRow k="Response shape" v={ep?.shape ?? "—"} />
+            <DRow k="Users returned" v={ep ? String(ep.count) : "—"} />
+            <DRow k="/api/Users result" v={endpointText} />
+            <DRow k="Matched user" v={matched} />
+            <DRow k="Matched N3 user id" v={d?.matchedN3UserId ?? "—"} />
+            <DRow k="Matched display name" v={d?.matchedDisplayName ?? "—"} />
+            <DRow
+              k="Role names"
+              v={currentUser.roleNames?.length ? currentUser.roleNames.join(", ") : "—"}
+            />
+            <DRow k="isAdministrator" v={currentUser.isAdministrator ? "true" : "false"} />
+            <DRow k="Admin gate" v={gateLabel[currentUser.adminGate] ?? currentUser.adminGate} />
+            <DRow
+              k="Reason"
+              v={reasonLabel[d?.reason ?? ""] ?? d?.reason ?? "—"}
+            />
+          </dl>
+        )}
+      </details>
+    </section>
+  );
+}
+
+function DRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {k}
+      </dt>
+      <dd className="mt-0.5 break-words text-foreground">{v}</dd>
     </div>
   );
 }
