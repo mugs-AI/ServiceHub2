@@ -24,8 +24,11 @@ export const Route = createFileRoute("/api/session/me")({
             roleNames: user.roleNames,
             isAdministrator: user.isAdministrator,
             adminGate: user.adminGate,
-            // Diagnostics are only exposed to administrators.
-            diagnostics: user.isAdministrator ? user.diagnostics : null,
+            // Phase 0.9.5: diagnostics exposed to the current authenticated
+            // user (own identifiers only — no other users' data, no tokens,
+            // no raw payloads) so Normal Users can see the exact reason
+            // Administrator resolution failed.
+            diagnostics: user.diagnostics,
           });
         } catch (err) {
           const resp = guardResponse(err);
