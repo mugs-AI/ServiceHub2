@@ -132,6 +132,40 @@ function pickLineId(line: N3DocLine, index: number): string {
   return `idx:${index}`;
 }
 
+function pickParentLineId(line: N3DocLine): string | null {
+  const raw =
+    (line as Record<string, unknown>).parentId ??
+    (line as Record<string, unknown>).parentLineId ??
+    (line as Record<string, unknown>).parent_id;
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  return s ? s : null;
+}
+
+type LineType =
+  | "stock"
+  | "description"
+  | "serial_or_reference"
+  | "child_detail"
+  | "unknown";
+
+/**
+ * Classify an N3 detail line strictly from official DTO signals. Never
+ * derives a Stock Code from description text.
+ */
+function classifyLine(line: N3DocLine, stockCode: string | null): LineType {
+  if (stockCode) return "stock";
+  const parent = pickParentLineId(line);
+  if (parent) return "child_detail";
+  const desc = (line.description ?? "").trim();
+  const looksLikeSerial =
+    !!(line as Record<string, unknown>).serialNo ||
+    !!(line as Record<string, unknown>).referenceNo;
+  if (looksLikeSerial) return "serial_or_reference";
+  if (desc) return "description";
+  return "unknown";
+}
+
 // ---------------------------------------------------------------------------
 // Main entry.
 
