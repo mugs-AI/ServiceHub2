@@ -99,7 +99,7 @@ export async function runWithSyncLog(
       failed_count: counters.failed,
       status,
       error_message: errorMessage ?? null,
-      details: Object.keys(counters.details).length > 0 ? counters.details : null,
+      details: (Object.keys(counters.details).length > 0 ? counters.details : null) as never,
     })
     .eq("id", logRow.id);
 
