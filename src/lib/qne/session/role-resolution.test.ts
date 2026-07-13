@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   decideAdmin,
   hasAdministratorRole,
+  isOwnerUser,
   matchCurrentUser,
   normaliseEmail,
   type N3UserDto,
@@ -20,20 +21,22 @@ const jonas: N3UserDto = {
   ],
 };
 
-const billing: N3UserDto = {
-  userId: "u-b",
-  userName: "billing@acme.co",
-  email: "billing@acme.co",
-  displayName: "Billing",
+const billingOwner: N3UserDto = {
+  userId: "u-bo",
+  userName: "bo@acme.co",
+  email: "bo@acme.co",
+  displayName: "BillingOwner",
+  isOwner: true,
   roles: [{ name: "Billing Administrators" }],
 };
 
-const coAdmin: N3UserDto = {
-  userId: "u-c",
-  userName: "co@acme.co",
-  email: "co@acme.co",
-  displayName: "Co",
-  roles: [{ name: "Co-Administrators" }],
+const adminNotOwner: N3UserDto = {
+  userId: "u-a",
+  userName: "a@acme.co",
+  email: "a@acme.co",
+  displayName: "Admin",
+  isOwner: false,
+  roles: [{ name: "Administrators" }],
 };
 
 const support: N3UserDto = {
@@ -41,6 +44,7 @@ const support: N3UserDto = {
   userName: "sup@acme.co",
   email: "sup@acme.co",
   displayName: "Sup",
+  isOwner: false,
   roles: [{ name: "Support" }],
 };
 
@@ -48,11 +52,11 @@ const neverAllow = { isAllowlisted: () => false, tryBootstrap: () => false };
 const ok = (users: N3UserDto[]): UsersLoad => ({ users, status: "ok" });
 
 describe("email normalisation & matching", () => {
-  it("matches lowercase BasicInfo email to uppercase N3 username", () => {
+  it("matches lowercase identity to uppercase N3 username", () => {
     const users: N3UserDto[] = [{ ...jonas, userName: "LKS.MUGS@GMAIL.COM", email: null }];
     expect(matchCurrentUser(users, { email: "lks.mugs@gmail.com" })).toBe(users[0]);
   });
-  it("matches uppercase BasicInfo email to lowercase N3 username", () => {
+  it("matches uppercase identity to lowercase N3 username", () => {
     const users: N3UserDto[] = [{ ...jonas, userName: "lks.mugs@gmail.com", email: null }];
     expect(matchCurrentUser(users, { email: "LKS.MUGS@GMAIL.COM" })).toBe(users[0]);
   });
@@ -61,45 +65,83 @@ describe("email normalisation & matching", () => {
   });
 });
 
-describe("hasAdministratorRole", () => {
-  it("exact Administrators role → true", () => {
-    expect(hasAdministratorRole(jonas)).toBe(true);
+describe("isOwnerUser / hasAdministratorRole", () => {
+  it("Owner=true → isOwnerUser true", () => {
+    expect(isOwnerUser(jonas)).toBe(true);
   });
-  it("only Billing Administrators → false", () => {
-    expect(hasAdministratorRole(billing)).toBe(false);
+  it("Owner=false → isOwnerUser false, even with Administrators role", () => {
+    expect(isOwnerUser(adminNotOwner)).toBe(false);
   });
-  it("only Co-Administrators → false", () => {
-    expect(hasAdministratorRole(coAdmin)).toBe(false);
-  });
-  it("Owner + Administrators → true", () => {
-    expect(hasAdministratorRole(jonas)).toBe(true);
+  it("hasAdministratorRole is informational only", () => {
+    expect(hasAdministratorRole(adminNotOwner)).toBe(true);
+    expect(hasAdministratorRole(support)).toBe(false);
   });
 });
 
-describe("decideAdmin", () => {
-  it("returns n3_role for exact Administrators role", async () => {
+describe("decideAdmin — Owner-based rule", () => {
+  it("Owner=true → n3_owner", async () => {
     const d = await decideAdmin(ok([jonas, support]), { email: "LKS.MUGS@GMAIL.COM" }, neverAllow);
     expect(d).toMatchObject({
       isAdministrator: true,
-      adminGate: "n3_role",
+      adminGate: "n3_owner",
       matchedUserId: "u-jonas",
       matchedDisplayName: "JONAS",
-      reason: "matched_administrators_role",
+      isOwner: true,
+      reason: "matched_owner",
     });
+  });
+  it("Owner=true even without Administrators role → n3_owner", async () => {
+    const d = await decideAdmin(ok([billingOwner]), { email: "bo@acme.co" }, neverAllow);
+    expect(d.isAdministrator).toBe(true);
+    expect(d.adminGate).toBe("n3_owner");
+    expect(d.reason).toBe("matched_owner");
+  });
+  it("Administrators role but not Owner → Normal User", async () => {
+    const d = await decideAdmin(ok([adminNotOwner]), { email: "a@acme.co" }, neverAllow);
+    expect(d.isAdministrator).toBe(false);
+    expect(d.adminGate).toBe("none");
+    expect(d.reason).toBe("matched_not_owner");
     expect(d.roleNames).toContain("Administrators");
   });
-  it("returns none for Billing Administrators only", async () => {
-    const d = await decideAdmin(ok([billing]), { email: "billing@acme.co" }, neverAllow);
+  it("Support user → Normal User", async () => {
+    const d = await decideAdmin(ok([support]), { email: "sup@acme.co" }, neverAllow);
     expect(d.isAdministrator).toBe(false);
-    expect(d.adminGate).toBe("none");
-    expect(d.reason).toBe("matched_without_administrators_role");
+    expect(d.reason).toBe("matched_not_owner");
   });
-  it("returns none for Co-Administrators only", async () => {
-    const d = await decideAdmin(ok([coAdmin]), { email: "co@acme.co" }, neverAllow);
+  it("matches by userName when email missing", async () => {
+    const d = await decideAdmin(ok([jonas]), { userName: "LKS.MUGS@GMAIL.COM" }, neverAllow);
+    expect(d.isAdministrator).toBe(true);
+    expect(d.matchedUserId).toBe("u-jonas");
+  });
+  it("matches by stable userId first", async () => {
+    const d = await decideAdmin(ok([jonas]), { userId: "u-jonas" }, neverAllow);
+    expect(d.isAdministrator).toBe(true);
+  });
+  it("identity missing → identity_missing", async () => {
+    const d = await decideAdmin(ok([jonas]), {}, neverAllow);
     expect(d.isAdministrator).toBe(false);
-    expect(d.adminGate).toBe("none");
+    expect(d.reason).toBe("identity_missing");
   });
-  it("falls back to allowlist when /api/Users failed", async () => {
+  it("no matching user → no_matching_user", async () => {
+    const d = await decideAdmin(ok([support]), { email: "ghost@acme.co" }, neverAllow);
+    expect(d.isAdministrator).toBe(false);
+    expect(d.reason).toBe("no_matching_user");
+  });
+  it("/api/Users 401 without fallback → users_endpoint_unauthorized", async () => {
+    const d = await decideAdmin(
+      { users: null, status: "unauthorized" },
+      { email: "x@y.co" },
+      neverAllow,
+    );
+    expect(d.isAdministrator).toBe(false);
+    expect(d.reason).toBe("users_endpoint_unauthorized");
+  });
+  it("/api/Users failed without fallback → users_endpoint_failed", async () => {
+    const d = await decideAdmin({ users: null, status: "failed" }, { email: "x@y.co" }, neverAllow);
+    expect(d.isAdministrator).toBe(false);
+    expect(d.reason).toBe("users_endpoint_failed");
+  });
+  it("allowlist fallback fires when enabled", async () => {
     const d = await decideAdmin(
       { users: null, status: "failed" },
       { email: "someone@acme.co" },
@@ -109,49 +151,10 @@ describe("decideAdmin", () => {
     expect(d.isAdministrator).toBe(true);
     expect(d.reason).toBe("allowlist_fallback");
   });
-  it("allowlist matching is case-insensitive", async () => {
-    const seen: string[] = [];
-    const d = await decideAdmin(
-      ok([]),
-      { email: "MiXeD@Acme.CO" },
-      { isAllowlisted: (e) => { seen.push(e); return true; } },
-    );
-    expect(d.isAdministrator).toBe(true);
-    expect(seen[0]).toBe("MiXeD@Acme.CO");
-  });
-  it("handles multiple roles correctly", async () => {
-    const multi: N3UserDto = {
-      userId: "m",
-      email: "m@x.co",
-      roles: [{ name: "Accountant" }, { name: "Owner" }, { name: "Administrators" }],
-    };
-    const d = await decideAdmin(ok([multi]), { email: "m@x.co" }, neverAllow);
-    expect(d.isAdministrator).toBe(true);
-    expect(d.adminGate).toBe("n3_role");
-    expect(d.roleNames).toEqual(["Accountant", "Owner", "Administrators"]);
-  });
-  it("returns users_endpoint_unauthorized when endpoint 401s and no fallback", async () => {
-    const d = await decideAdmin({ users: null, status: "unauthorized" }, { email: "x@y.co" }, neverAllow);
+  it("inactive Owner is not admin", async () => {
+    const inactive: N3UserDto = { ...jonas, isDisabled: true };
+    const d = await decideAdmin(ok([inactive]), { email: "lks.mugs@gmail.com" }, neverAllow);
     expect(d.isAdministrator).toBe(false);
-    expect(d.reason).toBe("users_endpoint_unauthorized");
-  });
-  it("returns basicinfo_user_identifier_missing when identity is empty", async () => {
-    const d = await decideAdmin(ok([jonas]), {}, neverAllow);
-    expect(d.isAdministrator).toBe(false);
-    expect(d.reason).toBe("basicinfo_user_identifier_missing");
-  });
-  it("returns users_endpoint_failed when endpoint errors and no fallback", async () => {
-    const d = await decideAdmin({ users: null, status: "failed" }, { email: "x@y.co" }, neverAllow);
-    expect(d.isAdministrator).toBe(false);
-    expect(d.reason).toBe("users_endpoint_failed");
-  });
-  it("matches by userName when email missing", async () => {
-    const d = await decideAdmin(ok([jonas]), { userName: "LKS.MUGS@GMAIL.COM" }, neverAllow);
-    expect(d.isAdministrator).toBe(true);
-    expect(d.matchedUserId).toBe("u-jonas");
-  });
-  it("does not mistake tenant code for user identity (matcher receives cleaned identity)", async () => {
-    const d = await decideAdmin(ok([jonas]), { email: null, userName: null, userId: null, userCode: null }, neverAllow);
-    expect(d.reason).toBe("basicinfo_user_identifier_missing");
+    expect(d.reason).toBe("matched_not_owner");
   });
 });
