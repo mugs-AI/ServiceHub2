@@ -784,6 +784,42 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
+function BreakdownCard({ title, b }: { title: string; b: LineBreakdown }) {
+  const Row = ({ k, v, muted }: { k: string; v: number | string; muted?: boolean }) => (
+    <div className={`flex justify-between ${muted ? "text-muted-foreground" : ""}`}>
+      <dt>{k}</dt>
+      <dd className="font-mono">{typeof v === "number" ? v.toLocaleString() : v}</dd>
+    </div>
+  );
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="text-xs font-semibold text-foreground">{title}</h4>
+        <span className="text-[10px] text-muted-foreground">
+          {b.distinctDocuments.toLocaleString()} documents
+        </span>
+      </div>
+      <dl className="space-y-1 text-[11px]">
+        <Row k="Total lines stored" v={b.total} />
+        <Row k="Stock lines" v={b.stock} />
+        <Row k="Description-only" v={b.description} muted />
+        <Row k="Serial / reference" v={b.serial_or_reference} muted />
+        <Row k="Child detail" v={b.child_detail} muted />
+        <Row k="Unknown / other" v={b.unknown} muted />
+        <Row k="Voided source lines" v={b.voided} muted />
+        <div className="mt-2 border-t pt-1" />
+        <Row k="Stock → Renewal mapped" v={b.stockRenewalMapped} />
+        <Row k="Stock → Ad Hoc mapped" v={b.stockAdHocMapped} />
+        <Row k="Stock — no mapping" v={b.stockUnmapped} muted />
+        <Row k="Lines without stock (ignored)" v={b.linesWithoutStock} muted />
+        {b.duplicateRowsDetected > 0 && (
+          <Row k="Duplicate rows detected" v={b.duplicateRowsDetected} />
+        )}
+      </dl>
+    </div>
+  );
+}
+
 interface VerifyDocResponse {
   tenantCode: string;
   documentNo: string;
