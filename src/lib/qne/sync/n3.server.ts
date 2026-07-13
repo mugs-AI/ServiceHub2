@@ -110,7 +110,7 @@ export async function resolveTenantContext(request: Request): Promise<N3TenantCo
 
   let info: { tenantCode: string; companyName: string; email: string };
   try {
-    info = normaliseBasicInfo(await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo"));
+    info = extractBasicInfo(await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo"));
   } catch (err) {
     if (err instanceof Error && /401|unauth/i.test(err.message)) {
       throw new UnauthorizedSyncError(err.message);
