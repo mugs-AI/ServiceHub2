@@ -1,27 +1,30 @@
 // Server-only current-user resolution & access guards.
-// Tenant + user identity are ALWAYS resolved from the authenticated N3
-// session (BasicInfo + JWT payload fallback). Browser-supplied values are
-// ignored.
 //
-// Administrator status is resolved from the official N3 /api/Users role
-// attachments (see role-resolution.ts). The tenant-scoped ServiceHub
-// allowlist (service_hub_admins) remains only as a secure fallback.
+// Phase 0.9.7 rules (Owner-based ServiceHub Administration):
+//   • Current-user identity is sourced from the VALIDATED N3 bearer context
+//     (JWT payload claims). BasicInfo is NOT used as user identity — it is
+//     tenant/company metadata only. Browser-submitted values are ignored.
+//   • Administrator ⇔ matched UserDto in /api/Users has isOwner === true.
+//   • The Administrators role is informational only.
+//   • Tenant allowlist / bootstrap remain as emergency fallbacks, DISABLED
+//     by default — enable per-tenant with SERVICEHUB_ALLOWLIST_FALLBACK=1.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { buildN3Url } from "@/lib/qne/server-config";
 import { unwrapApiResponse } from "@/lib/qne/envelope";
 import { n3Get } from "@/lib/qne/sync/n3.server";
-import { decodeJwtPayload } from "@/lib/qne/jwt";
+import { decodeJwtPayload, type JwtDisplayClaims } from "@/lib/qne/jwt";
 import {
   decideAdmin,
   type AdminDecision,
   type AdminDecisionReason,
   type AdminGate,
+  type IdentityLookup,
   type N3UserDto,
   type UsersEndpointStatus,
   type UsersLoad,
 } from "@/lib/qne/session/role-resolution";
-import { normalizeBasicInfo, type NormalizedBasicInfo } from "@/lib/qne/session/basic-info";
+import { normalizeBasicInfo } from "@/lib/qne/session/basic-info";
 
 export interface CurrentUserContext {
   token: string;
@@ -31,11 +34,13 @@ export interface CurrentUserContext {
   displayName: string;
   userCode: string | null;
   isAdministrator: boolean;
+  isOwner: boolean;
   adminGate: AdminGate;
   roleNames: string[];
   /** Structured diagnostics — never surfaced to Normal Users. */
   diagnostics: {
-    basicInfoUserIdentifier: string | null;
+    identitySource: "n3_jwt" | "n3_jwt+basicinfo" | "unknown";
+    identityUserIdentifier: string | null;
     matchedN3UserId: string | null;
     matchedDisplayName: string | null;
     reason: AdminDecision["reason"];
@@ -63,6 +68,10 @@ export class ForbiddenError extends Error {
   }
 }
 
+function allowlistFallbackEnabled(): boolean {
+  const v = (process.env.SERVICEHUB_ALLOWLIST_FALLBACK ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
 
 function envAllowlist(): Set<string> {
   const raw = process.env.SERVICEHUB_BOOTSTRAP_ADMIN_EMAILS ?? "";
@@ -75,6 +84,7 @@ function envAllowlist(): Set<string> {
 }
 
 async function isAllowlisted(tenantCode: string, email: string): Promise<boolean> {
+  if (!allowlistFallbackEnabled()) return false;
   const emailLc = email.trim().toLowerCase();
   if (!emailLc) return false;
   if (envAllowlist().has(emailLc)) return true;
@@ -88,6 +98,7 @@ async function isAllowlisted(tenantCode: string, email: string): Promise<boolean
 }
 
 async function tryBootstrap(tenantCode: string, email: string): Promise<boolean> {
+  if (!allowlistFallbackEnabled()) return false;
   const { count } = await supabaseAdmin
     .from("service_hub_admins")
     .select("id", { count: "exact", head: true })
@@ -102,13 +113,56 @@ async function tryBootstrap(tenantCode: string, email: string): Promise<boolean>
   return !error;
 }
 
+/** Case-insensitive claim picker. Trims. Rejects empty strings. */
+function pickClaim(
+  claims: JwtDisplayClaims,
+  keys: readonly string[],
+): string | null {
+  const lower: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(claims)) lower[k.toLowerCase()] = v;
+  for (const k of keys) {
+    const v = lower[k.toLowerCase()];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  }
+  return null;
+}
+
 /**
- * Fetch /api/Users through the same-origin path (direct upstream call from
- * the server). Accepts multiple response shapes documented in the OpenAPI:
+ * Extract current-user identity from the validated N3 bearer JWT.
+ * N3 signs the token; any request forwarded to N3 with a bad token comes
+ * back 401 before we ever get here, so the claim set is trusted context.
+ */
+function identityFromJwt(claims: JwtDisplayClaims): IdentityLookup & {
+  displayName: string | null;
+} {
+  return {
+    userId: pickClaim(claims, [
+      "userId",
+      "uid",
+      "userGuid",
+      "sub",
+      "nameid",
+      "nameId",
+    ]),
+    userCode: pickClaim(claims, ["userCode"]),
+    email: pickClaim(claims, ["email", "upn", "preferred_username"]),
+    userName: pickClaim(claims, [
+      "userName",
+      "unique_name",
+      "username",
+      "loginName",
+      "login",
+    ]),
+    displayName: pickClaim(claims, ["displayName", "name", "fullName"]),
+  };
+}
+
+/**
+ * Fetch /api/Users with tolerance for multiple documented shapes:
  *   { code, message, data: UserDto[] }
- *   { code, message, data: { value: UserDto[], count } }   // paged
- *   { code, message, data: { data: UserDto[] } }           // occasional wrap
- * Records structured diagnostics so a stuck resolution is never silent.
+ *   { code, message, data: { value: UserDto[], count } }
+ *   { code, message, data: { data: UserDto[] } }
  */
 async function fetchN3Users(token: string): Promise<UsersLoad & {
   httpStatus: number | null;
@@ -176,7 +230,6 @@ async function fetchN3Users(token: string): Promise<UsersLoad & {
     };
   }
 
-  // Accept: array, {value: []}, {items: []}, {data: []}.
   let users: N3UserDto[] | null = null;
   let shape = "unknown";
   if (Array.isArray(data)) {
@@ -219,8 +272,9 @@ async function fetchN3Users(token: string): Promise<UsersLoad & {
 
 /**
  * Resolve the authenticated N3 user from an incoming Request.
- * Tenant comes from BasicInfo first, then falls back to the JWT payload
- * (`tenantCode` claim) — matching the N3 Development Brief.
+ * Tenant/company come from BasicInfo (with JWT tenantCode as fallback).
+ * User identity comes from the JWT payload — NEVER from BasicInfo or the
+ * browser.
  */
 export async function requireAuthenticatedN3User(
   request: Request,
@@ -230,81 +284,79 @@ export async function requireAuthenticatedN3User(
   if (!match) throw new UnauthorizedError("Missing Authorization bearer");
   const token = match[1].trim();
 
-  let basic: unknown = {};
+  const claims = decodeJwtPayload(token);
+  const jwtIdentity = identityFromJwt(claims);
+
+  // BasicInfo is tenant/company only.
+  let basicRaw: unknown = {};
   try {
-    basic = (await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo")) ?? {};
+    basicRaw = (await n3Get<unknown>(token, "main", "/api/companyprofile/BasicInfo")) ?? {};
   } catch (err) {
     if (err instanceof Error && /401|unauth/i.test(err.message)) {
       throw new UnauthorizedError(err.message);
     }
-    throw err;
+    // Non-401 BasicInfo failure is non-fatal for identity — JWT already has it.
   }
+  const basic = normalizeBasicInfo(basicRaw);
 
-  // One shared BasicInfo parser — same code the browser SessionProvider uses.
-  const normalized: NormalizedBasicInfo = normalizeBasicInfo(basic);
-  const claims = decodeJwtPayload(token);
-
-  // Tenant fallback to JWT claim is display-only per the brief.
   const tenantCode =
-    normalized.tenantCode ||
+    basic.tenantCode ||
     (typeof claims.tenantCode === "string" ? claims.tenantCode.trim() : "");
   const companyName =
-    normalized.companyName ||
+    basic.companyName ||
     (typeof claims.company === "string" ? (claims.company as string).trim() : "");
-  // JWT `email` / `name` remain a display-only fallback — never trusted as
-  // the sole user identifier for role matching (only BasicInfo is).
-  const email =
-    normalized.email ??
-    (typeof claims.email === "string" && claims.email.trim() ? claims.email.trim() : "");
-  const displayNameFromBasic = normalized.displayName;
-  const displayName =
-    displayNameFromBasic ||
-    (typeof claims.name === "string" ? claims.name.trim() : "") ||
-    email;
-  const userCode = normalized.userCode;
-  const userId = normalized.userId;
-  const userName = normalized.userName;
 
   if (!tenantCode) {
     throw new UnauthorizedError(
-      "Unable to resolve tenant from N3 session (BasicInfo and JWT payload both missing tenantCode)",
+      "Unable to resolve tenant from N3 session (BasicInfo and JWT both missing tenantCode)",
     );
   }
+
+  const email = jwtIdentity.email ?? "";
+  const userName = jwtIdentity.userName ?? "";
+  const userId = jwtIdentity.userId ?? null;
+  const userCode = jwtIdentity.userCode ?? null;
+  const displayNameFromJwt = jwtIdentity.displayName ?? "";
+
+  const identityUserIdentifier =
+    userId || userCode || email || userName || null;
 
   const load = await fetchN3Users(token);
 
   const decision = await decideAdmin(
     { users: load.users, status: load.status },
-    {
-      userId,
-      userCode,
-      email: normalized.email,
-      userName,
-    },
+    { userId, userCode, email, userName },
     {
       isAllowlisted: (e) => isAllowlisted(tenantCode, e),
       tryBootstrap: (e) => tryBootstrap(tenantCode, e),
     },
   );
 
-  // Prefer the display name N3 has on file when BasicInfo didn't surface one.
-  const effectiveDisplayName =
-    decision.matchedDisplayName && !displayNameFromBasic
-      ? decision.matchedDisplayName
-      : displayName;
+  const displayName =
+    decision.matchedDisplayName ||
+    displayNameFromJwt ||
+    email ||
+    userName ||
+    "";
 
   return {
     token,
     tenantCode,
     companyName,
     email,
-    displayName: effectiveDisplayName,
+    displayName,
     userCode,
     isAdministrator: decision.isAdministrator,
+    isOwner: decision.isOwner,
     adminGate: decision.adminGate,
     roleNames: decision.roleNames,
     diagnostics: {
-      basicInfoUserIdentifier: normalized.primaryUserIdentifier,
+      identitySource: identityUserIdentifier
+        ? basic.tenantCode
+          ? "n3_jwt+basicinfo"
+          : "n3_jwt"
+        : "unknown",
+      identityUserIdentifier,
       matchedN3UserId: decision.matchedUserId,
       matchedDisplayName: decision.matchedDisplayName,
       reason: decision.reason satisfies AdminDecisionReason,
