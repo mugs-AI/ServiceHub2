@@ -359,10 +359,11 @@ function AdminSnapshots() {
         <div className="grid gap-3 md:grid-cols-3">
           {(["Customers", "Stock", "Contract"] as HealthType[]).map((type) => {
             const row = health?.snapshots.find((s) => s.snapshot_type === type);
+            const displayLabel = type === "Contract" ? "Subscriptions" : type;
             return (
               <div key={type} className="rounded-md border p-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">{type}</h3>
+                  <h3 className="text-sm font-semibold">{displayLabel}</h3>
                   {statusBadge(row?.health_status ?? "Unknown")}
                 </div>
                 <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
@@ -393,6 +394,7 @@ function AdminSnapshots() {
               </div>
             );
           })}
+
         </div>
       </section>
 
