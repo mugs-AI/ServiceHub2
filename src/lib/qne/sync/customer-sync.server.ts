@@ -99,7 +99,8 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
       batch = [];
     };
 
-    for await (const raw of n3IterateList<N3Customer>(ctx.token, "main", "/api/customer")) {
+    const ep = N3_ENDPOINTS["customers.list"];
+    for await (const raw of n3IterateList<N3Customer>(ctx.token, ep.target, ep.path)) {
       const norm = normalise(raw, tenantCode);
       if (!norm.customer_code) {
         counters.skipped += 1;
