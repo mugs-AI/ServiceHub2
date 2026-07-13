@@ -236,11 +236,11 @@ function AdminSnapshots() {
           from the authenticated N3 session: <strong>{tenant || "—"}</strong>.
           All data on this page is scoped to your Client company only.
         </p>
-        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Interim administrator gate: N3 does not currently expose an official
-          ServiceHub role claim. Access to this page is controlled by the
-          tenant-scoped administrator allowlist managed in <strong>Settings</strong>.
-          Both this page and its APIs enforce the check server-side.
+        <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          ServiceHub administration is granted to the current N3 company
+          Owner (<code>UserDto.isOwner === true</code>). All other authenticated
+          users are Normal Users. Both this page and its APIs enforce the
+          Owner check server-side.
         </p>
       </div>
 

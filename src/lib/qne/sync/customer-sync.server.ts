@@ -2,6 +2,7 @@
 // Tenant-scoped: only rows belonging to the resolved tenant are touched.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
 import { n3IterateList, type N3TenantContext } from "./n3.server";
 import { runWithSyncLog, type SyncResult } from "./log.server";
 
@@ -98,7 +99,8 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
       batch = [];
     };
 
-    for await (const raw of n3IterateList<N3Customer>(ctx.token, "main", "/api/customer")) {
+    const ep = N3_ENDPOINTS["customers.list"];
+    for await (const raw of n3IterateList<N3Customer>(ctx.token, ep.target, ep.path)) {
       const norm = normalise(raw, tenantCode);
       if (!norm.customer_code) {
         counters.skipped += 1;

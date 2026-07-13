@@ -8,7 +8,7 @@ export const Route = createFileRoute("/users")({
       <N3ListExplorer
         title="N3 Users"
         hint="Users from the N3 platform-v1 scope. Used as the source for job assignees — no local shadow user table is created."
-        defaultPath="/api/user"
+        defaultPath="/api/Users/Lookup"
         preferredColumns={["id", "userName", "email", "displayName", "isActive"]}
       />
     </AdminOnly>

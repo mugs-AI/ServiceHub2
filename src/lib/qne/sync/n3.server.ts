@@ -53,7 +53,8 @@ export async function n3GetList<T>(
 }
 
 /**
- * Page through an N3 list endpoint, yielding every row. Tenant is enforced
+ * Page through an N3 list endpoint using OData `$top` / `$skip` (per the
+ * official `x-qne-paging: odata-page` extension). Tenant is enforced
  * upstream by the JWT itself — N3 scopes the response to that tenant.
  */
 export async function* n3IterateList<T>(
@@ -63,19 +64,19 @@ export async function* n3IterateList<T>(
   query: Record<string, unknown> = {},
   pageSize = 200,
 ): AsyncGenerator<T> {
-  let pageNo = 1;
+  let skip = 0;
   // Cap for safety; a single sync should never need this many pages.
   const HARD_CAP_PAGES = 500;
-  while (pageNo <= HARD_CAP_PAGES) {
+  for (let page = 0; page < HARD_CAP_PAGES; page++) {
     const { rows, total } = await n3GetList<T>(token, target, path, {
       ...query,
-      pageNo,
-      pageSize,
+      $top: pageSize,
+      $skip: skip,
     });
     for (const row of rows) yield row;
     if (rows.length < pageSize) return;
-    if (total && pageNo * pageSize >= total) return;
-    pageNo += 1;
+    if (total && skip + rows.length >= total) return;
+    skip += rows.length;
   }
 }
 

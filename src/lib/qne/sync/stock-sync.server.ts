@@ -1,6 +1,7 @@
 // StockSnapshotSync — mirrors business fields only. Never pricing.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
 import { n3IterateList, type N3TenantContext } from "./n3.server";
 import { runWithSyncLog, type SyncResult } from "./log.server";
 
@@ -79,7 +80,8 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
       batch = [];
     };
 
-    for await (const raw of n3IterateList<N3Stock>(ctx.token, "main", "/api/stock")) {
+    const ep = N3_ENDPOINTS["stock.list"];
+    for await (const raw of n3IterateList<N3Stock>(ctx.token, ep.target, ep.path)) {
       const norm = normalise(raw, tenantCode);
       if (!norm.stock_code) {
         counters.skipped += 1;

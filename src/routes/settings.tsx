@@ -42,9 +42,9 @@ function Settings() {
     setBusy(true);
     setError(null);
     try {
-      const { rows } = await qneGetList<Stock>("main", "/api/stock", {
-        pageNo: 1,
-        pageSize: 50,
+      const { rows } = await qneGetList<Stock>("main", "/api/Stocks/List", {
+        $top: 50,
+        $skip: 0,
         search: q,
       });
       setRows(rows);
@@ -191,6 +191,7 @@ function AdminAllowlistPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState("");
+  const [fallbackEnabled, setFallbackEnabled] = useState<boolean | null>(null);
 
   const authFetch = async (path: string, init: RequestInit = {}) => {
     const token = getStoredToken();
@@ -208,9 +209,14 @@ function AdminAllowlistPanel() {
     setError(null);
     try {
       const res = await authFetch("/api/admin/allowlist");
-      const json = (await res.json()) as { admins?: AllowlistEntry[]; error?: string };
+      const json = (await res.json()) as {
+        admins?: AllowlistEntry[];
+        error?: string;
+        fallbackEnabled?: boolean;
+      };
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       setRows(json.admins ?? []);
+      setFallbackEnabled(Boolean(json.fallbackEnabled));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -222,6 +228,10 @@ function AdminAllowlistPanel() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Owner-based administration is the primary rule; the allowlist exists only
+  // as an emergency fallback and stays hidden unless explicitly enabled.
+  if (fallbackEnabled === false) return null;
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,13 +268,14 @@ function AdminAllowlistPanel() {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-foreground">
-            Administrator allowlist
+            Emergency Administrator Fallback
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Interim gate — N3 does not yet expose an official role claim for
-            ServiceHub. Only emails on this tenant-scoped allowlist can access
-            Settings and Admin Tools. The first authenticated user of a tenant
-            is auto-promoted as bootstrap administrator.
+            ServiceHub administration is granted to the current N3 company
+            Owner. This allowlist is an emergency fallback, active only while
+            <code className="mx-1 rounded bg-muted px-1">SERVICEHUB_ALLOWLIST_FALLBACK=1</code>
+            is set. Only emails on this tenant-scoped list can access Settings
+            and Admin Tools under the fallback.
           </p>
         </div>
       </div>

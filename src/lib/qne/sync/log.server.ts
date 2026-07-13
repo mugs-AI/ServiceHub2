@@ -16,6 +16,7 @@ export interface SyncResult {
   logId: string;
   status: SyncStatus;
   errorMessage?: string;
+  notReadyReason?: string;
 }
 
 interface RunOptions {
@@ -28,6 +29,18 @@ interface Counters {
   updated: number;
   skipped: number;
   failed: number;
+}
+
+/**
+ * Thrown by a sync worker when required inputs are missing (e.g. no renewal
+ * stock mapping, no customer snapshots). The run is NOT a failure but it
+ * cannot produce a valid outcome — health must show Warning, not Healthy.
+ */
+export class SyncNotReadyError extends Error {
+  constructor(public readonly userMessage: string) {
+    super(userMessage);
+    this.name = "SyncNotReadyError";
+  }
 }
 
 export async function runWithSyncLog(
@@ -51,13 +64,20 @@ export async function runWithSyncLog(
   const counters: Counters = { inserted: 0, updated: 0, skipped: 0, failed: 0 };
   let status: SyncStatus = "success";
   let errorMessage: string | undefined;
+  let notReadyReason: string | undefined;
 
   try {
     await work(counters);
     if (counters.failed > 0) status = "partial";
   } catch (err) {
-    status = "failed";
-    errorMessage = err instanceof Error ? err.message : String(err);
+    if (err instanceof SyncNotReadyError) {
+      status = "partial";
+      notReadyReason = err.userMessage;
+      errorMessage = err.userMessage;
+    } else {
+      status = "failed";
+      errorMessage = err instanceof Error ? err.message : String(err);
+    }
   }
 
   const durationMs = Date.now() - started;
@@ -85,12 +105,14 @@ export async function runWithSyncLog(
       syncErrorMessage: errorMessage,
       counters,
       lastAttempt: new Date(),
-      succeeded: status !== "failed",
+      // A "not ready" sync did not fail, but it also did not succeed —
+      // do NOT advance last_successful_sync and force a Warning below.
+      succeeded: status !== "failed" && !notReadyReason,
+      notReadyReason,
     });
   } catch (err) {
     console.error("[snapshot_health] update failed", err);
   }
 
-  return { ...counters, durationMs, logId: logRow.id, status, errorMessage };
+  return { ...counters, durationMs, logId: logRow.id, status, errorMessage, notReadyReason };
 }
-
