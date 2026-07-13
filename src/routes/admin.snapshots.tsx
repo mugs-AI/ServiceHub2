@@ -709,6 +709,18 @@ function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
             <Stat label="Renewal events" value={state.totals.renewalEvents} />
             <Stat label="Current subscriptions" value={state.totals.currentSubscriptions} />
           </div>
+          {state.reconciliationNote && (
+            <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-900">
+              {state.reconciliationNote}
+            </p>
+          )}
+          {state.perSource && (
+            <div className="grid gap-3 md:grid-cols-2">
+              <BreakdownCard title="Sales Invoices" b={state.perSource.salesInvoice} />
+              <BreakdownCard title="Delivery Orders" b={state.perSource.deliveryOrder} />
+            </div>
+          )}
+
           {state.activeLocks.length > 0 && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
               Active sync locks:{" "}
