@@ -8,7 +8,7 @@ export const Route = createFileRoute("/customers")({
       <N3ListExplorer
         title="N3 Customers"
         hint="Administrator explorer — live from the N3 Open API."
-        defaultPath="/api/customer"
+        defaultPath="/api/Customers/List"
         preferredColumns={["code", "companyName", "name", "email", "phone1", "isActive"]}
       />
     </AdminOnly>
