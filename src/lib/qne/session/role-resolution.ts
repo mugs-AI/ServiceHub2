@@ -144,13 +144,17 @@ export interface UsersLoad {
  */
 export async function decideAdmin(
   usersLoad: UsersLoad,
-  identity: { userCode?: string | null; email?: string | null },
+  identity: IdentityLookup,
   allowlist: {
     isAllowlisted: (email: string) => Promise<boolean> | boolean;
     tryBootstrap?: (email: string) => Promise<boolean> | boolean;
   },
 ): Promise<AdminDecision> {
   const email = (identity.email ?? "").trim();
+  const userName = (identity.userName ?? "").trim();
+  const userId = (identity.userId ?? "").trim();
+  const userCode = (identity.userCode ?? "").trim();
+  const hasIdentity = Boolean(email || userName || userId || userCode);
   let matched: N3UserDto | null = null;
   let roleNames: string[] = [];
   let reason: AdminDecisionReason = "no_matching_user";
@@ -162,8 +166,8 @@ export async function decideAdmin(
         : usersLoad.status === "forbidden"
           ? "users_endpoint_forbidden"
           : "users_endpoint_failed";
-  } else if (!email && !identity.userCode) {
-    reason = "no_email";
+  } else if (!hasIdentity) {
+    reason = "basicinfo_user_identifier_missing";
   } else if (!usersLoad.users || usersLoad.users.length === 0) {
     reason = "no_matching_user";
   } else {
