@@ -80,7 +80,8 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
       batch = [];
     };
 
-    for await (const raw of n3IterateList<N3Stock>(ctx.token, "main", "/api/stock")) {
+    const ep = N3_ENDPOINTS["stock.list"];
+    for await (const raw of n3IterateList<N3Stock>(ctx.token, ep.target, ep.path)) {
       const norm = normalise(raw, tenantCode);
       if (!norm.stock_code) {
         counters.skipped += 1;
