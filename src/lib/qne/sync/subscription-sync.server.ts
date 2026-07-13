@@ -132,6 +132,40 @@ function pickLineId(line: N3DocLine, index: number): string {
   return `idx:${index}`;
 }
 
+function pickParentLineId(line: N3DocLine): string | null {
+  const raw =
+    (line as Record<string, unknown>).parentId ??
+    (line as Record<string, unknown>).parentLineId ??
+    (line as Record<string, unknown>).parent_id;
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  return s ? s : null;
+}
+
+type LineType =
+  | "stock"
+  | "description"
+  | "serial_or_reference"
+  | "child_detail"
+  | "unknown";
+
+/**
+ * Classify an N3 detail line strictly from official DTO signals. Never
+ * derives a Stock Code from description text.
+ */
+function classifyLine(line: N3DocLine, stockCode: string | null): LineType {
+  if (stockCode) return "stock";
+  const parent = pickParentLineId(line);
+  if (parent) return "child_detail";
+  const desc = (line.description ?? "").trim();
+  const looksLikeSerial =
+    !!(line as Record<string, unknown>).serialNo ||
+    !!(line as Record<string, unknown>).referenceNo;
+  if (looksLikeSerial) return "serial_or_reference";
+  if (desc) return "description";
+  return "unknown";
+}
+
 // ---------------------------------------------------------------------------
 // Main entry.
 
@@ -297,10 +331,20 @@ interface SourceMetrics {
   detailLinesStored: number;
   mappedRenewalLines: number;
   mappedAdHocLines: number;
+  unmappedStockLines: number;
   unmappedLinesIgnored: number;
   voidedDocuments: number;
+  voidedSourceLines: number;
   renewalEventsInserted: number;
   renewalEventsSkipped: number;
+  lineTypeCounts: {
+    stock: number;
+    description: number;
+    serial_or_reference: number;
+    child_detail: number;
+    unknown: number;
+  };
+  linesWithoutStockIgnored: number;
 }
 
 async function syncSourceDetails(args: {
@@ -336,11 +380,22 @@ async function syncSourceDetails(args: {
     detailLinesStored: 0,
     mappedRenewalLines: 0,
     mappedAdHocLines: 0,
+    unmappedStockLines: 0,
     unmappedLinesIgnored: 0,
     voidedDocuments: 0,
+    voidedSourceLines: 0,
     renewalEventsInserted: 0,
     renewalEventsSkipped: 0,
+    lineTypeCounts: {
+      stock: 0,
+      description: 0,
+      serial_or_reference: 0,
+      child_detail: 0,
+      unknown: 0,
+    },
+    linesWithoutStockIgnored: 0,
   };
+
 
   const headers: N3DocHeader[] = [];
   try {
@@ -399,6 +454,11 @@ async function syncSourceDetails(args: {
       const stockCode = pickStockCode(line);
       const lineId = pickLineId(line, index);
       const stockKey = normalizeStockKey(stockCode);
+      const parentLineId = pickParentLineId(line);
+      const lineType = classifyLine(line, stockCode);
+      metrics.lineTypeCounts[lineType] += 1;
+      if (isVoid) metrics.voidedSourceLines += 1;
+
       const row = {
         tenant_code: tenantCode,
         n3_document_id: docId,
@@ -409,19 +469,28 @@ async function syncSourceDetails(args: {
         customer_code: customerCode || null,
         customer_name: customerName ?? null,
         line_no: line.pos ?? line.numbering ?? index + 1,
+        source_line_order: line.pos ?? line.numbering ?? index + 1,
         stock_code: stockCode,
         stock_name: line.stock?.name ?? null,
         description: line.description ?? line.stock?.description ?? null,
         quantity: typeof line.qty === "number" ? line.qty : null,
         uom: line.uom?.code ?? null,
         is_void: isVoid,
+        is_void_source: isVoid,
         is_deleted_in_source: false,
+        line_type: lineType,
+        has_stock_code: !!stockCode,
+        parent_line_id: parentLineId,
         last_seen_at: new Date().toISOString(),
         last_synced_at: new Date().toISOString(),
       };
       upsertRows.push(row);
 
-      if (!stockKey) return;
+      // Only stock lines with a non-empty stock code can produce entitlement.
+      if (lineType !== "stock" || !stockKey) {
+        metrics.linesWithoutStockIgnored += 1;
+        return;
+      }
       const renewal = renewalMappings.get(stockKey);
       if (renewal) {
         metrics.mappedRenewalLines += 1;
@@ -461,6 +530,7 @@ async function syncSourceDetails(args: {
       } else if (adHocStockCodes.has(stockKey)) {
         metrics.mappedAdHocLines += 1; // stored for future job history; no expiry
       } else {
+        metrics.unmappedStockLines += 1;
         metrics.unmappedLinesIgnored += 1;
       }
     });

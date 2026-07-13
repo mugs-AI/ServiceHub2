@@ -36,17 +36,18 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
             supabaseAdmin
               .from("sales_invoice_line_snapshots")
               .select(
-                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void",
+                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void, line_type, has_stock_code, parent_line_id",
               )
               .eq("tenant_code", tenant)
               .eq("document_no", docNo),
             supabaseAdmin
               .from("delivery_order_line_snapshots")
               .select(
-                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void",
+                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void, line_type, has_stock_code, parent_line_id",
               )
               .eq("tenant_code", tenant)
               .eq("document_no", docNo),
+
             supabaseAdmin
               .from("renewal_stock_mappings")
               .select(
@@ -103,8 +104,12 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
                 | "unmapped"
                 | "renewal"
                 | "ad_hoc"
-                | "renewal_invalid_cycle" = "unmapped";
-              if (m) {
+                | "renewal_invalid_cycle"
+                | "not_applicable" = "unmapped";
+              // Non-stock lines cannot produce entitlement — mark them so.
+              if (r.line_type && r.line_type !== "stock") {
+                mappingResult = "not_applicable";
+              } else if (m) {
                 if (m.service_type === "Renewal") {
                   mappingResult =
                     !m.renewal_cycle_value || m.renewal_cycle_value <= 0
@@ -117,12 +122,16 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
                 n3_document_id: r.n3_document_id,
                 n3_line_id: r.n3_line_id,
                 line_no: r.line_no,
+                line_type: r.line_type,
+                has_stock_code: r.has_stock_code,
+                parent_line_id: r.parent_line_id,
                 stock_code: r.stock_code,
                 stock_name: r.stock_name,
                 description: r.description,
                 quantity: r.quantity,
                 is_void: r.is_void,
                 mapping_result: mappingResult,
+
                 subscription_category: m?.subscription_category ?? null,
                 renewal_cycle:
                   m?.renewal_cycle_value && m?.renewal_cycle_unit

@@ -359,10 +359,11 @@ function AdminSnapshots() {
         <div className="grid gap-3 md:grid-cols-3">
           {(["Customers", "Stock", "Contract"] as HealthType[]).map((type) => {
             const row = health?.snapshots.find((s) => s.snapshot_type === type);
+            const displayLabel = type === "Contract" ? "Subscriptions" : type;
             return (
               <div key={type} className="rounded-md border p-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">{type}</h3>
+                  <h3 className="text-sm font-semibold">{displayLabel}</h3>
                   {statusBadge(row?.health_status ?? "Unknown")}
                 </div>
                 <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
@@ -393,6 +394,7 @@ function AdminSnapshots() {
               </div>
             );
           })}
+
         </div>
       </section>
 
@@ -533,30 +535,9 @@ function AdminSnapshots() {
           emptyHint="No stock snapshots yet. Run Sync Stock."
         />
 
-        <PreviewTable
-          title="Contract snapshots"
-          total={preview?.contracts.total ?? 0}
-          error={preview?.contracts.error ?? null}
-          rows={preview?.contracts.rows ?? []}
-          columns={[
-            ["customer_code", "Customer"],
-            ["latest_document_no", "Doc No"],
-            ["latest_document_type", "Doc Type"],
-            ["latest_document_date", "Doc Date"],
-            ["renewal_stock_code", "Renewal Stock"],
-            ["contract_days", "Days"],
-            ["contract_start_date", "Start"],
-            ["expiry_date", "Expiry"],
-            ["remaining_days", "Remaining"],
-            ["contract_status", "Status"],
-            ["tenant_code", "Tenant"],
-          ]}
-          emptyHint={
-            mappingCount === 0
-              ? "No renewal stock mappings — every contract will be Unknown until mappings exist."
-              : "No contract snapshots yet. Run Recalculate Contracts."
-          }
-        />
+        {/* Legacy per-customer Contract preview removed in Phase 1.0.3 —
+            entitlements now live in Subscription snapshots below. */}
+
       </section>
 
       <TransactionDetailDiagnostics tenant={tenant} />
@@ -651,9 +632,31 @@ interface SubRunResponse {
     renewalEvents: number;
     currentSubscriptions: number;
   };
+  perSource?: {
+    salesInvoice: LineBreakdown;
+    deliveryOrder: LineBreakdown;
+  };
+  reconciliationNote?: string;
   activeLocks: Array<{ snapshotType: string; acquiredAt: string }>;
   error?: string;
 }
+
+interface LineBreakdown {
+  total: number;
+  stock: number;
+  description: number;
+  serial_or_reference: number;
+  child_detail: number;
+  unknown: number;
+  voided: number;
+  linesWithoutStock: number;
+  stockRenewalMapped: number;
+  stockAdHocMapped: number;
+  stockUnmapped: number;
+  duplicateRowsDetected: number;
+  distinctDocuments: number;
+}
+
 
 function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
   const [state, setState] = useState<SubRunResponse | { error: string } | null>(
@@ -706,6 +709,18 @@ function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
             <Stat label="Renewal events" value={state.totals.renewalEvents} />
             <Stat label="Current subscriptions" value={state.totals.currentSubscriptions} />
           </div>
+          {state.reconciliationNote && (
+            <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-900">
+              {state.reconciliationNote}
+            </p>
+          )}
+          {state.perSource && (
+            <div className="grid gap-3 md:grid-cols-2">
+              <BreakdownCard title="Sales Invoices" b={state.perSource.salesInvoice} />
+              <BreakdownCard title="Delivery Orders" b={state.perSource.deliveryOrder} />
+            </div>
+          )}
+
           {state.activeLocks.length > 0 && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
               Active sync locks:{" "}
@@ -765,6 +780,42 @@ function Stat({ label, value }: { label: string; value: number }) {
         {label}
       </div>
       <div className="text-lg font-semibold">{value.toLocaleString()}</div>
+    </div>
+  );
+}
+
+function BreakdownCard({ title, b }: { title: string; b: LineBreakdown }) {
+  const Row = ({ k, v, muted }: { k: string; v: number | string; muted?: boolean }) => (
+    <div className={`flex justify-between ${muted ? "text-muted-foreground" : ""}`}>
+      <dt>{k}</dt>
+      <dd className="font-mono">{typeof v === "number" ? v.toLocaleString() : v}</dd>
+    </div>
+  );
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="text-xs font-semibold text-foreground">{title}</h4>
+        <span className="text-[10px] text-muted-foreground">
+          {b.distinctDocuments.toLocaleString()} documents
+        </span>
+      </div>
+      <dl className="space-y-1 text-[11px]">
+        <Row k="Total lines stored" v={b.total} />
+        <Row k="Stock lines" v={b.stock} />
+        <Row k="Description-only" v={b.description} muted />
+        <Row k="Serial / reference" v={b.serial_or_reference} muted />
+        <Row k="Child detail" v={b.child_detail} muted />
+        <Row k="Unknown / other" v={b.unknown} muted />
+        <Row k="Voided source lines" v={b.voided} muted />
+        <div className="mt-2 border-t pt-1" />
+        <Row k="Stock → Renewal mapped" v={b.stockRenewalMapped} />
+        <Row k="Stock → Ad Hoc mapped" v={b.stockAdHocMapped} />
+        <Row k="Stock — no mapping" v={b.stockUnmapped} muted />
+        <Row k="Lines without stock (ignored)" v={b.linesWithoutStock} muted />
+        {b.duplicateRowsDetected > 0 && (
+          <Row k="Duplicate rows detected" v={b.duplicateRowsDetected} />
+        )}
+      </dl>
     </div>
   );
 }
@@ -864,6 +915,7 @@ function DocumentVerifier() {
                   <thead className="bg-muted uppercase text-muted-foreground">
                     <tr>
                       <th className="px-2 py-1 text-left">Line</th>
+                      <th className="px-2 py-1 text-left">Type</th>
                       <th className="px-2 py-1 text-left">Stock</th>
                       <th className="px-2 py-1 text-left">Description</th>
                       <th className="px-2 py-1 text-right">Qty</th>
@@ -878,6 +930,7 @@ function DocumentVerifier() {
                     {result.lines.map((l, i) => (
                       <tr key={i} className="border-t">
                         <td className="px-2 py-1">{String(l.line_no ?? "")}</td>
+                        <td className="px-2 py-1">{String(l.line_type ?? "—")}</td>
                         <td className="px-2 py-1 font-mono">{String(l.stock_code ?? "")}</td>
                         <td className="px-2 py-1">{String(l.description ?? l.stock_name ?? "")}</td>
                         <td className="px-2 py-1 text-right">{String(l.quantity ?? "")}</td>
@@ -888,6 +941,7 @@ function DocumentVerifier() {
                         <td className="px-2 py-1">{l.renewal_event ? "yes" : "no"}</td>
                       </tr>
                     ))}
+
                   </tbody>
                 </table>
               </div>
