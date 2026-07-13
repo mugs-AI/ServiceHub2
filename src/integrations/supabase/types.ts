@@ -212,15 +212,20 @@ export type Database = {
           document_date: string | null
           document_no: string | null
           document_status: string | null
+          has_stock_code: boolean
           id: string
           is_deleted_in_source: boolean
           is_void: boolean
+          is_void_source: boolean
           last_seen_at: string
           last_synced_at: string
           line_no: number | null
+          line_type: string
           n3_document_id: string
           n3_line_id: string
+          parent_line_id: string | null
           quantity: number | null
+          source_line_order: number | null
           stock_code: string | null
           stock_name: string | null
           tenant_code: string
@@ -235,15 +240,20 @@ export type Database = {
           document_date?: string | null
           document_no?: string | null
           document_status?: string | null
+          has_stock_code?: boolean
           id?: string
           is_deleted_in_source?: boolean
           is_void?: boolean
+          is_void_source?: boolean
           last_seen_at?: string
           last_synced_at?: string
           line_no?: number | null
+          line_type?: string
           n3_document_id: string
           n3_line_id: string
+          parent_line_id?: string | null
           quantity?: number | null
+          source_line_order?: number | null
           stock_code?: string | null
           stock_name?: string | null
           tenant_code: string
@@ -258,15 +268,20 @@ export type Database = {
           document_date?: string | null
           document_no?: string | null
           document_status?: string | null
+          has_stock_code?: boolean
           id?: string
           is_deleted_in_source?: boolean
           is_void?: boolean
+          is_void_source?: boolean
           last_seen_at?: string
           last_synced_at?: string
           line_no?: number | null
+          line_type?: string
           n3_document_id?: string
           n3_line_id?: string
+          parent_line_id?: string | null
           quantity?: number | null
+          source_line_order?: number | null
           stock_code?: string | null
           stock_name?: string | null
           tenant_code?: string
@@ -437,15 +452,20 @@ export type Database = {
           document_date: string | null
           document_no: string | null
           document_status: string | null
+          has_stock_code: boolean
           id: string
           is_deleted_in_source: boolean
           is_void: boolean
+          is_void_source: boolean
           last_seen_at: string
           last_synced_at: string
           line_no: number | null
+          line_type: string
           n3_document_id: string
           n3_line_id: string
+          parent_line_id: string | null
           quantity: number | null
+          source_line_order: number | null
           stock_code: string | null
           stock_name: string | null
           tenant_code: string
@@ -460,15 +480,20 @@ export type Database = {
           document_date?: string | null
           document_no?: string | null
           document_status?: string | null
+          has_stock_code?: boolean
           id?: string
           is_deleted_in_source?: boolean
           is_void?: boolean
+          is_void_source?: boolean
           last_seen_at?: string
           last_synced_at?: string
           line_no?: number | null
+          line_type?: string
           n3_document_id: string
           n3_line_id: string
+          parent_line_id?: string | null
           quantity?: number | null
+          source_line_order?: number | null
           stock_code?: string | null
           stock_name?: string | null
           tenant_code: string
@@ -483,15 +508,20 @@ export type Database = {
           document_date?: string | null
           document_no?: string | null
           document_status?: string | null
+          has_stock_code?: boolean
           id?: string
           is_deleted_in_source?: boolean
           is_void?: boolean
+          is_void_source?: boolean
           last_seen_at?: string
           last_synced_at?: string
           line_no?: number | null
+          line_type?: string
           n3_document_id?: string
           n3_line_id?: string
+          parent_line_id?: string | null
           quantity?: number | null
+          source_line_order?: number | null
           stock_code?: string | null
           stock_name?: string | null
           tenant_code?: string
