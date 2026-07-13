@@ -50,11 +50,37 @@ export class SyncNotReadyError extends Error {
   }
 }
 
+/**
+ * Thrown when another sync run of the same tenant + snapshot type is
+ * already in progress. Callers should translate this to HTTP 409.
+ */
+export class SyncLockedError extends Error {
+  constructor(public readonly userMessage: string) {
+    super(userMessage);
+    this.name = "SyncLockedError";
+  }
+}
+
 export async function runWithSyncLog(
   opts: RunOptions,
   work: (counters: Counters) => Promise<void>,
 ): Promise<SyncResult> {
+  // ---- Acquire tenant + snapshot-type lock -------------------------------
+  const { error: lockErr } = await supabaseAdmin
+    .from("sync_locks")
+    .insert({ tenant_code: opts.tenantCode, snapshot_type: opts.snapshotType });
+  if (lockErr) {
+    // 23505 = unique_violation. Anything else is unexpected.
+    if ((lockErr as { code?: string }).code === "23505") {
+      throw new SyncLockedError(
+        "A synchronization run is already in progress for this Client.",
+      );
+    }
+    throw new Error(`Failed to acquire sync lock: ${lockErr.message}`);
+  }
+
   const started = Date.now();
+
   const { data: logRow, error: logErr } = await supabaseAdmin
     .from("snapshot_sync_logs")
     .insert({
