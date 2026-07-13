@@ -21,6 +21,7 @@ import {
   type UsersEndpointStatus,
   type UsersLoad,
 } from "@/lib/qne/session/role-resolution";
+import { normalizeBasicInfo, type NormalizedBasicInfo } from "@/lib/qne/session/basic-info";
 
 export interface CurrentUserContext {
   token: string;
