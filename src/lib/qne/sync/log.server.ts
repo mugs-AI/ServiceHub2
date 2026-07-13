@@ -68,7 +68,7 @@ export async function runWithSyncLog(
     throw new Error(`Failed to open sync log: ${logErr?.message ?? "unknown"}`);
   }
 
-  const counters: Counters = { inserted: 0, updated: 0, skipped: 0, failed: 0 };
+  const counters: Counters = { inserted: 0, updated: 0, skipped: 0, failed: 0, details: {} };
   let status: SyncStatus = "success";
   let errorMessage: string | undefined;
   let notReadyReason: string | undefined;
