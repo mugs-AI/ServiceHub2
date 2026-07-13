@@ -17,6 +17,7 @@ export interface SyncResult {
   status: SyncStatus;
   errorMessage?: string;
   notReadyReason?: string;
+  details?: Record<string, unknown>;
 }
 
 interface RunOptions {
@@ -29,6 +30,12 @@ interface Counters {
   updated: number;
   skipped: number;
   failed: number;
+  /**
+   * Free-form counters and diagnostics stored on `snapshot_sync_logs.details`.
+   * The subscription sync uses this for per-run detail-line, mapping, and
+   * void-exclusion counts required by the Phase 1.0.1 diagnostics.
+   */
+  details: Record<string, unknown>;
 }
 
 /**
