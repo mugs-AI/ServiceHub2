@@ -135,6 +135,8 @@ export type Database = {
           last_calculated_at: string | null
           latest_document_date: string | null
           latest_document_no: string | null
+          latest_source_document_id: string | null
+          latest_source_line_id: string | null
           latest_source_type: string | null
           raw_payload: Json | null
           remaining_days: number | null
@@ -159,6 +161,8 @@ export type Database = {
           last_calculated_at?: string | null
           latest_document_date?: string | null
           latest_document_no?: string | null
+          latest_source_document_id?: string | null
+          latest_source_line_id?: string | null
           latest_source_type?: string | null
           raw_payload?: Json | null
           remaining_days?: number | null
@@ -183,6 +187,8 @@ export type Database = {
           last_calculated_at?: string | null
           latest_document_date?: string | null
           latest_document_no?: string | null
+          latest_source_document_id?: string | null
+          latest_source_line_id?: string | null
           latest_source_type?: string | null
           raw_payload?: Json | null
           remaining_days?: number | null
@@ -193,6 +199,78 @@ export type Database = {
           subscription_category?: string
           subscription_status?: string
           tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      delivery_order_line_snapshots: {
+        Row: {
+          created_at: string
+          customer_code: string | null
+          customer_name: string | null
+          description: string | null
+          document_date: string | null
+          document_no: string | null
+          document_status: string | null
+          id: string
+          is_deleted_in_source: boolean
+          is_void: boolean
+          last_seen_at: string
+          last_synced_at: string
+          line_no: number | null
+          n3_document_id: string
+          n3_line_id: string
+          quantity: number | null
+          stock_code: string | null
+          stock_name: string | null
+          tenant_code: string
+          uom: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_code?: string | null
+          customer_name?: string | null
+          description?: string | null
+          document_date?: string | null
+          document_no?: string | null
+          document_status?: string | null
+          id?: string
+          is_deleted_in_source?: boolean
+          is_void?: boolean
+          last_seen_at?: string
+          last_synced_at?: string
+          line_no?: number | null
+          n3_document_id: string
+          n3_line_id: string
+          quantity?: number | null
+          stock_code?: string | null
+          stock_name?: string | null
+          tenant_code: string
+          uom?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_code?: string | null
+          customer_name?: string | null
+          description?: string | null
+          document_date?: string | null
+          document_no?: string | null
+          document_status?: string | null
+          id?: string
+          is_deleted_in_source?: boolean
+          is_void?: boolean
+          last_seen_at?: string
+          last_synced_at?: string
+          line_no?: number | null
+          n3_document_id?: string
+          n3_line_id?: string
+          quantity?: number | null
+          stock_code?: string | null
+          stock_name?: string | null
+          tenant_code?: string
+          uom?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -350,6 +428,78 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_invoice_line_snapshots: {
+        Row: {
+          created_at: string
+          customer_code: string | null
+          customer_name: string | null
+          description: string | null
+          document_date: string | null
+          document_no: string | null
+          document_status: string | null
+          id: string
+          is_deleted_in_source: boolean
+          is_void: boolean
+          last_seen_at: string
+          last_synced_at: string
+          line_no: number | null
+          n3_document_id: string
+          n3_line_id: string
+          quantity: number | null
+          stock_code: string | null
+          stock_name: string | null
+          tenant_code: string
+          uom: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_code?: string | null
+          customer_name?: string | null
+          description?: string | null
+          document_date?: string | null
+          document_no?: string | null
+          document_status?: string | null
+          id?: string
+          is_deleted_in_source?: boolean
+          is_void?: boolean
+          last_seen_at?: string
+          last_synced_at?: string
+          line_no?: number | null
+          n3_document_id: string
+          n3_line_id: string
+          quantity?: number | null
+          stock_code?: string | null
+          stock_name?: string | null
+          tenant_code: string
+          uom?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_code?: string | null
+          customer_name?: string | null
+          description?: string | null
+          document_date?: string | null
+          document_no?: string | null
+          document_status?: string | null
+          id?: string
+          is_deleted_in_source?: boolean
+          is_void?: boolean
+          last_seen_at?: string
+          last_synced_at?: string
+          line_no?: number | null
+          n3_document_id?: string
+          n3_line_id?: string
+          quantity?: number | null
+          stock_code?: string | null
+          stock_name?: string | null
+          tenant_code?: string
+          uom?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       service_hub_admins: {
         Row: {
           created_at: string
@@ -441,6 +591,7 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string
+          details: Json | null
           duration_ms: number | null
           error_message: string | null
           failed_count: number
@@ -456,6 +607,7 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string
+          details?: Json | null
           duration_ms?: number | null
           error_message?: string | null
           failed_count?: number
@@ -471,6 +623,7 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string
+          details?: Json | null
           duration_ms?: number | null
           error_message?: string | null
           failed_count?: number
@@ -549,6 +702,75 @@ export type Database = {
           is_active?: boolean
           is_system?: boolean
           name?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscription_renewal_events: {
+        Row: {
+          created_at: string
+          customer_code: string
+          customer_name: string | null
+          expiry_date: string
+          id: string
+          is_source_void: boolean
+          renewal_cycle_unit: string
+          renewal_cycle_value: number
+          source_document_date: string
+          source_document_id: string
+          source_document_no: string | null
+          source_line_id: string
+          source_type: string
+          start_date: string
+          stock_code: string
+          stock_name: string | null
+          subscription_category_id: string | null
+          subscription_category_name: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_code: string
+          customer_name?: string | null
+          expiry_date: string
+          id?: string
+          is_source_void?: boolean
+          renewal_cycle_unit: string
+          renewal_cycle_value: number
+          source_document_date: string
+          source_document_id: string
+          source_document_no?: string | null
+          source_line_id: string
+          source_type: string
+          start_date: string
+          stock_code: string
+          stock_name?: string | null
+          subscription_category_id?: string | null
+          subscription_category_name: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_code?: string
+          customer_name?: string | null
+          expiry_date?: string
+          id?: string
+          is_source_void?: boolean
+          renewal_cycle_unit?: string
+          renewal_cycle_value?: number
+          source_document_date?: string
+          source_document_id?: string
+          source_document_no?: string | null
+          source_line_id?: string
+          source_type?: string
+          start_date?: string
+          stock_code?: string
+          stock_name?: string | null
+          subscription_category_id?: string | null
+          subscription_category_name?: string
           tenant_code?: string
           updated_at?: string
         }
