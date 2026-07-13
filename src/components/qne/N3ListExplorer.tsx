@@ -46,8 +46,8 @@ export function N3ListExplorer({
         path,
         {
           query: {
-            pageNo,
-            pageSize,
+            $top: pageSize,
+            $skip: (pageNo - 1) * pageSize,
             ...(search ? { search } : {}),
             ...extraQuery,
           },
