@@ -1,5 +1,9 @@
 // Pure, side-effect-free helpers for resolving the current N3 user's
-// Administrator status from the official N3 /api/Users response.
+// ServiceHub Administrator status from the official N3 /api/Users response.
+//
+// Phase 0.9.7 rule (Owner-based ServiceHub Administration):
+//   Administrator  ⇔  matched UserDto.isOwner === true
+// The N3 "Administrators" role remains informational only.
 //
 // Field names come from the platform-v1 OpenAPI spec:
 //   UserDto: { userId, userName, email, displayName, isOwner, isSupport,
@@ -30,7 +34,7 @@ export interface N3UserDto {
   deactivated?: boolean | null;
 }
 
-/** Official ServiceHub Administrator role name (exact, case-insensitive). */
+/** Kept for informational display only — no longer the Administrator rule. */
 export const ADMINISTRATOR_ROLE_NAME = "Administrators";
 
 export function normaliseEmail(value: string | null | undefined): string {
@@ -47,15 +51,20 @@ export function roleNamesOf(user: N3UserDto | null | undefined): string[] {
   return out;
 }
 
-/** Exact, case-insensitive match on the official "Administrators" role. */
+/** Informational — not the primary Administrator rule (that's `isOwner`). */
 export function hasAdministratorRole(user: N3UserDto | null | undefined): boolean {
   const target = ADMINISTRATOR_ROLE_NAME.toLowerCase();
   return roleNamesOf(user).some((n) => n.toLowerCase() === target);
 }
 
+/** Phase 0.9.7 primary rule — is this UserDto the tenant Owner? */
+export function isOwnerUser(user: N3UserDto | null | undefined): boolean {
+  return user?.isOwner === true;
+}
+
 /**
  * Only treat a user as inactive when the DTO EXPLICITLY marks them so.
- * When no active flag is present, treat as active (per Phase 0.9.4 rules).
+ * When no active flag is present, treat as active.
  */
 export function isUserActive(user: N3UserDto | null | undefined): boolean {
   if (!user) return false;
@@ -73,10 +82,9 @@ export interface IdentityLookup {
 }
 
 /**
- * Match the authenticated user (identified by BasicInfo) to an entry in
- * /api/Users. Priority: stable id → email → userName. Email and userName
- * are cross-matched against `UserDto.email` AND `UserDto.userName`, always
- * trimmed and lowercased. displayName is never used.
+ * Match the authenticated user to an entry in /api/Users. Priority:
+ * stable id → email → userName. Email and userName are cross-matched against
+ * `UserDto.email` AND `UserDto.userName`, always trimmed and lowercased.
  */
 export function matchCurrentUser(
   users: N3UserDto[],
@@ -102,19 +110,18 @@ export function matchCurrentUser(
   return null;
 }
 
-export type AdminGate = "n3_role" | "allowlist" | "bootstrap" | "none";
+export type AdminGate = "n3_owner" | "allowlist" | "bootstrap" | "none";
 
 export type UsersEndpointStatus = "ok" | "failed" | "unauthorized" | "forbidden";
 
 export type AdminDecisionReason =
-  | "matched_administrators_role"
-  | "matched_without_administrators_role"
-  | "role_data_missing"
+  | "matched_owner"
+  | "matched_not_owner"
   | "no_matching_user"
   | "users_endpoint_failed"
   | "users_endpoint_unauthorized"
   | "users_endpoint_forbidden"
-  | "basicinfo_user_identifier_missing"
+  | "identity_missing"
   | "allowlist_fallback"
   | "bootstrap_fallback";
 
@@ -124,6 +131,7 @@ export interface AdminDecision {
   roleNames: string[];
   matchedUserId: string | null;
   matchedDisplayName: string | null;
+  isOwner: boolean;
   reason: AdminDecisionReason;
 }
 
@@ -133,14 +141,13 @@ export interface UsersLoad {
 }
 
 /**
- * Decide administrator status from official N3 data with a secure fallback
- * to the tenant-scoped ServiceHub allowlist.
+ * Decide Administrator status from official N3 data.
  *
  * Precedence:
- *   1. Official N3 "Administrators" role  → adminGate = "n3_role"
- *   2. Tenant allowlist                    → adminGate = "allowlist"
- *   3. Bootstrap (first user this tenant)  → adminGate = "bootstrap"
- *   4. Otherwise                           → adminGate = "none"
+ *   1. Matched UserDto with isOwner === true → adminGate = "n3_owner"
+ *   2. Tenant allowlist (emergency fallback, disabled by default) → "allowlist"
+ *   3. Bootstrap (first user this tenant, disabled by default)     → "bootstrap"
+ *   4. Otherwise                                                   → "none"
  */
 export async function decideAdmin(
   usersLoad: UsersLoad,
@@ -155,8 +162,10 @@ export async function decideAdmin(
   const userId = (identity.userId ?? "").trim();
   const userCode = (identity.userCode ?? "").trim();
   const hasIdentity = Boolean(email || userName || userId || userCode);
+
   let matched: N3UserDto | null = null;
   let roleNames: string[] = [];
+  let ownerFlag = false;
   let reason: AdminDecisionReason = "no_matching_user";
 
   if (usersLoad.status !== "ok") {
@@ -167,33 +176,33 @@ export async function decideAdmin(
           ? "users_endpoint_forbidden"
           : "users_endpoint_failed";
   } else if (!hasIdentity) {
-    reason = "basicinfo_user_identifier_missing";
+    reason = "identity_missing";
   } else if (!usersLoad.users || usersLoad.users.length === 0) {
     reason = "no_matching_user";
   } else {
     matched = matchCurrentUser(usersLoad.users, identity);
     if (matched) {
       roleNames = roleNamesOf(matched);
-      if (isUserActive(matched) && hasAdministratorRole(matched)) {
+      ownerFlag = isOwnerUser(matched);
+      if (isUserActive(matched) && ownerFlag) {
         return {
           isAdministrator: true,
-          adminGate: "n3_role",
+          adminGate: "n3_owner",
           roleNames,
           matchedUserId: (matched.userId ?? "").trim() || null,
           matchedDisplayName: (matched.displayName ?? "").trim() || null,
-          reason: "matched_administrators_role",
+          isOwner: true,
+          reason: "matched_owner",
         };
       }
-      reason =
-        roleNames.length === 0
-          ? "role_data_missing"
-          : "matched_without_administrators_role";
+      reason = "matched_not_owner";
     } else {
       reason = "no_matching_user";
     }
   }
 
-  // Fallback — tenant-scoped ServiceHub allowlist.
+  // Emergency fallback — tenant allowlist. Disabled by default; only fires
+  // when a runtime opt-in is present (see current-user.server.ts).
   if (email && (await allowlist.isAllowlisted(email))) {
     return {
       isAdministrator: true,
@@ -201,6 +210,7 @@ export async function decideAdmin(
       roleNames,
       matchedUserId: (matched?.userId ?? "").trim() || null,
       matchedDisplayName: (matched?.displayName ?? "").trim() || null,
+      isOwner: ownerFlag,
       reason: "allowlist_fallback",
     };
   }
@@ -211,6 +221,7 @@ export async function decideAdmin(
       roleNames,
       matchedUserId: (matched?.userId ?? "").trim() || null,
       matchedDisplayName: (matched?.displayName ?? "").trim() || null,
+      isOwner: ownerFlag,
       reason: "bootstrap_fallback",
     };
   }
@@ -221,6 +232,7 @@ export async function decideAdmin(
     roleNames,
     matchedUserId: (matched?.userId ?? "").trim() || null,
     matchedDisplayName: (matched?.displayName ?? "").trim() || null,
+    isOwner: ownerFlag,
     reason,
   };
 }
