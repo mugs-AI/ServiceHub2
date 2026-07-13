@@ -562,7 +562,6 @@ function AdminSnapshots() {
       <TransactionDetailDiagnostics tenant={tenant} />
       <DocumentVerifier />
       <SubscriptionSnapshotsPreview tenant={tenant} />
-    </section>
 
     </div>
   );
