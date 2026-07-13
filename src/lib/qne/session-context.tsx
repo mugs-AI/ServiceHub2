@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { qneGet, UnauthorizedError } from "@/lib/qne/client";
 import { decodeJwtPayload } from "@/lib/qne/jwt";
+import { normalizeBasicInfo } from "@/lib/qne/session/basic-info";
 import {
   clearStoredToken,
   consumeTokenFromUrl,
@@ -23,7 +24,7 @@ export type CurrentUserReason =
   | "users_endpoint_failed"
   | "users_endpoint_unauthorized"
   | "users_endpoint_forbidden"
-  | "no_email"
+  | "basicinfo_user_identifier_missing"
   | "allowlist_fallback"
   | "bootstrap_fallback";
 
