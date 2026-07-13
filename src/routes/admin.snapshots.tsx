@@ -13,7 +13,7 @@ export const Route = createFileRoute("/admin/snapshots")({
   ),
 });
 
-type SnapshotKind = "customers" | "stock" | "contracts";
+type SnapshotKind = "customers" | "stock" | "contracts" | "subscriptions";
 type HealthType = "Customers" | "Stock" | "Contract";
 type HealthStatus = "Healthy" | "Warning" | "Error";
 
@@ -183,7 +183,7 @@ function AdminSnapshots() {
   const runAll = useCallback(async () => {
     if (running) return;
     setRunning("all");
-    for (const kind of ["customers", "stock", "contracts"] as SnapshotKind[]) {
+    for (const kind of ["customers", "stock", "contracts", "subscriptions"] as SnapshotKind[]) {
       try {
         const res = await authFetch(`/api/sync/${kind}`, { method: "POST" });
         const json = (await res.json()) as SyncResult;
@@ -276,6 +276,13 @@ function AdminSnapshots() {
           </button>
           <button
             disabled={busy}
+            onClick={() => runSync("subscriptions")}
+            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {running === "subscriptions" ? "Recalculating…" : "Recalculate Subscriptions"}
+          </button>
+          <button
+            disabled={busy}
             onClick={runAll}
             className="rounded-md border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
           >
@@ -311,7 +318,7 @@ function AdminSnapshots() {
                 </tr>
               </thead>
               <tbody>
-                {(["customers", "stock", "contracts"] as SnapshotKind[]).map((k) => {
+                {(["customers", "stock", "contracts", "subscriptions"] as SnapshotKind[]).map((k) => {
                   const r = lastResults[k];
                   if (!r) return null;
                   return (
