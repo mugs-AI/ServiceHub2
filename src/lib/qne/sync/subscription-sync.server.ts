@@ -454,6 +454,11 @@ async function syncSourceDetails(args: {
       const stockCode = pickStockCode(line);
       const lineId = pickLineId(line, index);
       const stockKey = normalizeStockKey(stockCode);
+      const parentLineId = pickParentLineId(line);
+      const lineType = classifyLine(line, stockCode);
+      metrics.lineTypeCounts[lineType] += 1;
+      if (isVoid) metrics.voidedSourceLines += 1;
+
       const row = {
         tenant_code: tenantCode,
         n3_document_id: docId,
@@ -464,19 +469,28 @@ async function syncSourceDetails(args: {
         customer_code: customerCode || null,
         customer_name: customerName ?? null,
         line_no: line.pos ?? line.numbering ?? index + 1,
+        source_line_order: line.pos ?? line.numbering ?? index + 1,
         stock_code: stockCode,
         stock_name: line.stock?.name ?? null,
         description: line.description ?? line.stock?.description ?? null,
         quantity: typeof line.qty === "number" ? line.qty : null,
         uom: line.uom?.code ?? null,
         is_void: isVoid,
+        is_void_source: isVoid,
         is_deleted_in_source: false,
+        line_type: lineType,
+        has_stock_code: !!stockCode,
+        parent_line_id: parentLineId,
         last_seen_at: new Date().toISOString(),
         last_synced_at: new Date().toISOString(),
       };
       upsertRows.push(row);
 
-      if (!stockKey) return;
+      // Only stock lines with a non-empty stock code can produce entitlement.
+      if (lineType !== "stock" || !stockKey) {
+        metrics.linesWithoutStockIgnored += 1;
+        return;
+      }
       const renewal = renewalMappings.get(stockKey);
       if (renewal) {
         metrics.mappedRenewalLines += 1;
@@ -516,6 +530,7 @@ async function syncSourceDetails(args: {
       } else if (adHocStockCodes.has(stockKey)) {
         metrics.mappedAdHocLines += 1; // stored for future job history; no expiry
       } else {
+        metrics.unmappedStockLines += 1;
         metrics.unmappedLinesIgnored += 1;
       }
     });
