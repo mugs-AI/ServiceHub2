@@ -1,47 +1,68 @@
-// SubscriptionSnapshotSync — Phase 1.0 Customer Subscription Engine.
+// Phase 1.0.1 — Subscription sync driven by official N3 transaction
+// DETAIL endpoints, not header lists.
 //
-// Rebuilds `customer_subscription_snapshots`. One row per
-// (tenant_code, customer_code, subscription_category). A Customer may own
-// many renewable services (Maintenance, Hosting, N3 Subscription,
-// ServiceHub2, Hotel, …), each with its OWN latest document, expiry,
-// remaining days, and status.
+// Flow:
+//   1. List Sales Invoice headers  → GET /api/SalesInvoices/{key}   → itemDetails[]
+//   2. List Delivery Order headers → GET /api/DeliveryOrders/{key}  → itemDetails[]
+//   3. Upsert ALL detail lines (mapped or not) into tenant-scoped
+//      *_line_snapshots tables — audit + future recalculation source.
+//   4. For every line whose stock_code matches an active RENEWAL mapping
+//      (case-insensitive, trimmed, exact equality), insert/update a
+//      `subscription_renewal_events` row (unique per source doc + line).
+//   5. Rebuild `customer_subscription_snapshots` — one row per
+//      (tenant_code, customer_code, subscription_category). Latest valid
+//      (non-voided) renewal event wins. Invoice and DO are independent
+//      sources.
 //
-// Renewal source rules:
-//   * Sales Invoice and Delivery Order are INDEPENDENT sources — they never
-//     need to match.
-//   * For each mapped Subscription Category, the latest qualifying document
-//     wins (regardless of type).
-//   * Ad Hoc mappings are operational history only — they NEVER create
-//     expiry rows.
-//   * Unmapped Stock Codes are ignored entirely.
-//
-// Renewal cycle is driven by the mapping: value + unit (day | month | year).
-// Never hardcoded to 365.
+// Ad Hoc mappings are stored for future job history but NEVER produce
+// expiry rows. Unmapped stock codes are stored in line snapshots but
+// ignored by subscription calculation.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
-import { n3IterateList, type N3TenantContext } from "./n3.server";
+import { n3Get, n3IterateList, type N3TenantContext } from "./n3.server";
 import { runWithSyncLog, SyncNotReadyError, type SyncResult } from "./log.server";
 
-// ---- N3 shapes (minimal) ----------------------------------------------------
+// ---------------------------------------------------------------------------
+// N3 shapes (minimal, only the fields we depend on).
 
+interface N3LookupCode {
+  code?: string;
+  name?: string;
+  description?: string;
+}
 interface N3DocLine {
+  id?: string;
+  pos?: number;
+  numbering?: number;
+  stockId?: number;
+  description?: string;
+  qty?: number;
+  stock?: N3LookupCode | null;
+  uom?: N3LookupCode | null;
+  // Some responses may inline the stock code directly.
   stockCode?: string;
   [k: string]: unknown;
 }
-interface N3Doc {
-  docNo?: string;
+interface N3DocHeader {
+  id?: string;
+  docCode?: string;
   documentNo?: string;
   docDate?: string;
   date?: string;
   customerCode?: string;
   customerName?: string;
-  details?: N3DocLine[];
-  lines?: N3DocLine[];
+  isCancelled?: boolean;
+  updatedAt?: number;
   [k: string]: unknown;
 }
+interface N3DocFull extends N3DocHeader {
+  itemDetails?: N3DocLine[];
+  details?: N3DocLine[];
+}
 
-// ---- Domain types -----------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Domain types.
 
 type CycleUnit = "day" | "month" | "year";
 type SourceType = "invoice" | "delivery_order";
@@ -54,17 +75,12 @@ interface RenewalMapping {
   renewal_cycle_unit: CycleUnit;
 }
 
-interface Candidate {
-  sourceType: SourceType;
-  docNo: string;
-  docDate: Date;
-  customerCode: string;
-  customerName: string | null;
-  stockCode: string;
-  mapping: RenewalMapping;
-}
+// ---------------------------------------------------------------------------
+// Helpers.
 
-// ---- Helpers ---------------------------------------------------------------
+function isCycleUnit(v: unknown): v is CycleUnit {
+  return v === "day" || v === "month" || v === "year";
+}
 
 function parseDate(v: string | undefined | null): Date | null {
   if (!v) return null;
@@ -72,15 +88,23 @@ function parseDate(v: string | undefined | null): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function isCycleUnit(v: unknown): v is CycleUnit {
-  return v === "day" || v === "month" || v === "year";
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
-function computeExpiry(start: Date, value: number, unit: CycleUnit): Date {
-  const d = new Date(start);
-  if (unit === "day") d.setUTCDate(d.getUTCDate() + value);
-  else if (unit === "month") d.setUTCMonth(d.getUTCMonth() + value);
+/**
+ * Inclusive expiry — day: start + value - 1 day; month/year: calendar
+ * arithmetic, then minus 1 day. Never fixed-days per month/year.
+ */
+export function computeInclusiveExpiry(start: Date, value: number, unit: CycleUnit): Date {
+  const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  if (unit === "day") {
+    d.setUTCDate(d.getUTCDate() + value - 1);
+    return d;
+  }
+  if (unit === "month") d.setUTCMonth(d.getUTCMonth() + value);
   else d.setUTCFullYear(d.getUTCFullYear() + value);
+  d.setUTCDate(d.getUTCDate() - 1);
   return d;
 }
 
@@ -90,62 +114,52 @@ function computeStatus(daysLeft: number, dueSoonDays: number): SubscriptionStatu
   return "Active";
 }
 
-function extractCandidate(
-  doc: N3Doc,
-  sourceType: SourceType,
-  mappings: Map<string, RenewalMapping>,
-): Candidate[] {
-  const customerCode = (doc.customerCode ?? "").trim();
-  if (!customerCode) return [];
-  const date = parseDate(doc.docDate ?? doc.date);
-  if (!date) return [];
-  const lines = Array.isArray(doc.details)
-    ? doc.details
-    : Array.isArray(doc.lines)
-      ? doc.lines
-      : [];
-  const out: Candidate[] = [];
-  for (const line of lines) {
-    const code = (line.stockCode ?? "").trim();
-    if (!code) continue;
-    const mapping = mappings.get(code);
-    if (!mapping) continue; // ignore unmapped stock codes
-    out.push({
-      sourceType,
-      docNo: (doc.docNo ?? doc.documentNo ?? "").toString(),
-      docDate: date,
-      customerCode,
-      customerName: (doc.customerName as string | undefined) ?? null,
-      stockCode: code,
-      mapping,
-    });
-  }
-  return out;
+function normalizeStockKey(v: string | null | undefined): string {
+  return (v ?? "").trim().toLowerCase();
 }
 
-// ---- Sync -------------------------------------------------------------------
+function pickStockCode(line: N3DocLine): string | null {
+  const fromStock = line.stock?.code?.trim();
+  if (fromStock) return fromStock;
+  const inline = (line.stockCode ?? "").trim();
+  return inline || null;
+}
 
-export async function syncSubscriptionSnapshots(
-  ctx: N3TenantContext,
-): Promise<SyncResult> {
+function pickLineId(line: N3DocLine, index: number): string {
+  if (line.id) return String(line.id);
+  const pos = line.pos ?? line.numbering;
+  if (pos != null) return `pos:${pos}`;
+  return `idx:${index}`;
+}
+
+// ---------------------------------------------------------------------------
+// Main entry.
+
+export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<SyncResult> {
   const { tenantCode } = ctx;
+
   return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters) => {
-    // 1. Load active Renewal mappings for this tenant. Ad Hoc mappings are
-    //    intentionally excluded — they never create expiry.
+    // ---- 1. Load mappings ---------------------------------------------------
     const { data: mappingRows, error: mapErr } = await supabaseAdmin
       .from("renewal_stock_mappings")
       .select(
         "stock_code, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
       )
       .eq("tenant_code", tenantCode)
-      .eq("is_active", true)
-      .eq("service_type", "Renewal");
+      .eq("is_active", true);
     if (mapErr) throw new Error(`Load renewal_stock_mappings failed: ${mapErr.message}`);
 
-    const mappings = new Map<string, RenewalMapping>();
+    const renewalMappings = new Map<string, RenewalMapping>(); // key: normalized stock code
+    const adHocStockCodes = new Set<string>();
     for (const m of mappingRows ?? []) {
+      const key = normalizeStockKey(m.stock_code);
+      if (!key) continue;
+      if (m.service_type === "Ad Hoc") {
+        adHocStockCodes.add(key);
+        continue;
+      }
+      if (m.service_type !== "Renewal") continue;
       const category = (m.subscription_category ?? "").trim() || "Maintenance";
-      // Prefer new cycle columns; legacy contract_days = day cycle fallback.
       let value = typeof m.renewal_cycle_value === "number" ? m.renewal_cycle_value : null;
       let unit: CycleUnit = isCycleUnit(m.renewal_cycle_unit) ? m.renewal_cycle_unit : "day";
       if (value == null && typeof m.contract_days === "number") {
@@ -153,20 +167,24 @@ export async function syncSubscriptionSnapshots(
         unit = "day";
       }
       if (!value || value <= 0) continue;
-      mappings.set(m.stock_code, {
+      renewalMappings.set(key, {
         stock_code: m.stock_code,
         subscription_category: category,
         renewal_cycle_value: value,
         renewal_cycle_unit: unit,
       });
     }
-    if (mappings.size === 0) {
+
+    counters.details.activeRenewalMappings = renewalMappings.size;
+    counters.details.activeAdHocMappings = adHocStockCodes.size;
+
+    if (renewalMappings.size === 0) {
       throw new SyncNotReadyError(
-        "Subscription calculation not ready — configure Renewal Stock Mapping.",
+        "Subscription calculation not ready — configure at least one Renewal Stock Mapping.",
       );
     }
 
-    // 2. Due-soon threshold from general_settings (default 30 days).
+    // ---- 2. Tenant settings + known customers ------------------------------
     const { data: settings } = await supabaseAdmin
       .from("general_settings")
       .select("due_soon_days")
@@ -174,171 +192,423 @@ export async function syncSubscriptionSnapshots(
       .maybeSingle();
     const dueSoonDays = settings?.due_soon_days ?? 30;
 
-    // 3. Ensure default subscription categories exist for this tenant.
     await ensureDefaultCategories(tenantCode);
 
-    // 4. Customer name lookup from customer_snapshots (tenant-scoped).
+    // Category id lookup (tenant-scoped, case-insensitive).
+    const { data: catRows } = await supabaseAdmin
+      .from("subscription_categories")
+      .select("id, name")
+      .eq("tenant_code", tenantCode);
+    const categoryIdByName = new Map<string, string>();
+    for (const c of catRows ?? []) categoryIdByName.set(c.name.toLowerCase(), c.id);
+
     const { data: custRows, error: custErr } = await supabaseAdmin
       .from("customer_snapshots")
       .select("customer_code, customer_name")
       .eq("tenant_code", tenantCode);
     if (custErr) throw new Error(`Load customer_snapshots failed: ${custErr.message}`);
-    const knownCustomers = new Set<string>();
     const customerNameByCode = new Map<string, string | null>();
-    for (const c of custRows ?? []) {
-      knownCustomers.add(c.customer_code);
-      customerNameByCode.set(c.customer_code, c.customer_name ?? null);
-    }
-    if (knownCustomers.size === 0) {
+    for (const c of custRows ?? []) customerNameByCode.set(c.customer_code, c.customer_name ?? null);
+    if (customerNameByCode.size === 0) {
       throw new SyncNotReadyError(
         "Subscription calculation not ready — no Customer Snapshots. Run Customer Sync first.",
       );
     }
 
-    // 5. Stream Sales Invoices + Delivery Orders (independent sources) and
-    //    keep the latest qualifying document per (customer, category).
-    const latestByKey = new Map<string, Candidate>();
+    // ---- 3. Sync detail lines for Sales Invoices and Delivery Orders -------
+    const siMetrics = await syncSourceDetails({
+      ctx,
+      tenantCode,
+      sourceType: "invoice",
+      listEndpoint: N3_ENDPOINTS["salesInvoices.list"],
+      getEndpoint: N3_ENDPOINTS["salesInvoices.get"],
+      lineTable: "sales_invoice_line_snapshots",
+      renewalMappings,
+      adHocStockCodes,
+      categoryIdByName,
+      customerNameByCode,
+    });
+    const doMetrics = await syncSourceDetails({
+      ctx,
+      tenantCode,
+      sourceType: "delivery_order",
+      listEndpoint: N3_ENDPOINTS["deliveryOrders.list"],
+      getEndpoint: N3_ENDPOINTS["deliveryOrders.get"],
+      lineTable: "delivery_order_line_snapshots",
+      renewalMappings,
+      adHocStockCodes,
+      categoryIdByName,
+      customerNameByCode,
+    });
 
-    const consider = (cand: Candidate) => {
-      if (!knownCustomers.has(cand.customerCode)) return;
-      const key = `${cand.customerCode}::${cand.mapping.subscription_category}`;
-      const prev = latestByKey.get(key);
-      if (!prev || cand.docDate.getTime() > prev.docDate.getTime()) {
-        latestByKey.set(key, cand);
-      }
-    };
+    // Merge per-source metrics into the audit counters.
+    counters.details.salesInvoice = siMetrics;
+    counters.details.deliveryOrder = doMetrics;
+    counters.details.mappedRenewalLines = siMetrics.mappedRenewalLines + doMetrics.mappedRenewalLines;
+    counters.details.mappedAdHocLines = siMetrics.mappedAdHocLines + doMetrics.mappedAdHocLines;
+    counters.details.unmappedLinesIgnored =
+      siMetrics.unmappedLinesIgnored + doMetrics.unmappedLinesIgnored;
+    counters.details.renewalEventsInserted =
+      siMetrics.renewalEventsInserted + doMetrics.renewalEventsInserted;
+    counters.details.renewalEventsSkipped =
+      siMetrics.renewalEventsSkipped + doMetrics.renewalEventsSkipped;
+    counters.details.voidedDocumentsExcluded =
+      siMetrics.voidedDocuments + doMetrics.voidedDocuments;
+    counters.details.failedDetailRequests =
+      siMetrics.detailRequestsFailed + doMetrics.detailRequestsFailed;
+    counters.failed = siMetrics.detailRequestsFailed + doMetrics.detailRequestsFailed;
 
-    const invoicesEp = N3_ENDPOINTS["salesInvoices.list"];
-    const dosEp = N3_ENDPOINTS["deliveryOrders.list"];
-    try {
-      for await (const doc of n3IterateList<N3Doc>(ctx.token, invoicesEp.target, invoicesEp.path)) {
-        for (const cand of extractCandidate(doc, "invoice", mappings)) consider(cand);
-      }
-    } catch (err) {
-      throw new Error(
-        `Fetch ${invoicesEp.resource} (${invoicesEp.path}) failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-    try {
-      for await (const doc of n3IterateList<N3Doc>(ctx.token, dosEp.target, dosEp.path)) {
-        for (const cand of extractCandidate(doc, "delivery_order", mappings)) consider(cand);
-      }
-    } catch (err) {
-      throw new Error(
-        `Fetch ${dosEp.resource} (${dosEp.path}) failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+    const totalMapped = siMetrics.mappedRenewalLines + doMetrics.mappedRenewalLines;
+    const totalUnmapped = siMetrics.unmappedLinesIgnored + doMetrics.unmappedLinesIgnored;
+    const totalHeaders = siMetrics.headersScanned + doMetrics.headersScanned;
+    const totalLines = siMetrics.detailLinesStored + doMetrics.detailLinesStored;
 
-    if (latestByKey.size === 0) {
-      throw new SyncNotReadyError(
-        "No qualifying Sales Invoices or Delivery Orders found for the configured Renewal Stock Mappings.",
-      );
-    }
+    // ---- 4. Rebuild current subscription snapshots -------------------------
+    const rebuild = await rebuildCurrentSnapshots(tenantCode, dueSoonDays, customerNameByCode);
+    counters.inserted = rebuild.inserted;
+    counters.updated = rebuild.updated;
+    counters.skipped = rebuild.skipped;
+    counters.details.subscriptionSnapshotsInserted = rebuild.inserted;
+    counters.details.subscriptionSnapshotsUpdated = rebuild.updated;
+    counters.details.subscriptionSnapshotsUnchanged = rebuild.skipped;
 
-    // 6. Optional stock name lookup for reporting.
-    const stockCodes = Array.from(
-      new Set(Array.from(latestByKey.values()).map((c) => c.stockCode)),
-    );
-    const stockNameByCode = new Map<string, string | null>();
-    if (stockCodes.length > 0) {
-      const { data: stocks } = await supabaseAdmin
-        .from("stock_snapshots")
-        .select("stock_code, stock_name")
-        .eq("tenant_code", tenantCode)
-        .in("stock_code", stockCodes);
-      for (const s of stocks ?? []) stockNameByCode.set(s.stock_code, s.stock_name ?? null);
-    }
-
-    // 7. Load existing snapshots for change detection.
-    const targetKeys = Array.from(latestByKey.values()).map((c) => ({
-      customer_code: c.customerCode,
-      subscription_category: c.mapping.subscription_category,
-    }));
-    const targetCustomers = Array.from(new Set(targetKeys.map((k) => k.customer_code)));
-    const { data: existingRows, error: existingErr } = await supabaseAdmin
-      .from("customer_subscription_snapshots")
-      .select(
-        "customer_code, subscription_category, latest_document_no, latest_document_date, expiry_date, subscription_status",
-      )
-      .eq("tenant_code", tenantCode)
-      .in("customer_code", targetCustomers);
-    if (existingErr) throw new Error(`Load existing subscriptions failed: ${existingErr.message}`);
-    const existingByKey = new Map<string, Record<string, unknown>>();
-    for (const r of existingRows ?? []) {
-      existingByKey.set(
-        `${r.customer_code}::${r.subscription_category}`,
-        r as Record<string, unknown>,
-      );
-    }
-
-    const now = Date.now();
-    const toUpsert: Array<Record<string, unknown>> = [];
-
-    for (const [key, cand] of latestByKey) {
-      const expiry = computeExpiry(
-        cand.docDate,
-        cand.mapping.renewal_cycle_value,
-        cand.mapping.renewal_cycle_unit,
-      );
-      const daysLeft = Math.ceil((expiry.getTime() - now) / 86400000);
-      const status = computeStatus(daysLeft, dueSoonDays);
-      const row: Record<string, unknown> = {
-        tenant_code: tenantCode,
-        customer_code: cand.customerCode,
-        customer_name: cand.customerName ?? customerNameByCode.get(cand.customerCode) ?? null,
-        subscription_category: cand.mapping.subscription_category,
-        stock_code: cand.stockCode,
-        stock_name: stockNameByCode.get(cand.stockCode) ?? null,
-        renewal_cycle_value: cand.mapping.renewal_cycle_value,
-        renewal_cycle_unit: cand.mapping.renewal_cycle_unit,
-        latest_source_type: cand.sourceType,
-        latest_document_no: cand.docNo || null,
-        latest_document_date: cand.docDate.toISOString().slice(0, 10),
-        contract_start_date: cand.docDate.toISOString().slice(0, 10),
-        expiry_date: expiry.toISOString().slice(0, 10),
-        remaining_days: daysLeft,
-        subscription_status: status,
-        last_calculated_at: new Date().toISOString(),
-        is_stale: false,
-        calculation_error: null,
-      };
-
-      const existing = existingByKey.get(key);
-      if (!existing) counters.inserted += 1;
-      else {
-        const changed =
-          (existing.latest_document_no ?? null) !== (row.latest_document_no ?? null) ||
-          (existing.latest_document_date ?? null) !== (row.latest_document_date ?? null) ||
-          (existing.expiry_date ?? null) !== (row.expiry_date ?? null) ||
-          (existing.subscription_status ?? null) !== (row.subscription_status ?? null);
-        if (changed) counters.updated += 1;
-        else counters.skipped += 1;
-      }
-      toUpsert.push(row);
-    }
-
-    // 8. Upsert.
-    const BATCH = 200;
-    for (let i = 0; i < toUpsert.length; i += BATCH) {
-      const chunk = toUpsert.slice(i, i + BATCH) as unknown as Array<{
-        tenant_code: string;
-        customer_code: string;
-        subscription_category: string;
-      }>;
-      const { error } = await supabaseAdmin
-        .from("customer_subscription_snapshots")
-        .upsert(chunk, {
-          onConflict: "tenant_code,customer_code,subscription_category",
-        });
-      if (error) {
-        counters.failed += chunk.length;
-        throw new Error(`Upsert subscriptions failed: ${error.message}`);
-      }
+    // Zero-result diagnostics (used by health warning).
+    if (rebuild.inserted + rebuild.updated + rebuild.skipped === 0) {
+      let reason: string;
+      if (totalHeaders === 0) reason = "no transaction headers returned by N3";
+      else if (totalLines === 0) reason = "no detail lines returned for any document";
+      else if (totalMapped === 0 && totalUnmapped > 0)
+        reason = "no stock codes on N3 lines matched an active Renewal mapping";
+      else reason = "no qualifying renewal events could be built";
+      counters.details.zeroResultReason = reason;
+      throw new SyncNotReadyError(`No subscriptions produced — ${reason}.`);
     }
   });
 }
 
-// ---- Category seeding -------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Per-source (invoice / DO) detail sync.
+
+interface SourceMetrics {
+  headersScanned: number;
+  detailRequestsAttempted: number;
+  detailRequestsSucceeded: number;
+  detailRequestsFailed: number;
+  detailLinesStored: number;
+  mappedRenewalLines: number;
+  mappedAdHocLines: number;
+  unmappedLinesIgnored: number;
+  voidedDocuments: number;
+  renewalEventsInserted: number;
+  renewalEventsSkipped: number;
+}
+
+async function syncSourceDetails(args: {
+  ctx: N3TenantContext;
+  tenantCode: string;
+  sourceType: SourceType;
+  listEndpoint: (typeof N3_ENDPOINTS)[keyof typeof N3_ENDPOINTS];
+  getEndpoint: (typeof N3_ENDPOINTS)[keyof typeof N3_ENDPOINTS];
+  lineTable: "sales_invoice_line_snapshots" | "delivery_order_line_snapshots";
+  renewalMappings: Map<string, RenewalMapping>;
+  adHocStockCodes: Set<string>;
+  categoryIdByName: Map<string, string>;
+  customerNameByCode: Map<string, string | null>;
+}): Promise<SourceMetrics> {
+  const {
+    ctx,
+    tenantCode,
+    sourceType,
+    listEndpoint,
+    getEndpoint,
+    lineTable,
+    renewalMappings,
+    adHocStockCodes,
+    categoryIdByName,
+    customerNameByCode,
+  } = args;
+
+  const metrics: SourceMetrics = {
+    headersScanned: 0,
+    detailRequestsAttempted: 0,
+    detailRequestsSucceeded: 0,
+    detailRequestsFailed: 0,
+    detailLinesStored: 0,
+    mappedRenewalLines: 0,
+    mappedAdHocLines: 0,
+    unmappedLinesIgnored: 0,
+    voidedDocuments: 0,
+    renewalEventsInserted: 0,
+    renewalEventsSkipped: 0,
+  };
+
+  const headers: N3DocHeader[] = [];
+  try {
+    for await (const h of n3IterateList<N3DocHeader>(ctx.token, listEndpoint.target, listEndpoint.path)) {
+      headers.push(h);
+    }
+  } catch (err) {
+    throw new Error(
+      `Fetch ${listEndpoint.resource} (${listEndpoint.path}) failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  metrics.headersScanned = headers.length;
+
+  for (const header of headers) {
+    const docId = (header.id ?? "").toString().trim();
+    if (!docId) continue;
+
+    const docNo = (header.docCode ?? header.documentNo ?? "").toString() || null;
+    metrics.detailRequestsAttempted += 1;
+    let full: N3DocFull;
+    try {
+      full = await n3Get<N3DocFull>(
+        ctx.token,
+        getEndpoint.target,
+        getEndpoint.path.replace("{key}", encodeURIComponent(docId)),
+      );
+      metrics.detailRequestsSucceeded += 1;
+    } catch (err) {
+      metrics.detailRequestsFailed += 1;
+      const status = err instanceof Error ? err.message.match(/\((\d{3})\)/)?.[1] : undefined;
+      console.error(
+        `[subscription-sync] detail fetch failed source=${sourceType} docId=${docId} docNo=${docNo ?? "?"} status=${status ?? "?"}`,
+      );
+      continue;
+    }
+
+    const lines = Array.isArray(full.itemDetails)
+      ? full.itemDetails
+      : Array.isArray(full.details)
+        ? full.details
+        : [];
+    const docDate = parseDate(full.docDate ?? header.docDate ?? null);
+    const isVoid = Boolean(full.isCancelled ?? header.isCancelled);
+    if (isVoid) metrics.voidedDocuments += 1;
+    const customerCode = (full.customerCode ?? header.customerCode ?? "").trim();
+    const customerName =
+      (full.customerName as string | undefined) ??
+      (header.customerName as string | undefined) ??
+      (customerCode ? customerNameByCode.get(customerCode) ?? null : null);
+
+    // ---- Upsert every line (mapped or not) ------------------------------
+    const upsertRows: Array<Record<string, unknown>> = [];
+    const renewalEvents: Array<Record<string, unknown>> = [];
+
+    lines.forEach((line, index) => {
+      const stockCode = pickStockCode(line);
+      const lineId = pickLineId(line, index);
+      const stockKey = normalizeStockKey(stockCode);
+      const row = {
+        tenant_code: tenantCode,
+        n3_document_id: docId,
+        n3_line_id: lineId,
+        document_no: docNo,
+        document_date: docDate ? isoDate(docDate) : null,
+        document_status: isVoid ? "Cancelled" : "Active",
+        customer_code: customerCode || null,
+        customer_name: customerName ?? null,
+        line_no: line.pos ?? line.numbering ?? index + 1,
+        stock_code: stockCode,
+        stock_name: line.stock?.name ?? null,
+        description: line.description ?? line.stock?.description ?? null,
+        quantity: typeof line.qty === "number" ? line.qty : null,
+        uom: line.uom?.code ?? null,
+        is_void: isVoid,
+        is_deleted_in_source: false,
+        last_seen_at: new Date().toISOString(),
+        last_synced_at: new Date().toISOString(),
+      };
+      upsertRows.push(row);
+
+      if (!stockKey) return;
+      const renewal = renewalMappings.get(stockKey);
+      if (renewal) {
+        metrics.mappedRenewalLines += 1;
+        if (isVoid) {
+          metrics.renewalEventsSkipped += 1;
+          return;
+        }
+        if (!docDate || !customerCode) {
+          metrics.renewalEventsSkipped += 1;
+          return;
+        }
+        const expiry = computeInclusiveExpiry(
+          docDate,
+          renewal.renewal_cycle_value,
+          renewal.renewal_cycle_unit,
+        );
+        renewalEvents.push({
+          tenant_code: tenantCode,
+          customer_code: customerCode,
+          customer_name: customerName ?? null,
+          subscription_category_id:
+            categoryIdByName.get(renewal.subscription_category.toLowerCase()) ?? null,
+          subscription_category_name: renewal.subscription_category,
+          stock_code: renewal.stock_code,
+          stock_name: line.stock?.name ?? null,
+          source_type: sourceType,
+          source_document_id: docId,
+          source_document_no: docNo,
+          source_document_date: isoDate(docDate),
+          source_line_id: lineId,
+          renewal_cycle_value: renewal.renewal_cycle_value,
+          renewal_cycle_unit: renewal.renewal_cycle_unit,
+          start_date: isoDate(docDate),
+          expiry_date: isoDate(expiry),
+          is_source_void: false,
+        });
+      } else if (adHocStockCodes.has(stockKey)) {
+        metrics.mappedAdHocLines += 1; // stored for future job history; no expiry
+      } else {
+        metrics.unmappedLinesIgnored += 1;
+      }
+    });
+
+    // Batch upsert line snapshots.
+    if (upsertRows.length > 0) {
+      const { error } = await supabaseAdmin
+        .from(lineTable)
+        .upsert(upsertRows as never, { onConflict: "tenant_code,n3_document_id,n3_line_id" });
+      if (error) {
+        console.error(`[subscription-sync] upsert ${lineTable} failed docId=${docId}`, error);
+        metrics.detailRequestsFailed += 1;
+      } else {
+        metrics.detailLinesStored += upsertRows.length;
+      }
+    }
+
+    // Batch upsert renewal events.
+    if (renewalEvents.length > 0) {
+      const { error, count } = await supabaseAdmin
+        .from("subscription_renewal_events")
+        .upsert(renewalEvents as never, {
+          onConflict: "tenant_code,source_document_id,source_line_id",
+          count: "exact",
+        });
+      if (error) {
+        console.error(
+          `[subscription-sync] upsert renewal events failed docId=${docId}`,
+          error,
+        );
+        metrics.renewalEventsSkipped += renewalEvents.length;
+      } else {
+        metrics.renewalEventsInserted += count ?? renewalEvents.length;
+      }
+    }
+  }
+
+  return metrics;
+}
+
+// ---------------------------------------------------------------------------
+// Rebuild current customer_subscription_snapshots from the renewal event
+// history. Latest non-void event per (customer, category) wins.
+
+async function rebuildCurrentSnapshots(
+  tenantCode: string,
+  dueSoonDays: number,
+  customerNameByCode: Map<string, string | null>,
+): Promise<{ inserted: number; updated: number; skipped: number }> {
+  const { data: events, error } = await supabaseAdmin
+    .from("subscription_renewal_events")
+    .select(
+      "customer_code, customer_name, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
+    )
+    .eq("tenant_code", tenantCode)
+    .eq("is_source_void", false)
+    .order("source_document_date", { ascending: false });
+  if (error) throw new Error(`Load renewal events failed: ${error.message}`);
+
+  // Pick latest per (customer, category) — ordered descending, so first wins.
+  const latestByKey = new Map<string, (typeof events)[number]>();
+  for (const ev of events ?? []) {
+    const key = `${ev.customer_code}::${ev.subscription_category_name}`;
+    if (!latestByKey.has(key)) latestByKey.set(key, ev);
+  }
+
+  if (latestByKey.size === 0) return { inserted: 0, updated: 0, skipped: 0 };
+
+  // Load existing snapshots for change detection.
+  const targetCustomers = Array.from(
+    new Set(Array.from(latestByKey.values()).map((e) => e.customer_code)),
+  );
+  const { data: existingRows, error: existingErr } = await supabaseAdmin
+    .from("customer_subscription_snapshots")
+    .select(
+      "customer_code, subscription_category, latest_document_no, latest_document_date, expiry_date, subscription_status",
+    )
+    .eq("tenant_code", tenantCode)
+    .in("customer_code", targetCustomers);
+  if (existingErr) throw new Error(`Load existing subscriptions failed: ${existingErr.message}`);
+  const existingByKey = new Map<string, Record<string, unknown>>();
+  for (const r of existingRows ?? []) {
+    existingByKey.set(`${r.customer_code}::${r.subscription_category}`, r as Record<string, unknown>);
+  }
+
+  const now = Date.now();
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+  const toUpsert: Array<Record<string, unknown>> = [];
+
+  for (const [key, ev] of latestByKey) {
+    const expiryMs = new Date(ev.expiry_date).getTime();
+    const daysLeft = Math.ceil((expiryMs - now) / 86400000);
+    const status = computeStatus(daysLeft, dueSoonDays);
+    const row = {
+      tenant_code: tenantCode,
+      customer_code: ev.customer_code,
+      customer_name: ev.customer_name ?? customerNameByCode.get(ev.customer_code) ?? null,
+      subscription_category: ev.subscription_category_name,
+      stock_code: ev.stock_code,
+      stock_name: ev.stock_name ?? null,
+      renewal_cycle_value: ev.renewal_cycle_value,
+      renewal_cycle_unit: ev.renewal_cycle_unit,
+      latest_source_type: ev.source_type,
+      latest_document_no: ev.source_document_no ?? null,
+      latest_document_date: ev.source_document_date,
+      latest_source_document_id: ev.source_document_id,
+      latest_source_line_id: ev.source_line_id,
+      contract_start_date: ev.start_date,
+      expiry_date: ev.expiry_date,
+      remaining_days: daysLeft,
+      subscription_status: status,
+      last_calculated_at: new Date().toISOString(),
+      is_stale: false,
+      calculation_error: null,
+    };
+
+    const existing = existingByKey.get(key);
+    if (!existing) inserted += 1;
+    else {
+      const changed =
+        (existing.latest_document_no ?? null) !== (row.latest_document_no ?? null) ||
+        (existing.latest_document_date ?? null) !== row.latest_document_date ||
+        (existing.expiry_date ?? null) !== row.expiry_date ||
+        (existing.subscription_status ?? null) !== row.subscription_status;
+      if (changed) updated += 1;
+      else skipped += 1;
+    }
+    toUpsert.push(row);
+  }
+
+  const BATCH = 200;
+  for (let i = 0; i < toUpsert.length; i += BATCH) {
+    const chunk = toUpsert.slice(i, i + BATCH);
+    const { error: upsertErr } = await supabaseAdmin
+      .from("customer_subscription_snapshots")
+      .upsert(chunk as never, {
+        onConflict: "tenant_code,customer_code,subscription_category",
+      });
+    if (upsertErr) throw new Error(`Upsert subscriptions failed: ${upsertErr.message}`);
+  }
+
+  return { inserted, updated, skipped };
+}
+
+// ---------------------------------------------------------------------------
+// Category seeding (unchanged from Phase 1.0).
 
 const DEFAULT_CATEGORIES: Array<{ name: string; display_order: number }> = [
   { name: "Maintenance", display_order: 10 },
@@ -355,7 +625,7 @@ export async function ensureDefaultCategories(tenantCode: string): Promise<void>
     .from("subscription_categories")
     .select("name")
     .eq("tenant_code", tenantCode);
-  if (error) return; // best-effort; do not fail the sync for seeding
+  if (error) return;
   const have = new Set((existing ?? []).map((r) => r.name.toLowerCase()));
   const missing = DEFAULT_CATEGORIES.filter((c) => !have.has(c.name.toLowerCase()));
   if (missing.length === 0) return;

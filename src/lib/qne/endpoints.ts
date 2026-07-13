@@ -45,12 +45,32 @@ export const N3_ENDPOINTS = {
     operationId: "SalesInvoices_GetList_GET",
     resource: "SalesInvoices",
   },
+  "salesInvoices.get": {
+    target: "main",
+    method: "GET",
+    // Full document with `itemDetails[]` (SalesInvoiceDetailDto).
+    // `{key}` is the stable N3 document id (SalesInvoiceListDto.id).
+    path: "/api/SalesInvoices/{key}",
+    paging: "single",
+    operationId: "SalesInvoices_GetByKey_GET",
+    resource: "SalesInvoices",
+  },
   "deliveryOrders.list": {
     target: "main",
     method: "GET",
     path: "/api/DeliveryOrders/List",
     paging: "odata-page",
     operationId: "DeliveryOrders_GetList_GET",
+    resource: "DeliveryOrders",
+  },
+  "deliveryOrders.get": {
+    target: "main",
+    method: "GET",
+    // Full document with `itemDetails[]` (DeliveryOrderDetailDto) and
+    // `customerCode` (the DO list DTO omits customerCode).
+    path: "/api/DeliveryOrders/{key}",
+    paging: "single",
+    operationId: "DeliveryOrders_GetByKey_GET",
     resource: "DeliveryOrders",
   },
   "users.list": {
