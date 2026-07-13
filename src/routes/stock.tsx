@@ -8,7 +8,7 @@ export const Route = createFileRoute("/stock")({
       <N3ListExplorer
         title="N3 Stock codes"
         hint="Administrator explorer — master stock records from N3. Use Settings to map stock codes."
-        defaultPath="/api/stock"
+        defaultPath="/api/Stocks/List"
         preferredColumns={["code", "description", "uom", "stockGroup", "isActive"]}
       />
     </AdminOnly>
