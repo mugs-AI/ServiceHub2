@@ -122,6 +122,81 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_subscription_snapshots: {
+        Row: {
+          calculation_error: string | null
+          contract_start_date: string | null
+          created_at: string
+          customer_code: string
+          customer_name: string | null
+          expiry_date: string | null
+          id: string
+          is_stale: boolean
+          last_calculated_at: string | null
+          latest_document_date: string | null
+          latest_document_no: string | null
+          latest_source_type: string | null
+          raw_payload: Json | null
+          remaining_days: number | null
+          renewal_cycle_unit: string | null
+          renewal_cycle_value: number | null
+          stock_code: string | null
+          stock_name: string | null
+          subscription_category: string
+          subscription_status: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          calculation_error?: string | null
+          contract_start_date?: string | null
+          created_at?: string
+          customer_code: string
+          customer_name?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_stale?: boolean
+          last_calculated_at?: string | null
+          latest_document_date?: string | null
+          latest_document_no?: string | null
+          latest_source_type?: string | null
+          raw_payload?: Json | null
+          remaining_days?: number | null
+          renewal_cycle_unit?: string | null
+          renewal_cycle_value?: number | null
+          stock_code?: string | null
+          stock_name?: string | null
+          subscription_category: string
+          subscription_status?: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          calculation_error?: string | null
+          contract_start_date?: string | null
+          created_at?: string
+          customer_code?: string
+          customer_name?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_stale?: boolean
+          last_calculated_at?: string | null
+          latest_document_date?: string | null
+          latest_document_no?: string | null
+          latest_source_type?: string | null
+          raw_payload?: Json | null
+          remaining_days?: number | null
+          renewal_cycle_unit?: string | null
+          renewal_cycle_value?: number | null
+          stock_code?: string | null
+          stock_name?: string | null
+          subscription_category?: string
+          subscription_status?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       general_settings: {
         Row: {
           assigned_user_label: string
@@ -197,8 +272,11 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          renewal_cycle_unit: string | null
+          renewal_cycle_value: number | null
           service_type: string
           stock_code: string
+          subscription_category: string | null
           tenant_code: string
           updated_at: string
         }
@@ -207,8 +285,11 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          renewal_cycle_unit?: string | null
+          renewal_cycle_value?: number | null
           service_type: string
           stock_code: string
+          subscription_category?: string | null
           tenant_code: string
           updated_at?: string
         }
@@ -217,8 +298,11 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          renewal_cycle_unit?: string | null
+          renewal_cycle_value?: number | null
           service_type?: string
           stock_code?: string
+          subscription_category?: string | null
           tenant_code?: string
           updated_at?: string
         }
@@ -432,6 +516,39 @@ export type Database = {
           last_synced_at?: string | null
           stock_code?: string
           stock_name?: string | null
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscription_categories: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name?: string
           tenant_code?: string
           updated_at?: string
         }

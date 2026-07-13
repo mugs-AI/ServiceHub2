@@ -60,7 +60,9 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
             const typeParam = parseType(url.searchParams.get("type"));
             let query = supabaseAdmin
               .from("renewal_stock_mappings")
-              .select("stock_code, service_type, contract_days, is_active, updated_at")
+              .select(
+                "stock_code, service_type, contract_days, subscription_category, renewal_cycle_value, renewal_cycle_unit, is_active, updated_at",
+              )
               .eq("tenant_code", tenant)
               .order("stock_code", { ascending: true });
             if (typeParam) query = query.eq("service_type", SERVICE_TYPE_DB[typeParam]);
@@ -90,6 +92,9 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
               description: namesByCode.get(m.stock_code)?.description ?? null,
               service_type: m.service_type,
               contract_days: m.contract_days,
+              subscription_category: m.subscription_category,
+              renewal_cycle_value: m.renewal_cycle_value,
+              renewal_cycle_unit: m.renewal_cycle_unit,
               is_active: m.is_active,
               updated_at: m.updated_at,
             }));
@@ -142,12 +147,21 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
           const codes = trimmed.map((s) => s.stock_code);
           const mappingByCode = new Map<
             string,
-            { service_type: string; contract_days: number | null; is_active: boolean }
+            {
+              service_type: string;
+              contract_days: number | null;
+              subscription_category: string | null;
+              renewal_cycle_value: number | null;
+              renewal_cycle_unit: string | null;
+              is_active: boolean;
+            }
           >();
           if (codes.length > 0) {
             const { data: existing, error: mErr } = await supabaseAdmin
               .from("renewal_stock_mappings")
-              .select("stock_code, service_type, contract_days, is_active")
+              .select(
+                "stock_code, service_type, contract_days, subscription_category, renewal_cycle_value, renewal_cycle_unit, is_active",
+              )
               .eq("tenant_code", tenant)
               .in("stock_code", codes);
             if (mErr) throw mErr;
@@ -155,6 +169,9 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
               mappingByCode.set(m.stock_code, {
                 service_type: m.service_type,
                 contract_days: m.contract_days,
+                subscription_category: m.subscription_category,
+                renewal_cycle_value: m.renewal_cycle_value,
+                renewal_cycle_unit: m.renewal_cycle_unit,
                 is_active: m.is_active,
               });
             }
@@ -201,6 +218,9 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
             stock_code?: string;
             service_type?: string;
             contract_days?: number | null;
+            subscription_category?: string | null;
+            renewal_cycle_value?: number | null;
+            renewal_cycle_unit?: string | null;
           };
           const stockCode = String(body.stock_code ?? "").trim();
           const typeUi = parseType(String(body.service_type ?? ""));
@@ -213,16 +233,62 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
               { status: 400 },
             );
           }
+
           let contractDays: number | null = null;
+          let subscriptionCategory: string | null = null;
+          let cycleValue: number | null = null;
+          let cycleUnit: "day" | "month" | "year" | null = null;
+
           if (typeUi === "renewal") {
-            const n = Number(body.contract_days);
-            if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+            subscriptionCategory = String(body.subscription_category ?? "").trim() || null;
+            if (!subscriptionCategory) {
               return Response.json(
-                { error: "Contract Days must be a whole number ≥ 1" },
+                { error: "Subscription Category is required for Renewal mappings" },
                 { status: 400 },
               );
             }
-            contractDays = n;
+
+            const unitRaw = String(body.renewal_cycle_unit ?? "").trim().toLowerCase();
+            if (unitRaw !== "day" && unitRaw !== "month" && unitRaw !== "year") {
+              return Response.json(
+                { error: "Renewal Cycle Unit must be 'day', 'month', or 'year'" },
+                { status: 400 },
+              );
+            }
+            cycleUnit = unitRaw;
+
+            const cv = Number(body.renewal_cycle_value);
+            if (!Number.isFinite(cv) || !Number.isInteger(cv) || cv < 1) {
+              return Response.json(
+                { error: "Renewal Cycle Value must be a whole number ≥ 1" },
+                { status: 400 },
+              );
+            }
+            cycleValue = cv;
+
+            // Preserve legacy contract_days for backward-compatible Contract Sync:
+            // derive from cycle when unit === "day", otherwise leave the caller-supplied
+            // value (or null) so downstream Subscription Sync governs expiry.
+            if (cycleUnit === "day") {
+              contractDays = cv;
+            } else {
+              const n = Number(body.contract_days);
+              contractDays = Number.isFinite(n) && Number.isInteger(n) && n >= 1 ? n : null;
+            }
+
+            // Confirm the category belongs to this tenant and is active.
+            const { data: cat } = await supabaseAdmin
+              .from("subscription_categories")
+              .select("name, is_active")
+              .eq("tenant_code", user.tenantCode)
+              .eq("name", subscriptionCategory)
+              .maybeSingle();
+            if (!cat || cat.is_active === false) {
+              return Response.json(
+                { error: "Subscription Category not found or disabled for this Client" },
+                { status: 400 },
+              );
+            }
           }
 
           // Confirm the stock code exists in this tenant's snapshots — prevents
@@ -249,12 +315,17 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
                 stock_code: stockCode,
                 service_type: SERVICE_TYPE_DB[typeUi],
                 contract_days: contractDays,
+                subscription_category: subscriptionCategory,
+                renewal_cycle_value: cycleValue,
+                renewal_cycle_unit: cycleUnit,
                 is_active: true,
                 updated_at: new Date().toISOString(),
               },
               { onConflict: "tenant_code,stock_code" },
             )
-            .select("stock_code, service_type, contract_days, is_active")
+            .select(
+              "stock_code, service_type, contract_days, subscription_category, renewal_cycle_value, renewal_cycle_unit, is_active",
+            )
             .single();
           if (error) throw error;
 

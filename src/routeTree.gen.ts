@@ -21,9 +21,11 @@ import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspace/customers'
+import { Route as ApiSyncSubscriptionsRouteImport } from './routes/api/sync/subscriptions'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
+import { Route as ApiSettingsSubscriptionCategoriesRouteImport } from './routes/api/settings/subscription-categories'
 import { Route as ApiSettingsStockMappingsRouteImport } from './routes/api/settings/stock-mappings'
 import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
 import { Route as ApiDiagnosticsPreviewRouteImport } from './routes/api/diagnostics/preview'
@@ -92,6 +94,11 @@ const ApiWorkspaceCustomersRoute = ApiWorkspaceCustomersRouteImport.update({
   path: '/api/workspace/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSyncSubscriptionsRoute = ApiSyncSubscriptionsRouteImport.update({
+  id: '/api/sync/subscriptions',
+  path: '/api/sync/subscriptions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSyncStockRoute = ApiSyncStockRouteImport.update({
   id: '/api/sync/stock',
   path: '/api/sync/stock',
@@ -107,6 +114,12 @@ const ApiSyncContractsRoute = ApiSyncContractsRouteImport.update({
   path: '/api/sync/contracts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSettingsSubscriptionCategoriesRoute =
+  ApiSettingsSubscriptionCategoriesRouteImport.update({
+    id: '/api/settings/subscription-categories',
+    path: '/api/settings/subscription-categories',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSettingsStockMappingsRoute =
   ApiSettingsStockMappingsRouteImport.update({
     id: '/api/settings/stock-mappings',
@@ -163,9 +176,11 @@ export interface FileRoutesByFullPath {
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
+  '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRoutesByTo {
@@ -187,9 +202,11 @@ export interface FileRoutesByTo {
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
+  '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRoutesById {
@@ -212,9 +229,11 @@ export interface FileRoutesById {
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
+  '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRouteTypes {
@@ -238,9 +257,11 @@ export interface FileRouteTypes {
     | '/api/diagnostics/preview'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
+    | '/api/sync/subscriptions'
     | '/api/workspace/customers'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -262,9 +283,11 @@ export interface FileRouteTypes {
     | '/api/diagnostics/preview'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
+    | '/api/sync/subscriptions'
     | '/api/workspace/customers'
   id:
     | '__root__'
@@ -286,9 +309,11 @@ export interface FileRouteTypes {
     | '/api/diagnostics/preview'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/stock'
+    | '/api/sync/subscriptions'
     | '/api/workspace/customers'
   fileRoutesById: FileRoutesById
 }
@@ -311,9 +336,11 @@ export interface RootRouteChildren {
   ApiDiagnosticsPreviewRoute: typeof ApiDiagnosticsPreviewRoute
   ApiSessionMeRoute: typeof ApiSessionMeRoute
   ApiSettingsStockMappingsRoute: typeof ApiSettingsStockMappingsRoute
+  ApiSettingsSubscriptionCategoriesRoute: typeof ApiSettingsSubscriptionCategoriesRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
+  ApiSyncSubscriptionsRoute: typeof ApiSyncSubscriptionsRoute
   ApiWorkspaceCustomersRoute: typeof ApiWorkspaceCustomersRoute
 }
 
@@ -403,6 +430,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceCustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sync/subscriptions': {
+      id: '/api/sync/subscriptions'
+      path: '/api/sync/subscriptions'
+      fullPath: '/api/sync/subscriptions'
+      preLoaderRoute: typeof ApiSyncSubscriptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sync/stock': {
       id: '/api/sync/stock'
       path: '/api/sync/stock'
@@ -422,6 +456,13 @@ declare module '@tanstack/react-router' {
       path: '/api/sync/contracts'
       fullPath: '/api/sync/contracts'
       preLoaderRoute: typeof ApiSyncContractsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/settings/subscription-categories': {
+      id: '/api/settings/subscription-categories'
+      path: '/api/settings/subscription-categories'
+      fullPath: '/api/settings/subscription-categories'
+      preLoaderRoute: typeof ApiSettingsSubscriptionCategoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/settings/stock-mappings': {
@@ -495,9 +536,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDiagnosticsPreviewRoute: ApiDiagnosticsPreviewRoute,
   ApiSessionMeRoute: ApiSessionMeRoute,
   ApiSettingsStockMappingsRoute: ApiSettingsStockMappingsRoute,
+  ApiSettingsSubscriptionCategoriesRoute:
+    ApiSettingsSubscriptionCategoriesRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
+  ApiSyncSubscriptionsRoute: ApiSyncSubscriptionsRoute,
   ApiWorkspaceCustomersRoute: ApiWorkspaceCustomersRoute,
 }
 export const routeTree = rootRouteImport
