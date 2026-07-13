@@ -65,26 +65,39 @@ export function isUserActive(user: N3UserDto | null | undefined): boolean {
   return true;
 }
 
+export interface IdentityLookup {
+  userId?: string | null;
+  userCode?: string | null;
+  email?: string | null;
+  userName?: string | null;
+}
+
 /**
  * Match the authenticated user (identified by BasicInfo) to an entry in
- * /api/Users. Priority: userId → email → userName. Email and userName are
- * cross-matched, trimmed and lowercased. displayName is never used.
+ * /api/Users. Priority: stable id → email → userName. Email and userName
+ * are cross-matched against `UserDto.email` AND `UserDto.userName`, always
+ * trimmed and lowercased. displayName is never used.
  */
 export function matchCurrentUser(
   users: N3UserDto[],
-  identity: { userCode?: string | null; email?: string | null },
+  identity: IdentityLookup,
 ): N3UserDto | null {
-  const wantId = (identity.userCode ?? "").trim();
+  const wantId = (identity.userId ?? identity.userCode ?? "").trim();
   if (wantId) {
     for (const u of users) {
       if ((u.userId ?? "").trim() === wantId) return u;
     }
   }
   const wantEmail = normaliseEmail(identity.email);
-  if (!wantEmail) return null;
+  const wantUserName = normaliseEmail(identity.userName);
+  if (!wantEmail && !wantUserName) return null;
   for (const u of users) {
-    if (normaliseEmail(u.email) === wantEmail) return u;
-    if (normaliseEmail(u.userName) === wantEmail) return u;
+    const uEmail = normaliseEmail(u.email);
+    const uUser = normaliseEmail(u.userName);
+    if (wantEmail && (uEmail === wantEmail || uUser === wantEmail)) return u;
+    if (wantUserName && (uEmail === wantUserName || uUser === wantUserName)) {
+      return u;
+    }
   }
   return null;
 }
