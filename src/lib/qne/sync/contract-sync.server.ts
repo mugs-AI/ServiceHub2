@@ -3,8 +3,9 @@
 // days ALWAYS come from renewal_stock_mappings — never hardcoded.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
 import { n3IterateList, type N3TenantContext } from "./n3.server";
-import { runWithSyncLog, type SyncResult } from "./log.server";
+import { runWithSyncLog, SyncNotReadyError, type SyncResult } from "./log.server";
 
 interface N3DocLine {
   stockCode?: string;
