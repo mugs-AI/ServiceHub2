@@ -155,22 +155,21 @@ function RoleDiagnostics() {
   const { currentUser } = useSession();
   const d = currentUser?.diagnostics;
   const gateLabel: Record<string, string> = {
-    n3_role: "Official N3 Administrators role",
-    allowlist: "Tenant-scoped ServiceHub allowlist (fallback)",
-    bootstrap: "First-user bootstrap (fallback)",
+    n3_owner: "Official N3 tenant Owner (isOwner=true)",
+    allowlist: "Tenant-scoped ServiceHub allowlist (emergency fallback)",
+    bootstrap: "First-user bootstrap (emergency fallback)",
     none: "Not an administrator",
   };
   const reasonLabel: Record<string, string> = {
-    matched_administrators_role: "Matched N3 user has the Administrators role",
-    matched_without_administrators_role: "Matched N3 user does not have the Administrators role",
-    role_data_missing: "Matched N3 user has no roles attached",
+    matched_owner: "Matched N3 user has isOwner = true",
+    matched_not_owner: "Matched N3 user has isOwner = false",
     no_matching_user: "No matching N3 user in /api/Users",
     users_endpoint_failed: "/api/Users request failed",
     users_endpoint_unauthorized: "/api/Users returned 401 Unauthorized",
     users_endpoint_forbidden: "/api/Users returned 403 Forbidden",
-    no_email: "BasicInfo user identifier missing",
-    allowlist_fallback: "Granted via tenant allowlist (fallback)",
-    bootstrap_fallback: "Granted as first user of this tenant (bootstrap)",
+    identity_missing: "N3 JWT did not carry a user identifier",
+    allowlist_fallback: "Granted via tenant allowlist (emergency fallback)",
+    bootstrap_fallback: "Granted as first user of this tenant (emergency fallback)",
   };
   const ep = d?.usersEndpoint;
   const endpointText = ep
@@ -181,9 +180,11 @@ function RoleDiagnostics() {
   return (
     <div className="rounded-xl border bg-card p-4 text-xs shadow-sm">
       <dl className="grid gap-2 sm:grid-cols-2">
-        <Row k="BasicInfo identifier" v={d?.basicInfoUserIdentifier ?? "—"} />
+        <Row k="Identity source" v={d?.identitySource ?? "—"} />
+        <Row k="Identity identifier" v={d?.identityUserIdentifier ?? "—"} />
         <Row k="Matched N3 user id" v={d?.matchedN3UserId ?? "—"} />
         <Row k="Matched display name" v={d?.matchedDisplayName ?? "—"} />
+        <Row k="isOwner" v={currentUser?.isOwner ? "true" : "false"} />
         <Row
           k="Role names"
           v={currentUser?.roleNames?.length ? currentUser.roleNames.join(", ") : "—"}
@@ -199,6 +200,7 @@ function RoleDiagnostics() {
     </div>
   );
 }
+
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
