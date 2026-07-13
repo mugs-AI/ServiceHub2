@@ -41,14 +41,14 @@ function InvoicesPage() {
         <N3ListExplorer
           key="invoice"
           title="Sales Invoices"
-          defaultPath="/api/salesinvoice"
+          defaultPath="/api/SalesInvoices/List"
           preferredColumns={["docNo", "docDate", "customerCode", "customerName", "netTotal"]}
         />
       ) : (
         <N3ListExplorer
           key="do"
           title="Delivery Orders"
-          defaultPath="/api/deliveryorder"
+          defaultPath="/api/DeliveryOrders/List"
           preferredColumns={["docNo", "docDate", "customerCode", "customerName", "netTotal"]}
         />
       )}
