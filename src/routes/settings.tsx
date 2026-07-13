@@ -268,13 +268,14 @@ function AdminAllowlistPanel() {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-foreground">
-            Administrator allowlist
+            Emergency Administrator Fallback
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Interim gate — N3 does not yet expose an official role claim for
-            ServiceHub. Only emails on this tenant-scoped allowlist can access
-            Settings and Admin Tools. The first authenticated user of a tenant
-            is auto-promoted as bootstrap administrator.
+            ServiceHub administration is granted to the current N3 company
+            Owner. This allowlist is an emergency fallback, active only while
+            <code className="mx-1 rounded bg-muted px-1">SERVICEHUB_ALLOWLIST_FALLBACK=1</code>
+            is set. Only emails on this tenant-scoped list can access Settings
+            and Admin Tools under the fallback.
           </p>
         </div>
       </div>
