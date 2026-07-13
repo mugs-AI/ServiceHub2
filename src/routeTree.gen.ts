@@ -21,6 +21,7 @@ import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspace/customers'
+import { Route as ApiWorkspaceCustomerSubscriptionsRouteImport } from './routes/api/workspace/customer-subscriptions'
 import { Route as ApiSyncSubscriptionsRouteImport } from './routes/api/sync/subscriptions'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
@@ -28,6 +29,9 @@ import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contract
 import { Route as ApiSettingsSubscriptionCategoriesRouteImport } from './routes/api/settings/subscription-categories'
 import { Route as ApiSettingsStockMappingsRouteImport } from './routes/api/settings/stock-mappings'
 import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
+import { Route as ApiDiagnosticsVerifyDocumentRouteImport } from './routes/api/diagnostics/verify-document'
+import { Route as ApiDiagnosticsSubscriptionRunRouteImport } from './routes/api/diagnostics/subscription-run'
+import { Route as ApiDiagnosticsSubscriptionPreviewRouteImport } from './routes/api/diagnostics/subscription-preview'
 import { Route as ApiDiagnosticsPreviewRouteImport } from './routes/api/diagnostics/preview'
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
@@ -94,6 +98,12 @@ const ApiWorkspaceCustomersRoute = ApiWorkspaceCustomersRouteImport.update({
   path: '/api/workspace/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceCustomerSubscriptionsRoute =
+  ApiWorkspaceCustomerSubscriptionsRouteImport.update({
+    id: '/api/workspace/customer-subscriptions',
+    path: '/api/workspace/customer-subscriptions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSyncSubscriptionsRoute = ApiSyncSubscriptionsRouteImport.update({
   id: '/api/sync/subscriptions',
   path: '/api/sync/subscriptions',
@@ -131,6 +141,24 @@ const ApiSessionMeRoute = ApiSessionMeRouteImport.update({
   path: '/api/session/me',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDiagnosticsVerifyDocumentRoute =
+  ApiDiagnosticsVerifyDocumentRouteImport.update({
+    id: '/api/diagnostics/verify-document',
+    path: '/api/diagnostics/verify-document',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiDiagnosticsSubscriptionRunRoute =
+  ApiDiagnosticsSubscriptionRunRouteImport.update({
+    id: '/api/diagnostics/subscription-run',
+    path: '/api/diagnostics/subscription-run',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiDiagnosticsSubscriptionPreviewRoute =
+  ApiDiagnosticsSubscriptionPreviewRouteImport.update({
+    id: '/api/diagnostics/subscription-preview',
+    path: '/api/diagnostics/subscription-preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDiagnosticsPreviewRoute = ApiDiagnosticsPreviewRouteImport.update({
   id: '/api/diagnostics/preview',
   path: '/api/diagnostics/preview',
@@ -174,6 +202,9 @@ export interface FileRoutesByFullPath {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
+  '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
+  '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
@@ -181,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRoutesByTo {
@@ -200,6 +232,9 @@ export interface FileRoutesByTo {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
+  '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
+  '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
@@ -207,6 +242,7 @@ export interface FileRoutesByTo {
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRoutesById {
@@ -227,6 +263,9 @@ export interface FileRoutesById {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
+  '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
+  '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
+  '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
@@ -234,6 +273,7 @@ export interface FileRoutesById {
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
 }
 export interface FileRouteTypes {
@@ -255,6 +295,9 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-preview'
+    | '/api/diagnostics/subscription-run'
+    | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
@@ -262,6 +305,7 @@ export interface FileRouteTypes {
     | '/api/sync/customers'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -281,6 +325,9 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-preview'
+    | '/api/diagnostics/subscription-run'
+    | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
@@ -288,6 +335,7 @@ export interface FileRouteTypes {
     | '/api/sync/customers'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
   id:
     | '__root__'
@@ -307,6 +355,9 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
+    | '/api/diagnostics/subscription-preview'
+    | '/api/diagnostics/subscription-run'
+    | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
@@ -314,6 +365,7 @@ export interface FileRouteTypes {
     | '/api/sync/customers'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
   fileRoutesById: FileRoutesById
 }
@@ -334,6 +386,9 @@ export interface RootRouteChildren {
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
   ApiDiagnosticsPreviewRoute: typeof ApiDiagnosticsPreviewRoute
+  ApiDiagnosticsSubscriptionPreviewRoute: typeof ApiDiagnosticsSubscriptionPreviewRoute
+  ApiDiagnosticsSubscriptionRunRoute: typeof ApiDiagnosticsSubscriptionRunRoute
+  ApiDiagnosticsVerifyDocumentRoute: typeof ApiDiagnosticsVerifyDocumentRoute
   ApiSessionMeRoute: typeof ApiSessionMeRoute
   ApiSettingsStockMappingsRoute: typeof ApiSettingsStockMappingsRoute
   ApiSettingsSubscriptionCategoriesRoute: typeof ApiSettingsSubscriptionCategoriesRoute
@@ -341,6 +396,7 @@ export interface RootRouteChildren {
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
   ApiSyncSubscriptionsRoute: typeof ApiSyncSubscriptionsRoute
+  ApiWorkspaceCustomerSubscriptionsRoute: typeof ApiWorkspaceCustomerSubscriptionsRoute
   ApiWorkspaceCustomersRoute: typeof ApiWorkspaceCustomersRoute
 }
 
@@ -430,6 +486,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceCustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace/customer-subscriptions': {
+      id: '/api/workspace/customer-subscriptions'
+      path: '/api/workspace/customer-subscriptions'
+      fullPath: '/api/workspace/customer-subscriptions'
+      preLoaderRoute: typeof ApiWorkspaceCustomerSubscriptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sync/subscriptions': {
       id: '/api/sync/subscriptions'
       path: '/api/sync/subscriptions'
@@ -477,6 +540,27 @@ declare module '@tanstack/react-router' {
       path: '/api/session/me'
       fullPath: '/api/session/me'
       preLoaderRoute: typeof ApiSessionMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/diagnostics/verify-document': {
+      id: '/api/diagnostics/verify-document'
+      path: '/api/diagnostics/verify-document'
+      fullPath: '/api/diagnostics/verify-document'
+      preLoaderRoute: typeof ApiDiagnosticsVerifyDocumentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/diagnostics/subscription-run': {
+      id: '/api/diagnostics/subscription-run'
+      path: '/api/diagnostics/subscription-run'
+      fullPath: '/api/diagnostics/subscription-run'
+      preLoaderRoute: typeof ApiDiagnosticsSubscriptionRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/diagnostics/subscription-preview': {
+      id: '/api/diagnostics/subscription-preview'
+      path: '/api/diagnostics/subscription-preview'
+      fullPath: '/api/diagnostics/subscription-preview'
+      preLoaderRoute: typeof ApiDiagnosticsSubscriptionPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/diagnostics/preview': {
@@ -534,6 +618,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
   ApiDiagnosticsPreviewRoute: ApiDiagnosticsPreviewRoute,
+  ApiDiagnosticsSubscriptionPreviewRoute:
+    ApiDiagnosticsSubscriptionPreviewRoute,
+  ApiDiagnosticsSubscriptionRunRoute: ApiDiagnosticsSubscriptionRunRoute,
+  ApiDiagnosticsVerifyDocumentRoute: ApiDiagnosticsVerifyDocumentRoute,
   ApiSessionMeRoute: ApiSessionMeRoute,
   ApiSettingsStockMappingsRoute: ApiSettingsStockMappingsRoute,
   ApiSettingsSubscriptionCategoriesRoute:
@@ -542,6 +630,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
   ApiSyncSubscriptionsRoute: ApiSyncSubscriptionsRoute,
+  ApiWorkspaceCustomerSubscriptionsRoute:
+    ApiWorkspaceCustomerSubscriptionsRoute,
   ApiWorkspaceCustomersRoute: ApiWorkspaceCustomersRoute,
 }
 export const routeTree = rootRouteImport

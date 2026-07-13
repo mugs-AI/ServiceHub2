@@ -250,21 +250,184 @@ export function CustomerLookup() {
               )}
             </div>
 
-            <div
-              className="rounded-lg border border-dashed bg-card/60 p-4"
-              data-extension="contract-status"
-            >
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Contract status
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Contract, expiry and remaining days will appear here once the
-                Contract Snapshot surface is wired in the next milestone.
-              </p>
-            </div>
+            <CustomerSubscriptionsPanel
+              key={selected?.customer_code ?? "none"}
+              customerCode={selected?.customer_code ?? null}
+            />
+
           </div>
         </div>
       )}
     </div>
   );
 }
+
+interface SubscriptionRow {
+  customer_code: string;
+  subscription_category: string | null;
+  stock_code: string | null;
+  stock_name: string | null;
+  latest_document_no: string | null;
+  latest_source_type: string | null;
+  latest_document_date: string | null;
+  renewal_cycle_value: number | null;
+  renewal_cycle_unit: string | null;
+  expiry_date: string | null;
+  remaining_days: number | null;
+  subscription_status: string | null;
+  calculation_error: string | null;
+  updated_at: string | null;
+}
+
+function CustomerSubscriptionsPanel({
+  customerCode,
+}: {
+  customerCode: string | null;
+}) {
+  const [state, setState] = useState<
+    | { kind: "idle" }
+    | { kind: "loading" }
+    | { kind: "ok"; rows: SubscriptionRow[] }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  useEffect(() => {
+    if (!customerCode) {
+      setState({ kind: "idle" });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setState({ kind: "loading" });
+      try {
+        const token = getStoredToken();
+        const res = await fetch(
+          `/api/workspace/customer-subscriptions?customerCode=${encodeURIComponent(customerCode)}`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setState({
+            kind: "error",
+            message: body?.error ?? "Unable to load subscriptions.",
+          });
+          return;
+        }
+        setState({ kind: "ok", rows: body.subscriptions ?? [] });
+      } catch {
+        if (!cancelled) {
+          setState({
+            kind: "error",
+            message: "Unable to load subscriptions.",
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [customerCode]);
+
+  const statusColor = (s: string | null | undefined) => {
+    switch ((s ?? "").toLowerCase()) {
+      case "active":
+        return "bg-emerald-100 text-emerald-800 border-emerald-200";
+      case "expiring":
+      case "expiring soon":
+        return "bg-amber-100 text-amber-900 border-amber-200";
+      case "expired":
+        return "bg-rose-100 text-rose-800 border-rose-200";
+      default:
+        return "bg-muted text-muted-foreground border-border";
+    }
+  };
+
+  return (
+    <div className="rounded-lg border bg-card p-4 shadow-sm">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Subscriptions & entitlements
+      </div>
+      {!customerCode && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Select a customer to view their active entitlements.
+        </p>
+      )}
+      {customerCode && state.kind === "loading" && (
+        <p className="mt-2 text-sm text-muted-foreground">Loading…</p>
+      )}
+      {customerCode && state.kind === "error" && (
+        <p className="mt-2 text-sm text-destructive">{state.message}</p>
+      )}
+      {customerCode && state.kind === "ok" && state.rows.length === 0 && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          No subscription found for this customer. Ensure Renewal Stock
+          Mappings and Subscriptions have been synced.
+        </p>
+      )}
+      {customerCode && state.kind === "ok" && state.rows.length > 0 && (
+        <ul className="mt-3 space-y-3">
+          {state.rows.map((r) => (
+            <li
+              key={`${r.subscription_category}-${r.stock_code}`}
+              className="rounded-md border bg-background p-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-foreground">
+                  {r.subscription_category ?? "Uncategorised"}
+                </div>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusColor(
+                    r.subscription_status,
+                  )}`}
+                >
+                  {r.subscription_status ?? "unknown"}
+                </span>
+              </div>
+              <dl className="mt-2 grid grid-cols-2 gap-y-1 text-xs">
+                <dt className="text-muted-foreground">Stock</dt>
+                <dd className="truncate">
+                  {r.stock_code}
+                  {r.stock_name ? ` · ${r.stock_name}` : ""}
+                </dd>
+                <dt className="text-muted-foreground">Latest doc</dt>
+                <dd>
+                  {r.latest_document_no ?? "—"}
+                  {r.latest_source_type ? ` (${r.latest_source_type})` : ""}
+                </dd>
+                <dt className="text-muted-foreground">Doc date</dt>
+                <dd>
+                  {r.latest_document_date
+                    ? new Date(r.latest_document_date).toLocaleDateString()
+                    : "—"}
+                </dd>
+                <dt className="text-muted-foreground">Cycle</dt>
+                <dd>
+                  {r.renewal_cycle_value && r.renewal_cycle_unit
+                    ? `${r.renewal_cycle_value} ${r.renewal_cycle_unit}`
+                    : "—"}
+                </dd>
+                <dt className="text-muted-foreground">Expiry</dt>
+                <dd>
+                  {r.expiry_date
+                    ? new Date(r.expiry_date).toLocaleDateString()
+                    : "—"}
+                </dd>
+                <dt className="text-muted-foreground">Remaining</dt>
+                <dd>
+                  {r.remaining_days == null ? "—" : `${r.remaining_days} day(s)`}
+                </dd>
+              </dl>
+              {r.calculation_error && (
+                <p className="mt-2 text-xs text-destructive">
+                  {r.calculation_error}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+

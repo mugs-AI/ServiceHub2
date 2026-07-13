@@ -776,6 +776,27 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_locks: {
+        Row: {
+          acquired_at: string
+          acquired_by: string | null
+          snapshot_type: string
+          tenant_code: string
+        }
+        Insert: {
+          acquired_at?: string
+          acquired_by?: string | null
+          snapshot_type: string
+          tenant_code: string
+        }
+        Update: {
+          acquired_at?: string
+          acquired_by?: string | null
+          snapshot_type?: string
+          tenant_code?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

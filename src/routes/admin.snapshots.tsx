@@ -183,7 +183,7 @@ function AdminSnapshots() {
   const runAll = useCallback(async () => {
     if (running) return;
     setRunning("all");
-    for (const kind of ["customers", "stock", "contracts", "subscriptions"] as SnapshotKind[]) {
+    for (const kind of ["customers", "stock", "subscriptions"] as SnapshotKind[]) {
       try {
         const res = await authFetch(`/api/sync/${kind}`, { method: "POST" });
         const json = (await res.json()) as SyncResult;
@@ -269,17 +269,12 @@ function AdminSnapshots() {
           </button>
           <button
             disabled={busy}
-            onClick={() => runSync("contracts")}
-            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {running === "contracts" ? "Recalculating…" : "Recalculate Contracts"}
-          </button>
-          <button
-            disabled={busy}
             onClick={() => runSync("subscriptions")}
             className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {running === "subscriptions" ? "Recalculating…" : "Recalculate Subscriptions"}
+            {running === "subscriptions"
+              ? "Syncing…"
+              : "Sync Transaction Details & Recalculate Subscriptions"}
           </button>
           <button
             disabled={busy}
@@ -563,6 +558,11 @@ function AdminSnapshots() {
           }
         />
       </section>
+
+      <TransactionDetailDiagnostics tenant={tenant} />
+      <DocumentVerifier />
+      <SubscriptionSnapshotsPreview tenant={tenant} />
+
     </div>
   );
 }
@@ -629,3 +629,384 @@ function PreviewTable({
     </div>
   );
 }
+
+interface SubRunResponse {
+  tenantCode: string;
+  latest: {
+    id: string;
+    status: string;
+    started_at: string;
+    completed_at: string | null;
+    duration_ms: number | null;
+    inserted_count: number;
+    updated_count: number;
+    skipped_count: number;
+    failed_count: number;
+    error_message: string | null;
+    details: Record<string, unknown> | null;
+  } | null;
+  totals: {
+    salesInvoiceLines: number;
+    deliveryOrderLines: number;
+    renewalEvents: number;
+    currentSubscriptions: number;
+  };
+  activeLocks: Array<{ snapshotType: string; acquiredAt: string }>;
+  error?: string;
+}
+
+function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
+  const [state, setState] = useState<SubRunResponse | { error: string } | null>(
+    null,
+  );
+  const [busy, setBusy] = useState(false);
+
+  const reload = useCallback(async () => {
+    setBusy(true);
+    try {
+      const res = await authFetch("/api/diagnostics/subscription-run");
+      const json = await res.json();
+      if (!res.ok) setState({ error: json?.error ?? `HTTP ${res.status}` });
+      else setState(json);
+    } catch (err) {
+      setState({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tenant) void reload();
+  }, [tenant, reload]);
+
+  return (
+    <section className="rounded-lg border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">
+          Transaction Detail Diagnostics
+        </h2>
+        <button
+          onClick={reload}
+          disabled={busy}
+          className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+        >
+          {busy ? "Loading…" : "Refresh"}
+        </button>
+      </div>
+      {state && "error" in state && (
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {state.error}
+        </p>
+      )}
+      {state && !("error" in state) && (
+        <div className="space-y-3 text-xs">
+          <div className="grid gap-2 md:grid-cols-4">
+            <Stat label="Sales invoice lines" value={state.totals.salesInvoiceLines} />
+            <Stat label="Delivery order lines" value={state.totals.deliveryOrderLines} />
+            <Stat label="Renewal events" value={state.totals.renewalEvents} />
+            <Stat label="Current subscriptions" value={state.totals.currentSubscriptions} />
+          </div>
+          {state.activeLocks.length > 0 && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
+              Active sync locks:{" "}
+              {state.activeLocks
+                .map((l) => `${l.snapshotType} (since ${fmtDate(l.acquiredAt)})`)
+                .join(", ")}
+            </p>
+          )}
+          {state.latest ? (
+            <div className="rounded-md border p-3">
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-foreground">
+                  Latest subscription sync
+                </span>
+                <span>{state.latest.status}</span>
+              </div>
+              <div className="grid gap-1 md:grid-cols-3">
+                <div>Started: {fmtDate(state.latest.started_at)}</div>
+                <div>Completed: {fmtDate(state.latest.completed_at)}</div>
+                <div>Duration: {state.latest.duration_ms ?? "—"} ms</div>
+                <div>Inserted: {state.latest.inserted_count}</div>
+                <div>Updated: {state.latest.updated_count}</div>
+                <div>Skipped: {state.latest.skipped_count}</div>
+                <div>Failed: {state.latest.failed_count}</div>
+              </div>
+              {state.latest.error_message && (
+                <p className="mt-2 rounded bg-destructive/10 px-2 py-1 text-destructive">
+                  {state.latest.error_message}
+                </p>
+              )}
+              {state.latest.details && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-muted-foreground">
+                    Per-run details
+                  </summary>
+                  <pre className="mt-1 overflow-x-auto rounded bg-muted/40 p-2 text-[11px]">
+                    {JSON.stringify(state.latest.details, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">
+              No subscription sync has been recorded yet.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border bg-background p-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="text-lg font-semibold">{value.toLocaleString()}</div>
+    </div>
+  );
+}
+
+interface VerifyDocResponse {
+  tenantCode: string;
+  documentNo: string;
+  found: boolean;
+  header: Record<string, unknown> | null;
+  detailFetch: { operation: string | null; linesStored: number };
+  lines: Array<Record<string, unknown>>;
+  currentSubscriptions: Array<Record<string, unknown>>;
+  renewalEvents: Array<Record<string, unknown>>;
+  hint: string | null;
+  error?: string;
+}
+
+function DocumentVerifier() {
+  const [docNo, setDocNo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<VerifyDocResponse | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docNo.trim()) return;
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await authFetch(
+        `/api/diagnostics/verify-document?docNo=${encodeURIComponent(docNo.trim())}`,
+      );
+      const json = (await res.json()) as VerifyDocResponse;
+      if (!res.ok) setResult({ ...json, found: false, error: json.error ?? `HTTP ${res.status}` });
+      else setResult(json);
+    } catch (err) {
+      setResult({
+        tenantCode: "",
+        documentNo: docNo,
+        found: false,
+        header: null,
+        detailFetch: { operation: null, linesStored: 0 },
+        lines: [],
+        currentSubscriptions: [],
+        renewalEvents: [],
+        hint: null,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="rounded-lg border bg-card p-4">
+      <h2 className="mb-3 text-sm font-semibold text-foreground">Document Verifier</h2>
+      <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
+        <input
+          value={docNo}
+          onChange={(e) => setDocNo(e.target.value)}
+          placeholder="Enter Sales Invoice or Delivery Order No (e.g. MIS2606008)"
+          className="min-h-10 min-w-72 flex-1 rounded-md border bg-background px-3 text-sm shadow-sm"
+        />
+        <button
+          disabled={busy || !docNo.trim()}
+          className="min-h-10 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {busy ? "Verifying…" : "Verify"}
+        </button>
+      </form>
+      {result?.error && (
+        <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {result.error}
+        </p>
+      )}
+      {result && !result.error && (
+        <div className="mt-3 space-y-3 text-xs">
+          {!result.found && result.hint && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">{result.hint}</p>
+          )}
+          {result.found && (
+            <>
+              <div className="rounded-md border p-3">
+                <div className="font-semibold text-foreground">
+                  {String(result.header?.document_no ?? "")} ·{" "}
+                  {String(result.header?.source_type ?? "")}
+                </div>
+                <div className="mt-1 grid gap-1 text-muted-foreground md:grid-cols-3">
+                  <div>Customer: {String(result.header?.customer_code ?? "—")} {String(result.header?.customer_name ?? "")}</div>
+                  <div>Date: {fmtDate(result.header?.document_date as string)}</div>
+                  <div>Status: {String(result.header?.document_status ?? "—")}</div>
+                  <div>Detail op: {result.detailFetch.operation ?? "—"}</div>
+                  <div>Lines stored: {result.detailFetch.linesStored}</div>
+                </div>
+              </div>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-1 text-left">Line</th>
+                      <th className="px-2 py-1 text-left">Stock</th>
+                      <th className="px-2 py-1 text-left">Description</th>
+                      <th className="px-2 py-1 text-right">Qty</th>
+                      <th className="px-2 py-1 text-left">Void</th>
+                      <th className="px-2 py-1 text-left">Mapping</th>
+                      <th className="px-2 py-1 text-left">Category</th>
+                      <th className="px-2 py-1 text-left">Cycle</th>
+                      <th className="px-2 py-1 text-left">Event</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.lines.map((l, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-2 py-1">{String(l.line_no ?? "")}</td>
+                        <td className="px-2 py-1 font-mono">{String(l.stock_code ?? "")}</td>
+                        <td className="px-2 py-1">{String(l.description ?? l.stock_name ?? "")}</td>
+                        <td className="px-2 py-1 text-right">{String(l.quantity ?? "")}</td>
+                        <td className="px-2 py-1">{String(l.is_void ?? false)}</td>
+                        <td className="px-2 py-1">{String(l.mapping_result ?? "")}</td>
+                        <td className="px-2 py-1">{String(l.subscription_category ?? "—")}</td>
+                        <td className="px-2 py-1">{String(l.renewal_cycle ?? "—")}</td>
+                        <td className="px-2 py-1">{l.renewal_event ? "yes" : "no"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {result.currentSubscriptions.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer text-muted-foreground">
+                    Current subscriptions tied to this document ({result.currentSubscriptions.length})
+                  </summary>
+                  <pre className="mt-1 overflow-x-auto rounded bg-muted/40 p-2 text-[11px]">
+                    {JSON.stringify(result.currentSubscriptions, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+interface SubPreviewRow {
+  customer_code: string;
+  customer_name: string | null;
+  subscription_category: string | null;
+  stock_code: string | null;
+  latest_document_no: string | null;
+  latest_source_type: string | null;
+  latest_document_date: string | null;
+  expiry_date: string | null;
+  remaining_days: number | null;
+  subscription_status: string | null;
+}
+
+function SubscriptionSnapshotsPreview({ tenant }: { tenant: string }) {
+  const [rows, setRows] = useState<SubPreviewRow[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const reload = useCallback(async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await authFetch("/api/diagnostics/subscription-preview");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
+      setRows(json.rows ?? []);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tenant) void reload();
+  }, [tenant, reload]);
+
+  return (
+    <section className="rounded-lg border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">
+          Subscription snapshots (first 25, tenant-scoped)
+        </h2>
+        <button
+          onClick={reload}
+          disabled={busy}
+          className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+        >
+          {busy ? "Loading…" : "Refresh"}
+        </button>
+      </div>
+      {err && (
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>
+      )}
+      {rows && rows.length === 0 && (
+        <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          No subscription snapshots yet. Run Sync Transaction Details & Recalculate Subscriptions.
+        </p>
+      )}
+      {rows && rows.length > 0 && (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-xs">
+            <thead className="bg-muted uppercase text-muted-foreground">
+              <tr>
+                <th className="px-2 py-1 text-left">Customer</th>
+                <th className="px-2 py-1 text-left">Category</th>
+                <th className="px-2 py-1 text-left">Stock</th>
+                <th className="px-2 py-1 text-left">Latest Doc</th>
+                <th className="px-2 py-1 text-left">Doc Date</th>
+                <th className="px-2 py-1 text-left">Expiry</th>
+                <th className="px-2 py-1 text-right">Remaining</th>
+                <th className="px-2 py-1 text-left">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} className="border-t">
+                  <td className="px-2 py-1">
+                    {r.customer_code}
+                    {r.customer_name ? ` · ${r.customer_name}` : ""}
+                  </td>
+                  <td className="px-2 py-1">{r.subscription_category ?? "—"}</td>
+                  <td className="px-2 py-1 font-mono">{r.stock_code ?? "—"}</td>
+                  <td className="px-2 py-1">
+                    {r.latest_document_no ?? "—"}
+                    {r.latest_source_type ? ` (${r.latest_source_type})` : ""}
+                  </td>
+                  <td className="px-2 py-1">{fmtDate(r.latest_document_date)}</td>
+                  <td className="px-2 py-1">{fmtDate(r.expiry_date)}</td>
+                  <td className="px-2 py-1 text-right">{r.remaining_days ?? "—"}</td>
+                  <td className="px-2 py-1">{r.subscription_status ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
