@@ -632,9 +632,31 @@ interface SubRunResponse {
     renewalEvents: number;
     currentSubscriptions: number;
   };
+  perSource?: {
+    salesInvoice: LineBreakdown;
+    deliveryOrder: LineBreakdown;
+  };
+  reconciliationNote?: string;
   activeLocks: Array<{ snapshotType: string; acquiredAt: string }>;
   error?: string;
 }
+
+interface LineBreakdown {
+  total: number;
+  stock: number;
+  description: number;
+  serial_or_reference: number;
+  child_detail: number;
+  unknown: number;
+  voided: number;
+  linesWithoutStock: number;
+  stockRenewalMapped: number;
+  stockAdHocMapped: number;
+  stockUnmapped: number;
+  duplicateRowsDetected: number;
+  distinctDocuments: number;
+}
+
 
 function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
   const [state, setState] = useState<SubRunResponse | { error: string } | null>(
