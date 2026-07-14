@@ -657,6 +657,23 @@ interface LineBreakdown {
   distinctDocuments: number;
 }
 
+// Per-run detail counters emitted by subscription-sync.server.ts. Mirrors the
+// SourceMetrics shape server-side (Phase 1.0.4).
+interface RunSourceDetails {
+  headersScanned?: number;
+  detailRequestsSucceeded?: number;
+  detailRequestsFailed?: number;
+  detailLinesStored?: number;
+  mappedRenewalLines?: number;
+  renewalEventsInserted?: number;
+  renewalEventsSkipped?: number;
+  renewalEventsSkippedVoided?: number;
+  renewalEventsSkippedMissingCustomer?: number;
+  renewalEventsSkippedInvalidDate?: number;
+  voidedDocuments?: number;
+}
+
+
 
 function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
   const [state, setState] = useState<SubRunResponse | { error: string } | null>(
@@ -716,10 +733,21 @@ function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
           )}
           {state.perSource && (
             <div className="grid gap-3 md:grid-cols-2">
-              <BreakdownCard title="Sales Invoices" b={state.perSource.salesInvoice} />
-              <BreakdownCard title="Delivery Orders" b={state.perSource.deliveryOrder} />
+              <BreakdownCard
+                title="Sales Invoices"
+                b={state.perSource.salesInvoice}
+                run={runSourceDetails(state.latest?.details, "salesInvoice")}
+              />
+              <BreakdownCard
+                title="Delivery Orders"
+                b={state.perSource.deliveryOrder}
+                run={runSourceDetails(state.latest?.details, "deliveryOrder")}
+              />
             </div>
           )}
+
+          {renderSubscriptionSourceSplit(state.latest?.details)}
+
 
           {state.activeLocks.length > 0 && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
@@ -784,7 +812,71 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function BreakdownCard({ title, b }: { title: string; b: LineBreakdown }) {
+function runSourceDetails(
+  details: Record<string, unknown> | null | undefined,
+  key: "salesInvoice" | "deliveryOrder",
+): RunSourceDetails | null {
+  if (!details) return null;
+  const v = details[key];
+  return v && typeof v === "object" ? (v as RunSourceDetails) : null;
+}
+
+function renderSubscriptionSourceSplit(
+  details: Record<string, unknown> | null | undefined,
+) {
+  if (!details) return null;
+  const bySource = details.subscriptionSnapshotsBySource as
+    | {
+        invoice?: { inserted?: number; updated?: number; unchanged?: number; total?: number };
+        delivery_order?: {
+          inserted?: number;
+          updated?: number;
+          unchanged?: number;
+          total?: number;
+        };
+      }
+    | undefined;
+  if (!bySource) return null;
+  const inv = bySource.invoice ?? {};
+  const dord = bySource.delivery_order ?? {};
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <h4 className="mb-2 text-xs font-semibold text-foreground">
+        Current subscriptions — winning source (this run)
+      </h4>
+      <div className="grid gap-3 text-[11px] md:grid-cols-2">
+        <div>
+          <div className="mb-1 font-medium text-foreground">Sales Invoice</div>
+          <dl className="space-y-1 font-mono">
+            <div className="flex justify-between"><dt>Total</dt><dd>{inv.total ?? 0}</dd></div>
+            <div className="flex justify-between"><dt>Inserted</dt><dd>{inv.inserted ?? 0}</dd></div>
+            <div className="flex justify-between"><dt>Updated</dt><dd>{inv.updated ?? 0}</dd></div>
+            <div className="flex justify-between text-muted-foreground"><dt>Unchanged</dt><dd>{inv.unchanged ?? 0}</dd></div>
+          </dl>
+        </div>
+        <div>
+          <div className="mb-1 font-medium text-foreground">Delivery Order</div>
+          <dl className="space-y-1 font-mono">
+            <div className="flex justify-between"><dt>Total</dt><dd>{dord.total ?? 0}</dd></div>
+            <div className="flex justify-between"><dt>Inserted</dt><dd>{dord.inserted ?? 0}</dd></div>
+            <div className="flex justify-between"><dt>Updated</dt><dd>{dord.updated ?? 0}</dd></div>
+            <div className="flex justify-between text-muted-foreground"><dt>Unchanged</dt><dd>{dord.unchanged ?? 0}</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BreakdownCard({
+  title,
+  b,
+  run,
+}: {
+  title: string;
+  b: LineBreakdown;
+  run?: RunSourceDetails | null;
+}) {
   const Row = ({ k, v, muted }: { k: string; v: number | string; muted?: boolean }) => (
     <div className={`flex justify-between ${muted ? "text-muted-foreground" : ""}`}>
       <dt>{k}</dt>
@@ -814,6 +906,29 @@ function BreakdownCard({ title, b }: { title: string; b: LineBreakdown }) {
         <Row k="Lines without stock (ignored)" v={b.linesWithoutStock} muted />
         {b.duplicateRowsDetected > 0 && (
           <Row k="Duplicate rows detected" v={b.duplicateRowsDetected} />
+        )}
+        {run && (
+          <>
+            <div className="mt-2 border-t pt-1" />
+            <div className="text-[10px] uppercase text-muted-foreground">Latest run</div>
+            <Row k="Headers scanned" v={run.headersScanned ?? 0} />
+            <Row k="Detail requests OK" v={run.detailRequestsSucceeded ?? 0} />
+            {(run.detailRequestsFailed ?? 0) > 0 && (
+              <Row k="Detail requests failed" v={run.detailRequestsFailed ?? 0} />
+            )}
+            <Row k="Renewal events inserted" v={run.renewalEventsInserted ?? 0} />
+            <Row k="Events skipped — voided" v={run.renewalEventsSkippedVoided ?? 0} muted />
+            <Row
+              k="Events skipped — missing customer"
+              v={run.renewalEventsSkippedMissingCustomer ?? 0}
+              muted
+            />
+            <Row
+              k="Events skipped — invalid date"
+              v={run.renewalEventsSkippedInvalidDate ?? 0}
+              muted
+            />
+          </>
         )}
       </dl>
     </div>
@@ -924,6 +1039,7 @@ function DocumentVerifier() {
                       <th className="px-2 py-1 text-left">Category</th>
                       <th className="px-2 py-1 text-left">Cycle</th>
                       <th className="px-2 py-1 text-left">Event</th>
+                      <th className="px-2 py-1 text-left">Eligibility</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -939,6 +1055,13 @@ function DocumentVerifier() {
                         <td className="px-2 py-1">{String(l.subscription_category ?? "—")}</td>
                         <td className="px-2 py-1">{String(l.renewal_cycle ?? "—")}</td>
                         <td className="px-2 py-1">{l.renewal_event ? "yes" : "no"}</td>
+                        <td className="px-2 py-1">
+                          {l.eligible_for_renewal === "yes"
+                            ? "yes"
+                            : l.ineligible_reason
+                              ? `no · ${String(l.ineligible_reason).replaceAll("_", " ")}`
+                              : "—"}
+                        </td>
                       </tr>
                     ))}
 

@@ -117,6 +117,31 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
                       : "renewal";
                 } else if (m.service_type === "Ad Hoc") mappingResult = "ad_hoc";
               }
+
+              // Explicit eligibility reason: why did/didn't this line produce
+              // an entitlement event? Matches the sync skip branches 1:1.
+              let eligible: "yes" | "no" = "no";
+              let ineligibleReason:
+                | null
+                | "line_type_not_stock"
+                | "missing_stock_code"
+                | "unmapped_stock_code"
+                | "ad_hoc_stock_code"
+                | "renewal_invalid_cycle"
+                | "voided_source_document"
+                | "missing_customer_code"
+                | "invalid_document_date" = null;
+              if (mappingResult === "not_applicable") ineligibleReason = "line_type_not_stock";
+              else if (!r.stock_code) ineligibleReason = "missing_stock_code";
+              else if (mappingResult === "unmapped") ineligibleReason = "unmapped_stock_code";
+              else if (mappingResult === "ad_hoc") ineligibleReason = "ad_hoc_stock_code";
+              else if (mappingResult === "renewal_invalid_cycle")
+                ineligibleReason = "renewal_invalid_cycle";
+              else if (r.is_void) ineligibleReason = "voided_source_document";
+              else if (!r.customer_code) ineligibleReason = "missing_customer_code";
+              else if (!r.document_date) ineligibleReason = "invalid_document_date";
+              else eligible = "yes";
+
               return {
                 source,
                 n3_document_id: r.n3_document_id,
@@ -131,6 +156,8 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
                 quantity: r.quantity,
                 is_void: r.is_void,
                 mapping_result: mappingResult,
+                eligible_for_renewal: eligible,
+                ineligible_reason: ineligibleReason,
 
                 subscription_category: m?.subscription_category ?? null,
                 renewal_cycle:
