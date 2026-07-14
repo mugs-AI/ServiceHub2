@@ -24,6 +24,7 @@ import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspac
 import { Route as ApiWorkspaceCustomerSubscriptionsRouteImport } from './routes/api/workspace/customer-subscriptions'
 import { Route as ApiSyncSubscriptionsRouteImport } from './routes/api/sync/subscriptions'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
+import { Route as ApiSyncRecoverStaleRouteImport } from './routes/api/sync/recover-stale'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
 import { Route as ApiSettingsSubscriptionCategoriesRouteImport } from './routes/api/settings/subscription-categories'
@@ -113,6 +114,11 @@ const ApiSyncSubscriptionsRoute = ApiSyncSubscriptionsRouteImport.update({
 const ApiSyncStockRoute = ApiSyncStockRouteImport.update({
   id: '/api/sync/stock',
   path: '/api/sync/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSyncRecoverStaleRoute = ApiSyncRecoverStaleRouteImport.update({
+  id: '/api/sync/recover-stale',
+  path: '/api/sync/recover-stale',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSyncCustomersRoute = ApiSyncCustomersRouteImport.update({
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
@@ -249,6 +256,7 @@ export interface FileRoutesByTo {
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
@@ -281,6 +289,7 @@ export interface FileRoutesById {
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
@@ -314,6 +323,7 @@ export interface FileRouteTypes {
     | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
+    | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
@@ -345,6 +355,7 @@ export interface FileRouteTypes {
     | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
+    | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
@@ -376,6 +387,7 @@ export interface FileRouteTypes {
     | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
+    | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
@@ -408,6 +420,7 @@ export interface RootRouteChildren {
   ApiSettingsSubscriptionCategoriesRoute: typeof ApiSettingsSubscriptionCategoriesRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
+  ApiSyncRecoverStaleRoute: typeof ApiSyncRecoverStaleRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
   ApiSyncSubscriptionsRoute: typeof ApiSyncSubscriptionsRoute
   ApiWorkspaceCustomerSubscriptionsRoute: typeof ApiWorkspaceCustomerSubscriptionsRoute
@@ -519,6 +532,13 @@ declare module '@tanstack/react-router' {
       path: '/api/sync/stock'
       fullPath: '/api/sync/stock'
       preLoaderRoute: typeof ApiSyncStockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sync/recover-stale': {
+      id: '/api/sync/recover-stale'
+      path: '/api/sync/recover-stale'
+      fullPath: '/api/sync/recover-stale'
+      preLoaderRoute: typeof ApiSyncRecoverStaleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sync/customers': {
@@ -650,6 +670,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiSettingsSubscriptionCategoriesRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
+  ApiSyncRecoverStaleRoute: ApiSyncRecoverStaleRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
   ApiSyncSubscriptionsRoute: ApiSyncSubscriptionsRoute,
   ApiWorkspaceCustomerSubscriptionsRoute:
