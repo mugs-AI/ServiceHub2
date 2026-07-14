@@ -383,64 +383,89 @@ function CustomerSubscriptionsPanel({
       )}
       {customerCode && state.kind === "ok" && state.rows.length > 0 && (
         <ul className="mt-3 space-y-3">
-          {state.rows.map((r) => (
-            <li
-              key={`${r.subscription_category}-${r.stock_code}`}
-              className="rounded-md border bg-background p-3"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-foreground">
-                  {r.subscription_category ?? "Uncategorised"}
+          {state.rows.map((r) => {
+            const status = (r.subscription_status ?? "unknown").toLowerCase();
+            const expiryDate = r.expiry_date
+              ? new Date(r.expiry_date).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : null;
+            const remainingText =
+              r.remaining_days == null
+                ? null
+                : status === "expired"
+                  ? `${Math.abs(r.remaining_days)} day${Math.abs(r.remaining_days) === 1 ? "" : "s"} overdue`
+                  : `${r.remaining_days} day${r.remaining_days === 1 ? "" : "s"} remaining`;
+            const latestText = r.latest_source_type
+              ? `${r.latest_document_no ?? "—"} (${r.latest_source_type})`
+              : (r.latest_document_no ?? "—");
+
+            return (
+              <li
+                key={`${r.subscription_category}-${r.latest_document_no ?? "none"}-${r.stock_code ?? "none"}`}
+                className="rounded-lg border bg-background p-3 shadow-sm"
+              >
+                {/* Row 1 — Category and status */}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="text-sm font-bold text-foreground">
+                    {r.subscription_category ?? "Uncategorised"}
+                  </div>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${statusColor(
+                      r.subscription_status,
+                    )}`}
+                  >
+                    {r.subscription_status ?? "unknown"}
+                  </span>
                 </div>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusColor(
-                    r.subscription_status,
-                  )}`}
-                >
-                  {r.subscription_status ?? "unknown"}
-                </span>
-              </div>
-              <dl className="mt-2 grid grid-cols-2 gap-y-1 text-xs">
-                <dt className="text-muted-foreground">Stock</dt>
-                <dd className="truncate">
-                  {r.stock_code}
-                  {r.stock_name ? ` · ${r.stock_name}` : ""}
-                </dd>
-                <dt className="text-muted-foreground">Latest doc</dt>
-                <dd>
-                  {r.latest_document_no ?? "—"}
-                  {r.latest_source_type ? ` (${r.latest_source_type})` : ""}
-                </dd>
-                <dt className="text-muted-foreground">Doc date</dt>
-                <dd>
-                  {r.latest_document_date
-                    ? new Date(r.latest_document_date).toLocaleDateString()
-                    : "—"}
-                </dd>
-                <dt className="text-muted-foreground">Cycle</dt>
-                <dd>
-                  {r.renewal_cycle_value && r.renewal_cycle_unit
-                    ? `${r.renewal_cycle_value} ${r.renewal_cycle_unit}`
-                    : "—"}
-                </dd>
-                <dt className="text-muted-foreground">Expiry</dt>
-                <dd>
-                  {r.expiry_date
-                    ? new Date(r.expiry_date).toLocaleDateString()
-                    : "—"}
-                </dd>
-                <dt className="text-muted-foreground">Remaining</dt>
-                <dd>
-                  {r.remaining_days == null ? "—" : `${r.remaining_days} day(s)`}
-                </dd>
-              </dl>
-              {r.calculation_error && (
-                <p className="mt-2 text-xs text-destructive">
-                  {r.calculation_error}
-                </p>
-              )}
-            </li>
-          ))}
+
+                {/* Row 2 — Expiry and remaining */}
+                <div className="mt-2 text-lg font-bold text-primary sm:text-xl">
+                  {expiryDate ? (
+                    <span>
+                      Expiry: {expiryDate}
+                      {remainingText && (
+                        <span className="ml-4 whitespace-nowrap">
+                          ({remainingText})
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span>Expiry: Not available</span>
+                  )}
+                </div>
+
+                {/* Row 3 — Latest document and stock */}
+                <div className="mt-2 text-xs text-muted-foreground sm:text-sm">
+                  <span className="font-medium">Latest:</span>{" "}
+                  <span className="truncate" title={latestText}>
+                    {latestText}
+                  </span>
+                  {r.stock_code && (
+                    <>
+                      <span className="mx-2">·</span>
+                      <span className="font-medium">Stock:</span>{" "}
+                      <span
+                        className="truncate"
+                        title={r.stock_name ? `${r.stock_code} · ${r.stock_name}` : r.stock_code}
+                      >
+                        {r.stock_code}
+                        {r.stock_name ? ` · ${r.stock_name}` : ""}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {r.calculation_error && (
+                  <p className="mt-2 text-xs text-destructive">
+                    {r.calculation_error}
+                  </p>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
