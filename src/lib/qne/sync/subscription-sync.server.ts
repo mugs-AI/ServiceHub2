@@ -423,10 +423,24 @@ async function syncSourceDetails(args: {
     );
   }
   metrics.headersScanned = headers.length;
+  await heartbeat?.(`Fetching ${sourceType} details 0/${headers.length}`, {
+    source: sourceType,
+    stage: "details",
+    total: headers.length,
+    processed: 0,
+  });
 
+  let processed = 0;
   for (const header of headers) {
     const docId = (header.id ?? "").toString().trim();
     if (!docId) continue;
+    processed += 1;
+    if (processed % 25 === 0 || processed === headers.length) {
+      await heartbeat?.(
+        `Fetching ${sourceType} details ${processed}/${headers.length}`,
+        { source: sourceType, stage: "details", total: headers.length, processed },
+      );
+    }
 
     const docNo = (header.docCode ?? header.documentNo ?? "").toString() || null;
     metrics.detailRequestsAttempted += 1;
