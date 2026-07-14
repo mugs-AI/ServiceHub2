@@ -368,6 +368,7 @@ async function syncSourceDetails(args: {
   adHocStockCodes: Set<string>;
   categoryIdByName: Map<string, string>;
   customerNameByCode: Map<string, string | null>;
+  heartbeat?: (stage: string, progress?: Record<string, unknown>) => Promise<void>;
 }): Promise<SourceMetrics> {
   const {
     ctx,
@@ -380,6 +381,7 @@ async function syncSourceDetails(args: {
     adHocStockCodes,
     categoryIdByName,
     customerNameByCode,
+    heartbeat,
   } = args;
 
   const metrics: SourceMetrics = {
