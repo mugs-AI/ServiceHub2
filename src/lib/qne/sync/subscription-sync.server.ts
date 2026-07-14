@@ -503,10 +503,17 @@ async function syncSourceDetails(args: {
         metrics.mappedRenewalLines += 1;
         if (isVoid) {
           metrics.renewalEventsSkipped += 1;
+          metrics.renewalEventsSkippedVoided += 1;
           return;
         }
-        if (!docDate || !customerCode) {
+        if (!customerCode) {
           metrics.renewalEventsSkipped += 1;
+          metrics.renewalEventsSkippedMissingCustomer += 1;
+          return;
+        }
+        if (!docDate) {
+          metrics.renewalEventsSkipped += 1;
+          metrics.renewalEventsSkippedInvalidDate += 1;
           return;
         }
         const expiry = computeInclusiveExpiry(
