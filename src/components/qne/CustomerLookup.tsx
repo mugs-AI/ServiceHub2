@@ -394,7 +394,7 @@ function CustomerSubscriptionsPanel({
             const remainingText =
               r.remaining_days == null
                 ? null
-                : status === "expired"
+                : status === "overdue" || r.remaining_days < 0
                   ? `${Math.abs(r.remaining_days)} day${Math.abs(r.remaining_days) === 1 ? "" : "s"} overdue`
                   : `${r.remaining_days} day${r.remaining_days === 1 ? "" : "s"} remaining`;
             const latestText = r.latest_source_type
