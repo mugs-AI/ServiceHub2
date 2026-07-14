@@ -140,8 +140,20 @@ function AdminSnapshots() {
   const [diag, setDiag] = useState<DiagnosticsResponse | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
 
+  const [recoverBusy, setRecoverBusy] = useState(false);
+  const [recoverMsg, setRecoverMsg] = useState<string | null>(null);
+
   const reloadHealth = useCallback(async () => {
     setHealthErr(null);
+    try {
+      const res = await authFetch("/api/diagnostics/health");
+      const json = (await res.json()) as HealthResponse & { error?: string };
+      if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setHealth(json);
+    } catch (err) {
+      setHealthErr(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
     try {
       const res = await authFetch("/api/diagnostics/health");
       const json = (await res.json()) as HealthResponse & { error?: string };
