@@ -38,6 +38,7 @@ export function CustomerLookup() {
   const [q, setQ] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [selected, setSelected] = useState<CustomerRow | null>(null);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const inflightRef = useRef<string | null>(null);
 
   const runSearch = useCallback(async (term: string) => {
@@ -209,43 +210,58 @@ export function CustomerLookup() {
                   Select a customer to view their snapshot details.
                 </p>
               ) : (
-                <div className="mt-2 space-y-3">
-                  <div>
-                    <div className="text-base font-semibold text-foreground">
-                      {selected.customer_name ?? "(no name)"}
+                <div className="mt-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-foreground">
+                        {selected.customer_name ?? "(no name)"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selected.customer_code}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {selected.customer_code}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSummaryExpanded((v) => !v)}
+                      className="shrink-0 text-xs font-medium text-primary hover:text-primary/80"
+                      aria-expanded={summaryExpanded}
+                    >
+                      {summaryExpanded ? "Hide details ▲" : "View details ▼"}
+                    </button>
                   </div>
-                  <dl className="grid grid-cols-2 gap-y-1 text-sm">
-                    {selected.contact_person && (
-                      <>
-                        <dt className="text-muted-foreground">Contact</dt>
-                        <dd>{selected.contact_person}</dd>
-                      </>
-                    )}
-                    {selected.phone && (
-                      <>
-                        <dt className="text-muted-foreground">Phone</dt>
-                        <dd>{selected.phone}</dd>
-                      </>
-                    )}
-                    {selected.email && (
-                      <>
-                        <dt className="text-muted-foreground">Email</dt>
-                        <dd className="truncate">{selected.email}</dd>
-                      </>
-                    )}
-                    {selected.last_synced_at && (
-                      <>
-                        <dt className="text-muted-foreground">Snapshot synced</dt>
-                        <dd>
-                          {new Date(selected.last_synced_at).toLocaleString()}
-                        </dd>
-                      </>
-                    )}
-                  </dl>
+
+                  {summaryExpanded && (
+                    <dl className="mt-3 space-y-1 border-t pt-3 text-sm">
+                      {selected.contact_person && (
+                        <div className="flex flex-col sm:flex-row sm:gap-2">
+                          <dt className="text-muted-foreground sm:min-w-20">Contact</dt>
+                          <dd className="text-foreground">{selected.contact_person}</dd>
+                        </div>
+                      )}
+                      {selected.phone && (
+                        <div className="flex flex-col sm:flex-row sm:gap-2">
+                          <dt className="text-muted-foreground sm:min-w-20">Phone</dt>
+                          <dd className="text-foreground">{selected.phone}</dd>
+                        </div>
+                      )}
+                      {selected.email && (
+                        <div className="flex flex-col sm:flex-row sm:gap-2">
+                          <dt className="text-muted-foreground sm:min-w-20">Email</dt>
+                          <dd className="truncate text-foreground" title={selected.email}>
+                            {selected.email}
+                          </dd>
+                        </div>
+                      )}
+                      {selected.last_synced_at && (
+                        <div className="flex flex-col sm:flex-row sm:gap-2">
+                          <dt className="text-muted-foreground sm:min-w-20">Snapshot synced</dt>
+                          <dd className="text-foreground">
+                            {new Date(selected.last_synced_at).toLocaleString()}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                  )}
                 </div>
               )}
             </div>
@@ -367,64 +383,89 @@ function CustomerSubscriptionsPanel({
       )}
       {customerCode && state.kind === "ok" && state.rows.length > 0 && (
         <ul className="mt-3 space-y-3">
-          {state.rows.map((r) => (
-            <li
-              key={`${r.subscription_category}-${r.stock_code}`}
-              className="rounded-md border bg-background p-3"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-foreground">
-                  {r.subscription_category ?? "Uncategorised"}
+          {state.rows.map((r) => {
+            const status = (r.subscription_status ?? "unknown").toLowerCase();
+            const expiryDate = r.expiry_date
+              ? new Date(r.expiry_date).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : null;
+            const remainingText =
+              r.remaining_days == null
+                ? null
+                : status === "expired"
+                  ? `${Math.abs(r.remaining_days)} day${Math.abs(r.remaining_days) === 1 ? "" : "s"} overdue`
+                  : `${r.remaining_days} day${r.remaining_days === 1 ? "" : "s"} remaining`;
+            const latestText = r.latest_source_type
+              ? `${r.latest_document_no ?? "—"} (${r.latest_source_type})`
+              : (r.latest_document_no ?? "—");
+
+            return (
+              <li
+                key={`${r.subscription_category}-${r.latest_document_no ?? "none"}-${r.stock_code ?? "none"}`}
+                className="rounded-lg border bg-background p-3 shadow-sm"
+              >
+                {/* Row 1 — Category and status */}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="text-sm font-bold text-foreground">
+                    {r.subscription_category ?? "Uncategorised"}
+                  </div>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${statusColor(
+                      r.subscription_status,
+                    )}`}
+                  >
+                    {r.subscription_status ?? "unknown"}
+                  </span>
                 </div>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusColor(
-                    r.subscription_status,
-                  )}`}
-                >
-                  {r.subscription_status ?? "unknown"}
-                </span>
-              </div>
-              <dl className="mt-2 grid grid-cols-2 gap-y-1 text-xs">
-                <dt className="text-muted-foreground">Stock</dt>
-                <dd className="truncate">
-                  {r.stock_code}
-                  {r.stock_name ? ` · ${r.stock_name}` : ""}
-                </dd>
-                <dt className="text-muted-foreground">Latest doc</dt>
-                <dd>
-                  {r.latest_document_no ?? "—"}
-                  {r.latest_source_type ? ` (${r.latest_source_type})` : ""}
-                </dd>
-                <dt className="text-muted-foreground">Doc date</dt>
-                <dd>
-                  {r.latest_document_date
-                    ? new Date(r.latest_document_date).toLocaleDateString()
-                    : "—"}
-                </dd>
-                <dt className="text-muted-foreground">Cycle</dt>
-                <dd>
-                  {r.renewal_cycle_value && r.renewal_cycle_unit
-                    ? `${r.renewal_cycle_value} ${r.renewal_cycle_unit}`
-                    : "—"}
-                </dd>
-                <dt className="text-muted-foreground">Expiry</dt>
-                <dd>
-                  {r.expiry_date
-                    ? new Date(r.expiry_date).toLocaleDateString()
-                    : "—"}
-                </dd>
-                <dt className="text-muted-foreground">Remaining</dt>
-                <dd>
-                  {r.remaining_days == null ? "—" : `${r.remaining_days} day(s)`}
-                </dd>
-              </dl>
-              {r.calculation_error && (
-                <p className="mt-2 text-xs text-destructive">
-                  {r.calculation_error}
-                </p>
-              )}
-            </li>
-          ))}
+
+                {/* Row 2 — Expiry and remaining */}
+                <div className="mt-2 text-lg font-bold text-primary sm:text-xl">
+                  {expiryDate ? (
+                    <span>
+                      Expiry: {expiryDate}
+                      {remainingText && (
+                        <span className="ml-4 whitespace-nowrap">
+                          ({remainingText})
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span>Expiry: Not available</span>
+                  )}
+                </div>
+
+                {/* Row 3 — Latest document and stock */}
+                <div className="mt-2 text-xs text-muted-foreground sm:text-sm">
+                  <span className="font-medium">Latest:</span>{" "}
+                  <span className="truncate" title={latestText}>
+                    {latestText}
+                  </span>
+                  {r.stock_code && (
+                    <>
+                      <span className="mx-2">·</span>
+                      <span className="font-medium">Stock:</span>{" "}
+                      <span
+                        className="truncate"
+                        title={r.stock_name ? `${r.stock_code} · ${r.stock_name}` : r.stock_code}
+                      >
+                        {r.stock_code}
+                        {r.stock_name ? ` · ${r.stock_name}` : ""}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {r.calculation_error && (
+                  <p className="mt-2 text-xs text-destructive">
+                    {r.calculation_error}
+                  </p>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
