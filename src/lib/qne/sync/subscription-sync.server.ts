@@ -70,6 +70,7 @@ type SubscriptionStatus = "Active" | "Due Soon" | "Overdue" | "Unknown";
 
 interface RenewalMapping {
   stock_code: string;
+  n3_stock_id: string | null;
   subscription_category: string;
   renewal_cycle_value: number;
   renewal_cycle_unit: CycleUnit;
