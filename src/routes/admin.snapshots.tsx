@@ -241,6 +241,36 @@ function AdminSnapshots() {
 
   const busy = running !== null;
   const mappingCount = preview?.mappings.activeCount ?? 0;
+  const activeLocks = health?.activeLocks ?? [];
+  const staleLocks = activeLocks.filter((l) => l.isStale);
+  const liveLocks = activeLocks.filter((l) => !l.isStale);
+
+  const recoverStale = useCallback(
+    async (snapshotType: ActiveLock["snapshotType"]) => {
+      setRecoverBusy(true);
+      setRecoverMsg(null);
+      try {
+        const res = await authFetch("/api/sync/recover-stale", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ snapshotType }),
+        });
+        const json = (await res.json()) as { recovered?: boolean; error?: string };
+        if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+        setRecoverMsg(
+          json.recovered
+            ? "Stale sync lock released. You can start a new run now."
+            : "Nothing to recover — no stale lock found.",
+        );
+      } catch (err) {
+        setRecoverMsg(err instanceof Error ? err.message : String(err));
+      } finally {
+        setRecoverBusy(false);
+        await reloadHealth();
+      }
+    },
+    [reloadHealth],
+  );
 
   return (
     <div className="space-y-6">
