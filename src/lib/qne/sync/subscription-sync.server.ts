@@ -253,11 +253,15 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
 
     const { data: custRows, error: custErr } = await supabaseAdmin
       .from("customer_snapshots")
-      .select("customer_code, customer_name")
+      .select("customer_code, customer_name, n3_customer_id")
       .eq("tenant_code", tenantCode);
     if (custErr) throw new Error(`Load customer_snapshots failed: ${custErr.message}`);
     const customerNameByCode = new Map<string, string | null>();
-    for (const c of custRows ?? []) customerNameByCode.set(c.customer_code, c.customer_name ?? null);
+    const customerN3IdByCode = new Map<string, string | null>();
+    for (const c of custRows ?? []) {
+      customerNameByCode.set(c.customer_code, c.customer_name ?? null);
+      customerN3IdByCode.set(c.customer_code, (c.n3_customer_id ?? null) as string | null);
+    }
     if (customerNameByCode.size === 0) {
       throw new SyncNotReadyError(
         "Subscription calculation not ready — no Customer Snapshots. Run Customer Sync first.",
@@ -274,9 +278,12 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       getEndpoint: N3_ENDPOINTS["salesInvoices.get"],
       lineTable: "sales_invoice_line_snapshots",
       renewalMappings,
+      renewalMappingsByStockId,
       adHocStockCodes,
+      adHocStockIds,
       categoryIdByName,
       customerNameByCode,
+      customerN3IdByCode,
       heartbeat,
     });
     await heartbeat("Fetching Delivery Order details");
@@ -288,11 +295,15 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       getEndpoint: N3_ENDPOINTS["deliveryOrders.get"],
       lineTable: "delivery_order_line_snapshots",
       renewalMappings,
+      renewalMappingsByStockId,
       adHocStockCodes,
+      adHocStockIds,
       categoryIdByName,
       customerNameByCode,
+      customerN3IdByCode,
       heartbeat,
     });
+
 
     // Merge per-source metrics into the audit counters.
     counters.details.salesInvoice = siMetrics;
