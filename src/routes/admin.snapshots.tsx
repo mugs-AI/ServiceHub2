@@ -657,6 +657,23 @@ interface LineBreakdown {
   distinctDocuments: number;
 }
 
+// Per-run detail counters emitted by subscription-sync.server.ts. Mirrors the
+// SourceMetrics shape server-side (Phase 1.0.4).
+interface RunSourceDetails {
+  headersScanned?: number;
+  detailRequestsSucceeded?: number;
+  detailRequestsFailed?: number;
+  detailLinesStored?: number;
+  mappedRenewalLines?: number;
+  renewalEventsInserted?: number;
+  renewalEventsSkipped?: number;
+  renewalEventsSkippedVoided?: number;
+  renewalEventsSkippedMissingCustomer?: number;
+  renewalEventsSkippedInvalidDate?: number;
+  voidedDocuments?: number;
+}
+
+
 
 function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
   const [state, setState] = useState<SubRunResponse | { error: string } | null>(
