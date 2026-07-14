@@ -173,6 +173,17 @@ function AdminSnapshots() {
     void reloadPreview();
   }, [tenant, reloadHealth, reloadPreview]);
 
+  // Poll health while a sync is running so activeLocks[].stage + heartbeat
+  // stays live for the "Sync in progress" panel.
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      void reloadHealth();
+    }, 3000);
+    return () => clearInterval(id);
+  }, [running, reloadHealth]);
+
+
   const runSync = useCallback(
     async (kind: SnapshotKind) => {
       if (running) return;
