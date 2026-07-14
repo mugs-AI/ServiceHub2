@@ -1139,7 +1139,7 @@ function DocumentVerifier() {
                       <th className="px-2 py-1 text-left">Mapping</th>
                       <th className="px-2 py-1 text-left">Category</th>
                       <th className="px-2 py-1 text-left">Cycle</th>
-                      <th className="px-2 py-1 text-left">Event</th>
+                      <th className="px-2 py-1 text-left">Renewal Event</th>
                       <th className="px-2 py-1 text-left">Eligibility</th>
                     </tr>
                   </thead>
