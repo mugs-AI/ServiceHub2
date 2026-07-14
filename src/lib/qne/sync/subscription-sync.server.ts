@@ -696,7 +696,7 @@ async function rebuildCurrentSnapshots(
   const { data: events, error } = await supabaseAdmin
     .from("subscription_renewal_events")
     .select(
-      "customer_code, customer_name, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
+      "customer_code, customer_name, n3_customer_id, n3_stock_id, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
     )
     .eq("tenant_code", tenantCode)
     .eq("is_source_void", false)
@@ -754,6 +754,8 @@ async function rebuildCurrentSnapshots(
       tenant_code: tenantCode,
       customer_code: ev.customer_code,
       customer_name: ev.customer_name ?? customerNameByCode.get(ev.customer_code) ?? null,
+      n3_customer_id: ev.n3_customer_id ?? null,
+      n3_stock_id: ev.n3_stock_id ?? null,
       subscription_category: ev.subscription_category_name,
       stock_code: ev.stock_code,
       stock_name: ev.stock_name ?? null,
@@ -772,6 +774,7 @@ async function rebuildCurrentSnapshots(
       is_stale: false,
       calculation_error: null,
     };
+
 
     const bucket =
       ev.source_type === "delivery_order" ? bySource.delivery_order : bySource.invoice;
