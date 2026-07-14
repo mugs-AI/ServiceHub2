@@ -390,6 +390,9 @@ async function syncSourceDetails(args: {
     voidedSourceLines: 0,
     renewalEventsInserted: 0,
     renewalEventsSkipped: 0,
+    renewalEventsSkippedVoided: 0,
+    renewalEventsSkippedMissingCustomer: 0,
+    renewalEventsSkippedInvalidDate: 0,
     lineTypeCounts: {
       stock: 0,
       description: 0,
