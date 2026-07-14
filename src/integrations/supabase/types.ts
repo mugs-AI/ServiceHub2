@@ -29,6 +29,9 @@ export type Database = {
           latest_document_date: string | null
           latest_document_no: string | null
           latest_document_type: string | null
+          n3_customer_id: string | null
+          n3_document_id: string | null
+          n3_stock_id: string | null
           remaining_days: number | null
           renewal_stock_code: string | null
           tenant_code: string
@@ -48,6 +51,9 @@ export type Database = {
           latest_document_date?: string | null
           latest_document_no?: string | null
           latest_document_type?: string | null
+          n3_customer_id?: string | null
+          n3_document_id?: string | null
+          n3_stock_id?: string | null
           remaining_days?: number | null
           renewal_stock_code?: string | null
           tenant_code: string
@@ -67,6 +73,9 @@ export type Database = {
           latest_document_date?: string | null
           latest_document_no?: string | null
           latest_document_type?: string | null
+          n3_customer_id?: string | null
+          n3_document_id?: string | null
+          n3_stock_id?: string | null
           remaining_days?: number | null
           renewal_stock_code?: string | null
           tenant_code?: string
@@ -84,6 +93,7 @@ export type Database = {
           email: string | null
           id: string
           last_synced_at: string | null
+          n3_customer_id: string | null
           n3_status: string | null
           phone: string | null
           sync_status: string
@@ -99,6 +109,7 @@ export type Database = {
           email?: string | null
           id?: string
           last_synced_at?: string | null
+          n3_customer_id?: string | null
           n3_status?: string | null
           phone?: string | null
           sync_status?: string
@@ -114,6 +125,7 @@ export type Database = {
           email?: string | null
           id?: string
           last_synced_at?: string | null
+          n3_customer_id?: string | null
           n3_status?: string | null
           phone?: string | null
           sync_status?: string
@@ -138,6 +150,8 @@ export type Database = {
           latest_source_document_id: string | null
           latest_source_line_id: string | null
           latest_source_type: string | null
+          n3_customer_id: string | null
+          n3_stock_id: string | null
           raw_payload: Json | null
           remaining_days: number | null
           renewal_cycle_unit: string | null
@@ -164,6 +178,8 @@ export type Database = {
           latest_source_document_id?: string | null
           latest_source_line_id?: string | null
           latest_source_type?: string | null
+          n3_customer_id?: string | null
+          n3_stock_id?: string | null
           raw_payload?: Json | null
           remaining_days?: number | null
           renewal_cycle_unit?: string | null
@@ -190,6 +206,8 @@ export type Database = {
           latest_source_document_id?: string | null
           latest_source_line_id?: string | null
           latest_source_type?: string | null
+          n3_customer_id?: string | null
+          n3_stock_id?: string | null
           raw_payload?: Json | null
           remaining_days?: number | null
           renewal_cycle_unit?: string | null
@@ -207,7 +225,9 @@ export type Database = {
         Row: {
           created_at: string
           customer_code: string | null
+          customer_code_at_transaction: string | null
           customer_name: string | null
+          customer_name_at_transaction: string | null
           description: string | null
           document_date: string | null
           document_no: string | null
@@ -221,13 +241,17 @@ export type Database = {
           last_synced_at: string
           line_no: number | null
           line_type: string
+          n3_customer_id: string | null
           n3_document_id: string
           n3_line_id: string
+          n3_stock_id: string | null
           parent_line_id: string | null
           quantity: number | null
           source_line_order: number | null
           stock_code: string | null
+          stock_code_at_transaction: string | null
           stock_name: string | null
+          stock_name_at_transaction: string | null
           tenant_code: string
           uom: string | null
           updated_at: string
@@ -235,7 +259,9 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_code?: string | null
+          customer_code_at_transaction?: string | null
           customer_name?: string | null
+          customer_name_at_transaction?: string | null
           description?: string | null
           document_date?: string | null
           document_no?: string | null
@@ -249,13 +275,17 @@ export type Database = {
           last_synced_at?: string
           line_no?: number | null
           line_type?: string
+          n3_customer_id?: string | null
           n3_document_id: string
           n3_line_id: string
+          n3_stock_id?: string | null
           parent_line_id?: string | null
           quantity?: number | null
           source_line_order?: number | null
           stock_code?: string | null
+          stock_code_at_transaction?: string | null
           stock_name?: string | null
+          stock_name_at_transaction?: string | null
           tenant_code: string
           uom?: string | null
           updated_at?: string
@@ -263,7 +293,9 @@ export type Database = {
         Update: {
           created_at?: string
           customer_code?: string | null
+          customer_code_at_transaction?: string | null
           customer_name?: string | null
+          customer_name_at_transaction?: string | null
           description?: string | null
           document_date?: string | null
           document_no?: string | null
@@ -277,13 +309,17 @@ export type Database = {
           last_synced_at?: string
           line_no?: number | null
           line_type?: string
+          n3_customer_id?: string | null
           n3_document_id?: string
           n3_line_id?: string
+          n3_stock_id?: string | null
           parent_line_id?: string | null
           quantity?: number | null
           source_line_order?: number | null
           stock_code?: string | null
+          stock_code_at_transaction?: string | null
           stock_name?: string | null
+          stock_name_at_transaction?: string | null
           tenant_code?: string
           uom?: string | null
           updated_at?: string
@@ -365,10 +401,12 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          n3_stock_id: string | null
           renewal_cycle_unit: string | null
           renewal_cycle_value: number | null
           service_type: string
           stock_code: string
+          stock_name: string | null
           subscription_category: string | null
           tenant_code: string
           updated_at: string
@@ -378,10 +416,12 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          n3_stock_id?: string | null
           renewal_cycle_unit?: string | null
           renewal_cycle_value?: number | null
           service_type: string
           stock_code: string
+          stock_name?: string | null
           subscription_category?: string | null
           tenant_code: string
           updated_at?: string
@@ -391,10 +431,12 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          n3_stock_id?: string | null
           renewal_cycle_unit?: string | null
           renewal_cycle_value?: number | null
           service_type?: string
           stock_code?: string
+          stock_name?: string | null
           subscription_category?: string | null
           tenant_code?: string
           updated_at?: string
@@ -447,7 +489,9 @@ export type Database = {
         Row: {
           created_at: string
           customer_code: string | null
+          customer_code_at_transaction: string | null
           customer_name: string | null
+          customer_name_at_transaction: string | null
           description: string | null
           document_date: string | null
           document_no: string | null
@@ -461,13 +505,17 @@ export type Database = {
           last_synced_at: string
           line_no: number | null
           line_type: string
+          n3_customer_id: string | null
           n3_document_id: string
           n3_line_id: string
+          n3_stock_id: string | null
           parent_line_id: string | null
           quantity: number | null
           source_line_order: number | null
           stock_code: string | null
+          stock_code_at_transaction: string | null
           stock_name: string | null
+          stock_name_at_transaction: string | null
           tenant_code: string
           uom: string | null
           updated_at: string
@@ -475,7 +523,9 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_code?: string | null
+          customer_code_at_transaction?: string | null
           customer_name?: string | null
+          customer_name_at_transaction?: string | null
           description?: string | null
           document_date?: string | null
           document_no?: string | null
@@ -489,13 +539,17 @@ export type Database = {
           last_synced_at?: string
           line_no?: number | null
           line_type?: string
+          n3_customer_id?: string | null
           n3_document_id: string
           n3_line_id: string
+          n3_stock_id?: string | null
           parent_line_id?: string | null
           quantity?: number | null
           source_line_order?: number | null
           stock_code?: string | null
+          stock_code_at_transaction?: string | null
           stock_name?: string | null
+          stock_name_at_transaction?: string | null
           tenant_code: string
           uom?: string | null
           updated_at?: string
@@ -503,7 +557,9 @@ export type Database = {
         Update: {
           created_at?: string
           customer_code?: string | null
+          customer_code_at_transaction?: string | null
           customer_name?: string | null
+          customer_name_at_transaction?: string | null
           description?: string | null
           document_date?: string | null
           document_no?: string | null
@@ -517,13 +573,17 @@ export type Database = {
           last_synced_at?: string
           line_no?: number | null
           line_type?: string
+          n3_customer_id?: string | null
           n3_document_id?: string
           n3_line_id?: string
+          n3_stock_id?: string | null
           parent_line_id?: string | null
           quantity?: number | null
           source_line_order?: number | null
           stock_code?: string | null
+          stock_code_at_transaction?: string | null
           stock_name?: string | null
+          stock_name_at_transaction?: string | null
           tenant_code?: string
           uom?: string | null
           updated_at?: string
@@ -617,6 +677,48 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_identity_backfill: {
+        Row: {
+          confidence: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          match_method: string
+          migration_status: string
+          n3_id: string | null
+          natural_key: string | null
+          notes: string | null
+          tenant_code: string
+        }
+        Insert: {
+          confidence: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          match_method: string
+          migration_status: string
+          n3_id?: string | null
+          natural_key?: string | null
+          notes?: string | null
+          tenant_code: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          match_method?: string
+          migration_status?: string
+          n3_id?: string | null
+          natural_key?: string | null
+          notes?: string | null
+          tenant_code?: string
+        }
+        Relationships: []
+      }
       snapshot_sync_logs: {
         Row: {
           completed_at: string | null
@@ -684,6 +786,7 @@ export type Database = {
           id: string
           is_active: boolean
           last_synced_at: string | null
+          n3_stock_id: string | null
           stock_code: string
           stock_name: string | null
           tenant_code: string
@@ -695,6 +798,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_synced_at?: string | null
+          n3_stock_id?: string | null
           stock_code: string
           stock_name?: string | null
           tenant_code: string
@@ -706,6 +810,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_synced_at?: string | null
+          n3_stock_id?: string | null
           stock_code?: string
           stock_name?: string | null
           tenant_code?: string
@@ -750,10 +855,17 @@ export type Database = {
         Row: {
           created_at: string
           customer_code: string
+          customer_code_at_event: string | null
           customer_name: string | null
+          customer_name_at_event: string | null
+          document_no_at_event: string | null
           expiry_date: string
           id: string
           is_source_void: boolean
+          n3_customer_id: string | null
+          n3_document_id: string | null
+          n3_line_id: string | null
+          n3_stock_id: string | null
           renewal_cycle_unit: string
           renewal_cycle_value: number
           source_document_date: string
@@ -763,7 +875,9 @@ export type Database = {
           source_type: string
           start_date: string
           stock_code: string
+          stock_code_at_event: string | null
           stock_name: string | null
+          stock_name_at_event: string | null
           subscription_category_id: string | null
           subscription_category_name: string
           tenant_code: string
@@ -772,10 +886,17 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_code: string
+          customer_code_at_event?: string | null
           customer_name?: string | null
+          customer_name_at_event?: string | null
+          document_no_at_event?: string | null
           expiry_date: string
           id?: string
           is_source_void?: boolean
+          n3_customer_id?: string | null
+          n3_document_id?: string | null
+          n3_line_id?: string | null
+          n3_stock_id?: string | null
           renewal_cycle_unit: string
           renewal_cycle_value: number
           source_document_date: string
@@ -785,7 +906,9 @@ export type Database = {
           source_type: string
           start_date: string
           stock_code: string
+          stock_code_at_event?: string | null
           stock_name?: string | null
+          stock_name_at_event?: string | null
           subscription_category_id?: string | null
           subscription_category_name: string
           tenant_code: string
@@ -794,10 +917,17 @@ export type Database = {
         Update: {
           created_at?: string
           customer_code?: string
+          customer_code_at_event?: string | null
           customer_name?: string | null
+          customer_name_at_event?: string | null
+          document_no_at_event?: string | null
           expiry_date?: string
           id?: string
           is_source_void?: boolean
+          n3_customer_id?: string | null
+          n3_document_id?: string | null
+          n3_line_id?: string | null
+          n3_stock_id?: string | null
           renewal_cycle_unit?: string
           renewal_cycle_value?: number
           source_document_date?: string
@@ -807,7 +937,9 @@ export type Database = {
           source_type?: string
           start_date?: string
           stock_code?: string
+          stock_code_at_event?: string | null
           stock_name?: string | null
+          stock_name_at_event?: string | null
           subscription_category_id?: string | null
           subscription_category_name?: string
           tenant_code?: string
@@ -851,6 +983,57 @@ export type Database = {
           status?: string
           sync_log_id?: string | null
           tenant_code?: string
+        }
+        Relationships: []
+      }
+      sync_runs: {
+        Row: {
+          completed_at: string | null
+          current_stage: string | null
+          current_stage_index: number
+          duration_ms: number | null
+          error_message: string | null
+          heartbeat_at: string
+          id: string
+          kind: string
+          progress: Json
+          started_at: string
+          status: string
+          summary: Json | null
+          tenant_code: string
+          total_stages: number
+        }
+        Insert: {
+          completed_at?: string | null
+          current_stage?: string | null
+          current_stage_index?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          heartbeat_at?: string
+          id?: string
+          kind: string
+          progress?: Json
+          started_at?: string
+          status: string
+          summary?: Json | null
+          tenant_code: string
+          total_stages?: number
+        }
+        Update: {
+          completed_at?: string | null
+          current_stage?: string | null
+          current_stage_index?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          heartbeat_at?: string
+          id?: string
+          kind?: string
+          progress?: Json
+          started_at?: string
+          status?: string
+          summary?: Json | null
+          tenant_code?: string
+          total_stages?: number
         }
         Relationships: []
       }
