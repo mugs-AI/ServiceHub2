@@ -386,6 +386,47 @@ function AdminSnapshots() {
         )}
       </section>
 
+      {/* Live sync progress — visible while any sync is running */}
+      {busy && (
+        <section className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+          <h2 className="mb-2 text-sm font-semibold text-foreground">
+            Sync in progress{running === "all" ? " (Run All)" : ""}
+          </h2>
+          {liveLocks.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Starting… waiting for the first heartbeat.
+            </p>
+          ) : (
+            <ul className="space-y-1 text-xs">
+              {liveLocks.map((l) => {
+                const hb = l.heartbeatAt ? new Date(l.heartbeatAt) : null;
+                const ageSec = hb ? Math.max(0, Math.round((Date.now() - hb.getTime()) / 1000)) : null;
+                return (
+                  <li key={`${l.snapshotType}`} className="flex flex-wrap items-center gap-x-3">
+                    <span className="font-medium capitalize">{l.snapshotType}</span>
+                    <span className="text-muted-foreground">
+                      stage: <span className="font-mono">{l.stage ?? "…"}</span>
+                    </span>
+                    {ageSec != null && (
+                      <span className="text-muted-foreground">
+                        heartbeat {ageSec}s ago
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {running === "all" && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Order: Customers → Stock → Subscriptions. The Subscriptions stage
+              runs the longest.
+            </p>
+          )}
+        </section>
+      )}
+
+
       {/* Last sync results */}
       {Object.keys(lastResults).length > 0 && (
         <section className="rounded-lg border bg-card p-4">
