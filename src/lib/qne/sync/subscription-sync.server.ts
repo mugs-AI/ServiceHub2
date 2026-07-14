@@ -508,6 +508,16 @@ async function syncSourceDetails(args: {
       (full.customerName as string | undefined) ??
       (header.customerName as string | undefined) ??
       (customerCode ? customerNameByCode.get(customerCode) ?? null : null);
+    // Prefer immutable N3 customer id from the document payload, then from
+    // the local snapshot.
+    const rawDocCustomerId =
+      (full as Record<string, unknown>).customerId ??
+      (header as Record<string, unknown>).customerId ??
+      null;
+    const customerN3Id =
+      (rawDocCustomerId != null ? String(rawDocCustomerId).trim() : "") ||
+      (customerCode ? customerN3IdByCode.get(customerCode) ?? null : null) ||
+      null;
 
     // ---- Upsert every line (mapped or not) ------------------------------
     const upsertRows: Array<Record<string, unknown>> = [];
@@ -522,19 +532,31 @@ async function syncSourceDetails(args: {
       metrics.lineTypeCounts[lineType] += 1;
       if (isVoid) metrics.voidedSourceLines += 1;
 
+      // Immutable N3 Stock ID for this line (fallback: none — line simply
+      // ships without one and matches by code as before).
+      const stockN3Id =
+        line.stockId != null && line.stockId !== 0 ? String(line.stockId) : null;
+      const stockNameAtTx = line.stock?.name ?? null;
+
       const row = {
         tenant_code: tenantCode,
         n3_document_id: docId,
         n3_line_id: lineId,
+        n3_stock_id: stockN3Id,
+        n3_customer_id: customerN3Id,
         document_no: docNo,
         document_date: docDate ? isoDate(docDate) : null,
         document_status: isVoid ? "Cancelled" : "Active",
         customer_code: customerCode || null,
         customer_name: customerName ?? null,
+        customer_code_at_transaction: customerCode || null,
+        customer_name_at_transaction: customerName ?? null,
         line_no: line.pos ?? line.numbering ?? index + 1,
         source_line_order: line.pos ?? line.numbering ?? index + 1,
         stock_code: stockCode,
-        stock_name: line.stock?.name ?? null,
+        stock_name: stockNameAtTx,
+        stock_code_at_transaction: stockCode,
+        stock_name_at_transaction: stockNameAtTx,
         description: line.description ?? line.stock?.description ?? null,
         quantity: typeof line.qty === "number" ? line.qty : null,
         uom: line.uom?.code ?? null,
@@ -554,7 +576,13 @@ async function syncSourceDetails(args: {
         metrics.linesWithoutStockIgnored += 1;
         return;
       }
-      const renewal = renewalMappings.get(stockKey);
+      // Prefer immutable Stock ID → fall back to Stock Code for legacy rows.
+      const renewal =
+        (stockN3Id && renewalMappingsByStockId.get(stockN3Id)) ||
+        renewalMappings.get(stockKey) ||
+        null;
+      const isAdHoc =
+        (stockN3Id && adHocStockIds.has(stockN3Id)) || adHocStockCodes.has(stockKey);
       if (renewal) {
         metrics.mappedRenewalLines += 1;
         if (isVoid) {
@@ -581,11 +609,20 @@ async function syncSourceDetails(args: {
           tenant_code: tenantCode,
           customer_code: customerCode,
           customer_name: customerName ?? null,
+          n3_customer_id: customerN3Id,
+          n3_stock_id: stockN3Id,
+          n3_document_id: docId,
+          n3_line_id: lineId,
+          customer_code_at_event: customerCode,
+          customer_name_at_event: customerName ?? null,
+          stock_code_at_event: stockCode,
+          stock_name_at_event: stockNameAtTx,
+          document_no_at_event: docNo,
           subscription_category_id:
             categoryIdByName.get(renewal.subscription_category.toLowerCase()) ?? null,
           subscription_category_name: renewal.subscription_category,
           stock_code: renewal.stock_code,
-          stock_name: line.stock?.name ?? null,
+          stock_name: stockNameAtTx,
           source_type: sourceType,
           source_document_id: docId,
           source_document_no: docNo,
@@ -597,12 +634,13 @@ async function syncSourceDetails(args: {
           expiry_date: isoDate(expiry),
           is_source_void: false,
         });
-      } else if (adHocStockCodes.has(stockKey)) {
+      } else if (isAdHoc) {
         metrics.mappedAdHocLines += 1; // stored for future job history; no expiry
       } else {
         metrics.unmappedStockLines += 1;
         metrics.unmappedLinesIgnored += 1;
       }
+
     });
 
     // Batch upsert line snapshots.
