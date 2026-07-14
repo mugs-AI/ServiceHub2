@@ -392,9 +392,12 @@ async function syncSourceDetails(args: {
   getEndpoint: (typeof N3_ENDPOINTS)[keyof typeof N3_ENDPOINTS];
   lineTable: "sales_invoice_line_snapshots" | "delivery_order_line_snapshots";
   renewalMappings: Map<string, RenewalMapping>;
+  renewalMappingsByStockId: Map<string, RenewalMapping>;
   adHocStockCodes: Set<string>;
+  adHocStockIds: Set<string>;
   categoryIdByName: Map<string, string>;
   customerNameByCode: Map<string, string | null>;
+  customerN3IdByCode: Map<string, string | null>;
   heartbeat?: (stage: string, progress?: Record<string, unknown>) => Promise<void>;
 }): Promise<SourceMetrics> {
   const {
@@ -405,11 +408,15 @@ async function syncSourceDetails(args: {
     getEndpoint,
     lineTable,
     renewalMappings,
+    renewalMappingsByStockId,
     adHocStockCodes,
+    adHocStockIds,
     categoryIdByName,
     customerNameByCode,
+    customerN3IdByCode,
     heartbeat,
   } = args;
+
 
   const metrics: SourceMetrics = {
     headersScanned: 0,
