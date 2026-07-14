@@ -31,12 +31,30 @@ export const Route = createFileRoute("/api/workspace/customer-subscriptions")({
             .eq("customer_code", customerCode);
           if (error) throw error;
 
-          // Maintenance first, then alphabetical by category.
+          // Maintenance first, then alphabetical by category. Within a
+          // category: Active, Due Soon, Overdue, Unknown; then earliest
+          // expiry first; then stock_code A–Z.
+          const statusOrder: Record<string, number> = {
+            active: 0,
+            "due soon": 1,
+            overdue: 2,
+            unknown: 3,
+          };
           const rows = (data ?? []).sort((a, b) => {
             const aM = (a.subscription_category ?? "").toLowerCase() === "maintenance" ? 0 : 1;
             const bM = (b.subscription_category ?? "").toLowerCase() === "maintenance" ? 0 : 1;
             if (aM !== bM) return aM - bM;
-            return (a.subscription_category ?? "").localeCompare(b.subscription_category ?? "");
+            const catCmp = (a.subscription_category ?? "").localeCompare(
+              b.subscription_category ?? "",
+            );
+            if (catCmp !== 0) return catCmp;
+            const aS = statusOrder[(a.subscription_status ?? "unknown").toLowerCase()] ?? 4;
+            const bS = statusOrder[(b.subscription_status ?? "unknown").toLowerCase()] ?? 4;
+            if (aS !== bS) return aS - bS;
+            const aE = a.expiry_date ? new Date(a.expiry_date).getTime() : Number.POSITIVE_INFINITY;
+            const bE = b.expiry_date ? new Date(b.expiry_date).getTime() : Number.POSITIVE_INFINITY;
+            if (aE !== bE) return aE - bE;
+            return (a.stock_code ?? "").localeCompare(b.stock_code ?? "");
           });
 
           return Response.json({
