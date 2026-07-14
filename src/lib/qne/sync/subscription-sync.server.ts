@@ -251,6 +251,7 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     }
 
     // ---- 3. Sync detail lines for Sales Invoices and Delivery Orders -------
+    await heartbeat("Fetching Sales Invoice details");
     const siMetrics = await syncSourceDetails({
       ctx,
       tenantCode,
@@ -262,7 +263,9 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       adHocStockCodes,
       categoryIdByName,
       customerNameByCode,
+      heartbeat,
     });
+    await heartbeat("Fetching Delivery Order details");
     const doMetrics = await syncSourceDetails({
       ctx,
       tenantCode,
@@ -274,6 +277,7 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       adHocStockCodes,
       categoryIdByName,
       customerNameByCode,
+      heartbeat,
     });
 
     // Merge per-source metrics into the audit counters.
