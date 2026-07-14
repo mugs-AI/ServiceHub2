@@ -70,6 +70,7 @@ type SubscriptionStatus = "Active" | "Due Soon" | "Overdue" | "Unknown";
 
 interface RenewalMapping {
   stock_code: string;
+  n3_stock_id: string | null;
   subscription_category: string;
   renewal_cycle_value: number;
   renewal_cycle_unit: CycleUnit;
@@ -178,19 +179,26 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     const { data: mappingRows, error: mapErr } = await supabaseAdmin
       .from("renewal_stock_mappings")
       .select(
-        "stock_code, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
+        "stock_code, n3_stock_id, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
       )
       .eq("tenant_code", tenantCode)
       .eq("is_active", true);
     if (mapErr) throw new Error(`Load renewal_stock_mappings failed: ${mapErr.message}`);
 
-    const renewalMappings = new Map<string, RenewalMapping>(); // key: normalized stock code
+    // Two lookup maps for renewal mappings — prefer N3 Stock ID, fall back to
+    // normalized Stock Code. Same value is stored in both so mapping match
+    // survives Stock Code rename.
+    const renewalMappingsByStockId = new Map<string, RenewalMapping>();
+    const renewalMappingsByCode = new Map<string, RenewalMapping>();
     const adHocStockCodes = new Set<string>();
+    const adHocStockIds = new Set<string>();
     for (const m of mappingRows ?? []) {
       const key = normalizeStockKey(m.stock_code);
-      if (!key) continue;
+      const n3Id = (m.n3_stock_id ?? "").toString().trim() || null;
+      if (!key && !n3Id) continue;
       if (m.service_type === "Ad Hoc") {
-        adHocStockCodes.add(key);
+        if (key) adHocStockCodes.add(key);
+        if (n3Id) adHocStockIds.add(n3Id);
         continue;
       }
       if (m.service_type !== "Renewal") continue;
@@ -202,13 +210,19 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
         unit = "day";
       }
       if (!value || value <= 0) continue;
-      renewalMappings.set(key, {
+      const mapping: RenewalMapping = {
         stock_code: m.stock_code,
+        n3_stock_id: n3Id,
         subscription_category: category,
         renewal_cycle_value: value,
         renewal_cycle_unit: unit,
-      });
+      };
+      if (key) renewalMappingsByCode.set(key, mapping);
+      if (n3Id) renewalMappingsByStockId.set(n3Id, mapping);
     }
+
+    const renewalMappings = renewalMappingsByCode; // legacy alias for downstream code paths
+
 
     counters.details.activeRenewalMappings = renewalMappings.size;
     counters.details.activeAdHocMappings = adHocStockCodes.size;
@@ -239,11 +253,15 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
 
     const { data: custRows, error: custErr } = await supabaseAdmin
       .from("customer_snapshots")
-      .select("customer_code, customer_name")
+      .select("customer_code, customer_name, n3_customer_id")
       .eq("tenant_code", tenantCode);
     if (custErr) throw new Error(`Load customer_snapshots failed: ${custErr.message}`);
     const customerNameByCode = new Map<string, string | null>();
-    for (const c of custRows ?? []) customerNameByCode.set(c.customer_code, c.customer_name ?? null);
+    const customerN3IdByCode = new Map<string, string | null>();
+    for (const c of custRows ?? []) {
+      customerNameByCode.set(c.customer_code, c.customer_name ?? null);
+      customerN3IdByCode.set(c.customer_code, (c.n3_customer_id ?? null) as string | null);
+    }
     if (customerNameByCode.size === 0) {
       throw new SyncNotReadyError(
         "Subscription calculation not ready — no Customer Snapshots. Run Customer Sync first.",
@@ -260,9 +278,12 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       getEndpoint: N3_ENDPOINTS["salesInvoices.get"],
       lineTable: "sales_invoice_line_snapshots",
       renewalMappings,
+      renewalMappingsByStockId,
       adHocStockCodes,
+      adHocStockIds,
       categoryIdByName,
       customerNameByCode,
+      customerN3IdByCode,
       heartbeat,
     });
     await heartbeat("Fetching Delivery Order details");
@@ -274,11 +295,15 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       getEndpoint: N3_ENDPOINTS["deliveryOrders.get"],
       lineTable: "delivery_order_line_snapshots",
       renewalMappings,
+      renewalMappingsByStockId,
       adHocStockCodes,
+      adHocStockIds,
       categoryIdByName,
       customerNameByCode,
+      customerN3IdByCode,
       heartbeat,
     });
+
 
     // Merge per-source metrics into the audit counters.
     counters.details.salesInvoice = siMetrics;
@@ -367,9 +392,12 @@ async function syncSourceDetails(args: {
   getEndpoint: (typeof N3_ENDPOINTS)[keyof typeof N3_ENDPOINTS];
   lineTable: "sales_invoice_line_snapshots" | "delivery_order_line_snapshots";
   renewalMappings: Map<string, RenewalMapping>;
+  renewalMappingsByStockId: Map<string, RenewalMapping>;
   adHocStockCodes: Set<string>;
+  adHocStockIds: Set<string>;
   categoryIdByName: Map<string, string>;
   customerNameByCode: Map<string, string | null>;
+  customerN3IdByCode: Map<string, string | null>;
   heartbeat?: (stage: string, progress?: Record<string, unknown>) => Promise<void>;
 }): Promise<SourceMetrics> {
   const {
@@ -380,11 +408,15 @@ async function syncSourceDetails(args: {
     getEndpoint,
     lineTable,
     renewalMappings,
+    renewalMappingsByStockId,
     adHocStockCodes,
+    adHocStockIds,
     categoryIdByName,
     customerNameByCode,
+    customerN3IdByCode,
     heartbeat,
   } = args;
+
 
   const metrics: SourceMetrics = {
     headersScanned: 0,
@@ -476,6 +508,16 @@ async function syncSourceDetails(args: {
       (full.customerName as string | undefined) ??
       (header.customerName as string | undefined) ??
       (customerCode ? customerNameByCode.get(customerCode) ?? null : null);
+    // Prefer immutable N3 customer id from the document payload, then from
+    // the local snapshot.
+    const rawDocCustomerId =
+      (full as Record<string, unknown>).customerId ??
+      (header as Record<string, unknown>).customerId ??
+      null;
+    const customerN3Id =
+      (rawDocCustomerId != null ? String(rawDocCustomerId).trim() : "") ||
+      (customerCode ? customerN3IdByCode.get(customerCode) ?? null : null) ||
+      null;
 
     // ---- Upsert every line (mapped or not) ------------------------------
     const upsertRows: Array<Record<string, unknown>> = [];
@@ -490,19 +532,31 @@ async function syncSourceDetails(args: {
       metrics.lineTypeCounts[lineType] += 1;
       if (isVoid) metrics.voidedSourceLines += 1;
 
+      // Immutable N3 Stock ID for this line (fallback: none — line simply
+      // ships without one and matches by code as before).
+      const stockN3Id =
+        line.stockId != null && line.stockId !== 0 ? String(line.stockId) : null;
+      const stockNameAtTx = line.stock?.name ?? null;
+
       const row = {
         tenant_code: tenantCode,
         n3_document_id: docId,
         n3_line_id: lineId,
+        n3_stock_id: stockN3Id,
+        n3_customer_id: customerN3Id,
         document_no: docNo,
         document_date: docDate ? isoDate(docDate) : null,
         document_status: isVoid ? "Cancelled" : "Active",
         customer_code: customerCode || null,
         customer_name: customerName ?? null,
+        customer_code_at_transaction: customerCode || null,
+        customer_name_at_transaction: customerName ?? null,
         line_no: line.pos ?? line.numbering ?? index + 1,
         source_line_order: line.pos ?? line.numbering ?? index + 1,
         stock_code: stockCode,
-        stock_name: line.stock?.name ?? null,
+        stock_name: stockNameAtTx,
+        stock_code_at_transaction: stockCode,
+        stock_name_at_transaction: stockNameAtTx,
         description: line.description ?? line.stock?.description ?? null,
         quantity: typeof line.qty === "number" ? line.qty : null,
         uom: line.uom?.code ?? null,
@@ -522,7 +576,13 @@ async function syncSourceDetails(args: {
         metrics.linesWithoutStockIgnored += 1;
         return;
       }
-      const renewal = renewalMappings.get(stockKey);
+      // Prefer immutable Stock ID → fall back to Stock Code for legacy rows.
+      const renewal =
+        (stockN3Id && renewalMappingsByStockId.get(stockN3Id)) ||
+        renewalMappings.get(stockKey) ||
+        null;
+      const isAdHoc =
+        (stockN3Id && adHocStockIds.has(stockN3Id)) || adHocStockCodes.has(stockKey);
       if (renewal) {
         metrics.mappedRenewalLines += 1;
         if (isVoid) {
@@ -549,11 +609,20 @@ async function syncSourceDetails(args: {
           tenant_code: tenantCode,
           customer_code: customerCode,
           customer_name: customerName ?? null,
+          n3_customer_id: customerN3Id,
+          n3_stock_id: stockN3Id,
+          n3_document_id: docId,
+          n3_line_id: lineId,
+          customer_code_at_event: customerCode,
+          customer_name_at_event: customerName ?? null,
+          stock_code_at_event: stockCode,
+          stock_name_at_event: stockNameAtTx,
+          document_no_at_event: docNo,
           subscription_category_id:
             categoryIdByName.get(renewal.subscription_category.toLowerCase()) ?? null,
           subscription_category_name: renewal.subscription_category,
           stock_code: renewal.stock_code,
-          stock_name: line.stock?.name ?? null,
+          stock_name: stockNameAtTx,
           source_type: sourceType,
           source_document_id: docId,
           source_document_no: docNo,
@@ -565,12 +634,13 @@ async function syncSourceDetails(args: {
           expiry_date: isoDate(expiry),
           is_source_void: false,
         });
-      } else if (adHocStockCodes.has(stockKey)) {
+      } else if (isAdHoc) {
         metrics.mappedAdHocLines += 1; // stored for future job history; no expiry
       } else {
         metrics.unmappedStockLines += 1;
         metrics.unmappedLinesIgnored += 1;
       }
+
     });
 
     // Batch upsert line snapshots.
@@ -626,7 +696,7 @@ async function rebuildCurrentSnapshots(
   const { data: events, error } = await supabaseAdmin
     .from("subscription_renewal_events")
     .select(
-      "customer_code, customer_name, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
+      "customer_code, customer_name, n3_customer_id, n3_stock_id, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
     )
     .eq("tenant_code", tenantCode)
     .eq("is_source_void", false)
@@ -684,6 +754,8 @@ async function rebuildCurrentSnapshots(
       tenant_code: tenantCode,
       customer_code: ev.customer_code,
       customer_name: ev.customer_name ?? customerNameByCode.get(ev.customer_code) ?? null,
+      n3_customer_id: ev.n3_customer_id ?? null,
+      n3_stock_id: ev.n3_stock_id ?? null,
       subscription_category: ev.subscription_category_name,
       stock_code: ev.stock_code,
       stock_name: ev.stock_name ?? null,
@@ -702,6 +774,7 @@ async function rebuildCurrentSnapshots(
       is_stale: false,
       calculation_error: null,
     };
+
 
     const bucket =
       ev.source_type === "delivery_order" ? bySource.delivery_order : bySource.invoice;
