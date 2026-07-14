@@ -610,12 +610,13 @@ async function rebuildCurrentSnapshots(
     .order("source_document_date", { ascending: false });
   if (error) throw new Error(`Load renewal events failed: ${error.message}`);
 
-  // Pick latest per (customer, category) — ordered descending, so first wins.
-  // Sales Invoice and Delivery Order events are considered as equal peers;
-  // whichever has the newer source_document_date takes the entitlement.
+  // Pick latest per (customer, category, stock_code) — ordered descending,
+  // so first wins. Sales Invoice and Delivery Order events are equal peers;
+  // whichever has the newer source_document_date wins. Different Stock
+  // Codes remain independent entitlements even inside the same category.
   const latestByKey = new Map<string, (typeof events)[number]>();
   for (const ev of events ?? []) {
-    const key = `${ev.customer_code}::${ev.subscription_category_name}`;
+    const key = `${ev.customer_code}::${ev.subscription_category_name}::${ev.stock_code ?? ""}`;
     if (!latestByKey.has(key)) latestByKey.set(key, ev);
   }
 
@@ -633,14 +634,17 @@ async function rebuildCurrentSnapshots(
   const { data: existingRows, error: existingErr } = await supabaseAdmin
     .from("customer_subscription_snapshots")
     .select(
-      "customer_code, subscription_category, latest_document_no, latest_document_date, expiry_date, subscription_status",
+      "customer_code, subscription_category, stock_code, latest_document_no, latest_document_date, expiry_date, subscription_status",
     )
     .eq("tenant_code", tenantCode)
     .in("customer_code", targetCustomers);
   if (existingErr) throw new Error(`Load existing subscriptions failed: ${existingErr.message}`);
   const existingByKey = new Map<string, Record<string, unknown>>();
   for (const r of existingRows ?? []) {
-    existingByKey.set(`${r.customer_code}::${r.subscription_category}`, r as Record<string, unknown>);
+    existingByKey.set(
+      `${r.customer_code}::${r.subscription_category}::${r.stock_code ?? ""}`,
+      r as Record<string, unknown>,
+    );
   }
 
   const now = Date.now();
