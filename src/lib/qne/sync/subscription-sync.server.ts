@@ -172,7 +172,8 @@ function classifyLine(line: N3DocLine, stockCode: string | null): LineType {
 export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<SyncResult> {
   const { tenantCode } = ctx;
 
-  return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters) => {
+  return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters, heartbeat) => {
+    await heartbeat("Loading renewal mappings");
     // ---- 1. Load mappings ---------------------------------------------------
     const { data: mappingRows, error: mapErr } = await supabaseAdmin
       .from("renewal_stock_mappings")
