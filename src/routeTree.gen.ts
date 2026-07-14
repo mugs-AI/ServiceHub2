@@ -34,6 +34,7 @@ import { Route as ApiDiagnosticsSubscriptionRunRouteImport } from './routes/api/
 import { Route as ApiDiagnosticsSubscriptionPreviewRouteImport } from './routes/api/diagnostics/subscription-preview'
 import { Route as ApiDiagnosticsPreviewRouteImport } from './routes/api/diagnostics/preview'
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
+import { Route as ApiDiagnosticsDocumentSearchRouteImport } from './routes/api/diagnostics/document-search'
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
@@ -169,6 +170,12 @@ const ApiDiagnosticsHealthRoute = ApiDiagnosticsHealthRouteImport.update({
   path: '/api/diagnostics/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDiagnosticsDocumentSearchRoute =
+  ApiDiagnosticsDocumentSearchRouteImport.update({
+    id: '/api/diagnostics/document-search',
+    path: '/api/diagnostics/document-search',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDiagnosticsTypeRoute = ApiDiagnosticsTypeRouteImport.update({
   id: '/api/diagnostics/$type',
   path: '/api/diagnostics/$type',
@@ -200,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
+  '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
@@ -230,6 +238,7 @@ export interface FileRoutesByTo {
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
+  '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
@@ -261,6 +270,7 @@ export interface FileRoutesById {
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
+  '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
+    | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
     | '/api/diagnostics/subscription-preview'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
+    | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
     | '/api/diagnostics/subscription-preview'
@@ -353,6 +365,7 @@ export interface FileRouteTypes {
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
+    | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
     | '/api/diagnostics/preview'
     | '/api/diagnostics/subscription-preview'
@@ -384,6 +397,7 @@ export interface RootRouteChildren {
   ApiAdminAllowlistRoute: typeof ApiAdminAllowlistRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
+  ApiDiagnosticsDocumentSearchRoute: typeof ApiDiagnosticsDocumentSearchRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
   ApiDiagnosticsPreviewRoute: typeof ApiDiagnosticsPreviewRoute
   ApiDiagnosticsSubscriptionPreviewRoute: typeof ApiDiagnosticsSubscriptionPreviewRoute
@@ -577,6 +591,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDiagnosticsHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/diagnostics/document-search': {
+      id: '/api/diagnostics/document-search'
+      path: '/api/diagnostics/document-search'
+      fullPath: '/api/diagnostics/document-search'
+      preLoaderRoute: typeof ApiDiagnosticsDocumentSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/diagnostics/$type': {
       id: '/api/diagnostics/$type'
       path: '/api/diagnostics/$type'
@@ -616,6 +637,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminAllowlistRoute: ApiAdminAllowlistRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
+  ApiDiagnosticsDocumentSearchRoute: ApiDiagnosticsDocumentSearchRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
   ApiDiagnosticsPreviewRoute: ApiDiagnosticsPreviewRoute,
   ApiDiagnosticsSubscriptionPreviewRoute:

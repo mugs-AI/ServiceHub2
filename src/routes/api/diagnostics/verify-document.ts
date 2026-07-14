@@ -165,6 +165,18 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
                     ? `${m.renewal_cycle_value} ${m.renewal_cycle_unit}`
                     : null,
                 renewal_event: eventBySourceLine.get(r.n3_line_id ?? "") ?? null,
+                // Phase 1.1 — explicit state for the "Renewal Event" column.
+                //   existing        — eligible mapped line with a stored event
+                //   missing         — eligible mapped line, no event stored
+                //   not_applicable  — line cannot produce entitlement
+                renewal_event_state:
+                  mappingResult === "renewal" || mappingResult === "renewal_invalid_cycle"
+                    ? eventBySourceLine.has(r.n3_line_id ?? "")
+                      ? "existing"
+                      : eligible === "yes"
+                        ? "missing"
+                        : "not_applicable"
+                    : "not_applicable",
               };
             });
 

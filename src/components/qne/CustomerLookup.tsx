@@ -262,6 +262,17 @@ export function CustomerLookup() {
                       )}
                     </dl>
                   )}
+
+                  <div className="mt-3 border-t pt-3">
+                    <button
+                      type="button"
+                      disabled
+                      title="Coming next"
+                      className="w-full cursor-not-allowed rounded-md border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary/70"
+                    >
+                      + New Service Job (Coming Next)
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -349,10 +360,9 @@ function CustomerSubscriptionsPanel({
     switch ((s ?? "").toLowerCase()) {
       case "active":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      case "expiring":
-      case "expiring soon":
+      case "due soon":
         return "bg-amber-100 text-amber-900 border-amber-200";
-      case "expired":
+      case "overdue":
         return "bg-rose-100 text-rose-800 border-rose-200";
       default:
         return "bg-muted text-muted-foreground border-border";
@@ -395,7 +405,7 @@ function CustomerSubscriptionsPanel({
             const remainingText =
               r.remaining_days == null
                 ? null
-                : status === "expired"
+                : status === "overdue" || r.remaining_days < 0
                   ? `${Math.abs(r.remaining_days)} day${Math.abs(r.remaining_days) === 1 ? "" : "s"} overdue`
                   : `${r.remaining_days} day${r.remaining_days === 1 ? "" : "s"} remaining`;
             const latestText = r.latest_source_type
