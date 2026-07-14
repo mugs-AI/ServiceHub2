@@ -262,6 +262,17 @@ export function CustomerLookup() {
                       )}
                     </dl>
                   )}
+
+                  <div className="mt-3 border-t pt-3">
+                    <button
+                      type="button"
+                      disabled
+                      title="Coming next"
+                      className="w-full cursor-not-allowed rounded-md border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary/70"
+                    >
+                      + New Service Job (Coming Next)
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
