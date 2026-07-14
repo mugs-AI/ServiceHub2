@@ -172,7 +172,8 @@ function classifyLine(line: N3DocLine, stockCode: string | null): LineType {
 export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<SyncResult> {
   const { tenantCode } = ctx;
 
-  return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters) => {
+  return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters, heartbeat) => {
+    await heartbeat("Loading renewal mappings");
     // ---- 1. Load mappings ---------------------------------------------------
     const { data: mappingRows, error: mapErr } = await supabaseAdmin
       .from("renewal_stock_mappings")
@@ -250,6 +251,7 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     }
 
     // ---- 3. Sync detail lines for Sales Invoices and Delivery Orders -------
+    await heartbeat("Fetching Sales Invoice details");
     const siMetrics = await syncSourceDetails({
       ctx,
       tenantCode,
@@ -261,7 +263,9 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       adHocStockCodes,
       categoryIdByName,
       customerNameByCode,
+      heartbeat,
     });
+    await heartbeat("Fetching Delivery Order details");
     const doMetrics = await syncSourceDetails({
       ctx,
       tenantCode,
@@ -273,6 +277,7 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       adHocStockCodes,
       categoryIdByName,
       customerNameByCode,
+      heartbeat,
     });
 
     // Merge per-source metrics into the audit counters.
@@ -298,7 +303,9 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     const totalLines = siMetrics.detailLinesStored + doMetrics.detailLinesStored;
 
     // ---- 4. Rebuild current subscription snapshots -------------------------
+    await heartbeat("Rebuilding Current Subscriptions");
     const rebuild = await rebuildCurrentSnapshots(tenantCode, dueSoonDays, customerNameByCode);
+    await heartbeat("Finalizing diagnostics");
     counters.inserted = rebuild.inserted;
     counters.updated = rebuild.updated;
     counters.skipped = rebuild.skipped;
@@ -363,6 +370,7 @@ async function syncSourceDetails(args: {
   adHocStockCodes: Set<string>;
   categoryIdByName: Map<string, string>;
   customerNameByCode: Map<string, string | null>;
+  heartbeat?: (stage: string, progress?: Record<string, unknown>) => Promise<void>;
 }): Promise<SourceMetrics> {
   const {
     ctx,
@@ -375,6 +383,7 @@ async function syncSourceDetails(args: {
     adHocStockCodes,
     categoryIdByName,
     customerNameByCode,
+    heartbeat,
   } = args;
 
   const metrics: SourceMetrics = {
@@ -416,10 +425,24 @@ async function syncSourceDetails(args: {
     );
   }
   metrics.headersScanned = headers.length;
+  await heartbeat?.(`Fetching ${sourceType} details 0/${headers.length}`, {
+    source: sourceType,
+    stage: "details",
+    total: headers.length,
+    processed: 0,
+  });
 
+  let processed = 0;
   for (const header of headers) {
     const docId = (header.id ?? "").toString().trim();
     if (!docId) continue;
+    processed += 1;
+    if (processed % 25 === 0 || processed === headers.length) {
+      await heartbeat?.(
+        `Fetching ${sourceType} details ${processed}/${headers.length}`,
+        { source: sourceType, stage: "details", total: headers.length, processed },
+      );
+    }
 
     const docNo = (header.docCode ?? header.documentNo ?? "").toString() || null;
     metrics.detailRequestsAttempted += 1;

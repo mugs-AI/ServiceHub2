@@ -625,10 +625,13 @@ export type Database = {
           duration_ms: number | null
           error_message: string | null
           failed_count: number
+          heartbeat_at: string | null
           id: string
           inserted_count: number
+          progress: Json | null
           skipped_count: number
           snapshot_type: string
+          stage: string | null
           started_at: string
           status: string
           tenant_code: string
@@ -641,10 +644,13 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           failed_count?: number
+          heartbeat_at?: string | null
           id?: string
           inserted_count?: number
+          progress?: Json | null
           skipped_count?: number
           snapshot_type: string
+          stage?: string | null
           started_at?: string
           status?: string
           tenant_code: string
@@ -657,10 +663,13 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           failed_count?: number
+          heartbeat_at?: string | null
           id?: string
           inserted_count?: number
+          progress?: Json | null
           skipped_count?: number
           snapshot_type?: string
+          stage?: string | null
           started_at?: string
           status?: string
           tenant_code?: string
@@ -810,19 +819,37 @@ export type Database = {
         Row: {
           acquired_at: string
           acquired_by: string | null
+          expires_at: string | null
+          heartbeat_at: string | null
+          run_id: string | null
           snapshot_type: string
+          stage: string | null
+          status: string
+          sync_log_id: string | null
           tenant_code: string
         }
         Insert: {
           acquired_at?: string
           acquired_by?: string | null
+          expires_at?: string | null
+          heartbeat_at?: string | null
+          run_id?: string | null
           snapshot_type: string
+          stage?: string | null
+          status?: string
+          sync_log_id?: string | null
           tenant_code: string
         }
         Update: {
           acquired_at?: string
           acquired_by?: string | null
+          expires_at?: string | null
+          heartbeat_at?: string | null
+          run_id?: string | null
           snapshot_type?: string
+          stage?: string | null
+          status?: string
+          sync_log_id?: string | null
           tenant_code?: string
         }
         Relationships: []

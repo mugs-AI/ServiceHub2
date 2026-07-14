@@ -34,9 +34,21 @@ interface HealthRow {
   threshold_hours: number;
 }
 
+interface ActiveLock {
+  tenantCode: string;
+  snapshotType: "customer" | "stock" | "contract";
+  acquiredAt: string | null;
+  heartbeatAt: string | null;
+  expiresAt: string | null;
+  stage: string | null;
+  isStale: boolean;
+  ageSeconds: number | null;
+}
+
 interface HealthResponse {
   tenantCode: string;
   snapshots: HealthRow[];
+  activeLocks?: ActiveLock[];
 }
 
 interface SyncResult {
@@ -127,6 +139,9 @@ function AdminSnapshots() {
   const [lastResults, setLastResults] = useState<Record<string, SyncResult>>({});
   const [diag, setDiag] = useState<DiagnosticsResponse | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
+
+  const [recoverBusy, setRecoverBusy] = useState(false);
+  const [recoverMsg, setRecoverMsg] = useState<string | null>(null);
 
   const reloadHealth = useCallback(async () => {
     setHealthErr(null);
@@ -226,6 +241,36 @@ function AdminSnapshots() {
 
   const busy = running !== null;
   const mappingCount = preview?.mappings.activeCount ?? 0;
+  const activeLocks = health?.activeLocks ?? [];
+  const staleLocks = activeLocks.filter((l) => l.isStale);
+  const liveLocks = activeLocks.filter((l) => !l.isStale);
+
+  const recoverStale = useCallback(
+    async (snapshotType: ActiveLock["snapshotType"]) => {
+      setRecoverBusy(true);
+      setRecoverMsg(null);
+      try {
+        const res = await authFetch("/api/sync/recover-stale", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ snapshotType }),
+        });
+        const json = (await res.json()) as { recovered?: boolean; error?: string };
+        if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+        setRecoverMsg(
+          json.recovered
+            ? "Stale sync lock released. You can start a new run now."
+            : "Nothing to recover — no stale lock found.",
+        );
+      } catch (err) {
+        setRecoverMsg(err instanceof Error ? err.message : String(err));
+      } finally {
+        setRecoverBusy(false);
+        await reloadHealth();
+      }
+    },
+    [reloadHealth],
+  );
 
   return (
     <div className="space-y-6">
@@ -243,6 +288,43 @@ function AdminSnapshots() {
           Owner check server-side.
         </p>
       </div>
+
+      {(staleLocks.length > 0 || liveLocks.length > 0) && (
+        <section className="rounded-lg border p-4 space-y-3"
+          style={{ borderColor: staleLocks.length > 0 ? "rgb(252 165 165)" : "rgb(191 219 254)", background: staleLocks.length > 0 ? "rgb(254 242 242)" : "rgb(239 246 255)" }}
+        >
+          {staleLocks.map((l) => (
+            <div key={`stale-${l.snapshotType}`} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-red-900">
+                <strong>A previous synchronization stopped unexpectedly.</strong>{" "}
+                <span className="text-red-800">
+                  Type: <code>{l.snapshotType}</code> · last heartbeat{" "}
+                  {l.ageSeconds != null ? `${l.ageSeconds}s ago` : "unknown"} ·
+                  stage: {l.stage ?? "unknown"}
+                </span>
+              </div>
+              <button
+                disabled={recoverBusy}
+                onClick={() => recoverStale(l.snapshotType)}
+                className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {recoverBusy ? "Recovering…" : "Recover Stale Sync"}
+              </button>
+            </div>
+          ))}
+          {liveLocks.map((l) => (
+            <div key={`live-${l.snapshotType}`} className="text-sm text-blue-900">
+              Sync in progress · <code>{l.snapshotType}</code> · stage:{" "}
+              <strong>{l.stage ?? "starting"}</strong>
+              {l.ageSeconds != null ? ` · last heartbeat ${l.ageSeconds}s ago` : ""}
+            </div>
+          ))}
+          {recoverMsg && (
+            <p className="text-xs text-foreground">{recoverMsg}</p>
+          )}
+        </section>
+      )}
+
 
       {/* Actions */}
       <section className="rounded-lg border bg-card p-4">
