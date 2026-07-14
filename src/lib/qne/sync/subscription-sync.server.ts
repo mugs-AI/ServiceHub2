@@ -337,6 +337,10 @@ interface SourceMetrics {
   voidedSourceLines: number;
   renewalEventsInserted: number;
   renewalEventsSkipped: number;
+  // Phase 1.0.4 — split skip reasons so Delivery Order path is auditable.
+  renewalEventsSkippedVoided: number;
+  renewalEventsSkippedMissingCustomer: number;
+  renewalEventsSkippedInvalidDate: number;
   lineTypeCounts: {
     stock: number;
     description: number;
