@@ -1155,7 +1155,14 @@ function DocumentVerifier() {
                         <td className="px-2 py-1">{String(l.mapping_result ?? "")}</td>
                         <td className="px-2 py-1">{String(l.subscription_category ?? "—")}</td>
                         <td className="px-2 py-1">{String(l.renewal_cycle ?? "—")}</td>
-                        <td className="px-2 py-1">{l.renewal_event ? "yes" : "no"}</td>
+                        <td className="px-2 py-1">
+                          {(() => {
+                            const s = (l as { renewal_event_state?: string }).renewal_event_state;
+                            if (s === "existing") return "existing";
+                            if (s === "missing") return "missing (re-sync needed)";
+                            return l.renewal_event ? "existing" : "—";
+                          })()}
+                        </td>
                         <td className="px-2 py-1">
                           {l.eligible_for_renewal === "yes"
                             ? "yes"
