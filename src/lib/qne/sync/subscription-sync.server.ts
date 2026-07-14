@@ -711,7 +711,7 @@ async function rebuildCurrentSnapshots(
     const { error: upsertErr } = await supabaseAdmin
       .from("customer_subscription_snapshots")
       .upsert(chunk as never, {
-        onConflict: "tenant_code,customer_code,subscription_category",
+        onConflict: "tenant_code,customer_code,subscription_category,stock_code",
       });
     if (upsertErr) throw new Error(`Upsert subscriptions failed: ${upsertErr.message}`);
   }
