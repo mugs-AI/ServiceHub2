@@ -590,11 +590,16 @@ async function syncSourceDetails(args: {
 // Rebuild current customer_subscription_snapshots from the renewal event
 // history. Latest non-void event per (customer, category) wins.
 
+interface RebuildBySource {
+  invoice: { inserted: number; updated: number; unchanged: number; total: number };
+  delivery_order: { inserted: number; updated: number; unchanged: number; total: number };
+}
+
 async function rebuildCurrentSnapshots(
   tenantCode: string,
   dueSoonDays: number,
   customerNameByCode: Map<string, string | null>,
-): Promise<{ inserted: number; updated: number; skipped: number }> {
+): Promise<{ inserted: number; updated: number; skipped: number; bySource: RebuildBySource }> {
   const { data: events, error } = await supabaseAdmin
     .from("subscription_renewal_events")
     .select(
@@ -606,13 +611,20 @@ async function rebuildCurrentSnapshots(
   if (error) throw new Error(`Load renewal events failed: ${error.message}`);
 
   // Pick latest per (customer, category) — ordered descending, so first wins.
+  // Sales Invoice and Delivery Order events are considered as equal peers;
+  // whichever has the newer source_document_date takes the entitlement.
   const latestByKey = new Map<string, (typeof events)[number]>();
   for (const ev of events ?? []) {
     const key = `${ev.customer_code}::${ev.subscription_category_name}`;
     if (!latestByKey.has(key)) latestByKey.set(key, ev);
   }
 
-  if (latestByKey.size === 0) return { inserted: 0, updated: 0, skipped: 0 };
+  const bySource: RebuildBySource = {
+    invoice: { inserted: 0, updated: 0, unchanged: 0, total: 0 },
+    delivery_order: { inserted: 0, updated: 0, unchanged: 0, total: 0 },
+  };
+
+  if (latestByKey.size === 0) return { inserted: 0, updated: 0, skipped: 0, bySource };
 
   // Load existing snapshots for change detection.
   const targetCustomers = Array.from(
@@ -664,16 +676,27 @@ async function rebuildCurrentSnapshots(
       calculation_error: null,
     };
 
+    const bucket =
+      ev.source_type === "delivery_order" ? bySource.delivery_order : bySource.invoice;
+    bucket.total += 1;
+
     const existing = existingByKey.get(key);
-    if (!existing) inserted += 1;
-    else {
+    if (!existing) {
+      inserted += 1;
+      bucket.inserted += 1;
+    } else {
       const changed =
         (existing.latest_document_no ?? null) !== (row.latest_document_no ?? null) ||
         (existing.latest_document_date ?? null) !== row.latest_document_date ||
         (existing.expiry_date ?? null) !== row.expiry_date ||
         (existing.subscription_status ?? null) !== row.subscription_status;
-      if (changed) updated += 1;
-      else skipped += 1;
+      if (changed) {
+        updated += 1;
+        bucket.updated += 1;
+      } else {
+        skipped += 1;
+        bucket.unchanged += 1;
+      }
     }
     toUpsert.push(row);
   }
@@ -689,7 +712,7 @@ async function rebuildCurrentSnapshots(
     if (upsertErr) throw new Error(`Upsert subscriptions failed: ${upsertErr.message}`);
   }
 
-  return { inserted, updated, skipped };
+  return { inserted, updated, skipped, bySource };
 }
 
 // ---------------------------------------------------------------------------
