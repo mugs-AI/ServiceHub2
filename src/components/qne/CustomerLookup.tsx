@@ -349,10 +349,9 @@ function CustomerSubscriptionsPanel({
     switch ((s ?? "").toLowerCase()) {
       case "active":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      case "expiring":
-      case "expiring soon":
+      case "due soon":
         return "bg-amber-100 text-amber-900 border-amber-200";
-      case "expired":
+      case "overdue":
         return "bg-rose-100 text-rose-800 border-rose-200";
       default:
         return "bg-muted text-muted-foreground border-border";
