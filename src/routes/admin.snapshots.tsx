@@ -34,9 +34,21 @@ interface HealthRow {
   threshold_hours: number;
 }
 
+interface ActiveLock {
+  tenantCode: string;
+  snapshotType: "customer" | "stock" | "contract";
+  acquiredAt: string | null;
+  heartbeatAt: string | null;
+  expiresAt: string | null;
+  stage: string | null;
+  isStale: boolean;
+  ageSeconds: number | null;
+}
+
 interface HealthResponse {
   tenantCode: string;
   snapshots: HealthRow[];
+  activeLocks?: ActiveLock[];
 }
 
 interface SyncResult {
