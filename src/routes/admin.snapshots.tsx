@@ -733,10 +733,21 @@ function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
           )}
           {state.perSource && (
             <div className="grid gap-3 md:grid-cols-2">
-              <BreakdownCard title="Sales Invoices" b={state.perSource.salesInvoice} />
-              <BreakdownCard title="Delivery Orders" b={state.perSource.deliveryOrder} />
+              <BreakdownCard
+                title="Sales Invoices"
+                b={state.perSource.salesInvoice}
+                run={runSourceDetails(state.latest?.details, "salesInvoice")}
+              />
+              <BreakdownCard
+                title="Delivery Orders"
+                b={state.perSource.deliveryOrder}
+                run={runSourceDetails(state.latest?.details, "deliveryOrder")}
+              />
             </div>
           )}
+
+          {renderSubscriptionSourceSplit(state.latest?.details)}
+
 
           {state.activeLocks.length > 0 && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
