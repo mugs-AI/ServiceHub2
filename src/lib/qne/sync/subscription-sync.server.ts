@@ -305,6 +305,7 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     counters.details.subscriptionSnapshotsInserted = rebuild.inserted;
     counters.details.subscriptionSnapshotsUpdated = rebuild.updated;
     counters.details.subscriptionSnapshotsUnchanged = rebuild.skipped;
+    counters.details.subscriptionSnapshotsBySource = rebuild.bySource;
 
     // Zero-result diagnostics (used by health warning).
     if (rebuild.inserted + rebuild.updated + rebuild.skipped === 0) {
