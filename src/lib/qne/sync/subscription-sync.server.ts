@@ -179,19 +179,26 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     const { data: mappingRows, error: mapErr } = await supabaseAdmin
       .from("renewal_stock_mappings")
       .select(
-        "stock_code, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
+        "stock_code, n3_stock_id, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
       )
       .eq("tenant_code", tenantCode)
       .eq("is_active", true);
     if (mapErr) throw new Error(`Load renewal_stock_mappings failed: ${mapErr.message}`);
 
-    const renewalMappings = new Map<string, RenewalMapping>(); // key: normalized stock code
+    // Two lookup maps for renewal mappings — prefer N3 Stock ID, fall back to
+    // normalized Stock Code. Same value is stored in both so mapping match
+    // survives Stock Code rename.
+    const renewalMappingsByStockId = new Map<string, RenewalMapping>();
+    const renewalMappingsByCode = new Map<string, RenewalMapping>();
     const adHocStockCodes = new Set<string>();
+    const adHocStockIds = new Set<string>();
     for (const m of mappingRows ?? []) {
       const key = normalizeStockKey(m.stock_code);
-      if (!key) continue;
+      const n3Id = (m.n3_stock_id ?? "").toString().trim() || null;
+      if (!key && !n3Id) continue;
       if (m.service_type === "Ad Hoc") {
-        adHocStockCodes.add(key);
+        if (key) adHocStockCodes.add(key);
+        if (n3Id) adHocStockIds.add(n3Id);
         continue;
       }
       if (m.service_type !== "Renewal") continue;
@@ -203,13 +210,19 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
         unit = "day";
       }
       if (!value || value <= 0) continue;
-      renewalMappings.set(key, {
+      const mapping: RenewalMapping = {
         stock_code: m.stock_code,
+        n3_stock_id: n3Id,
         subscription_category: category,
         renewal_cycle_value: value,
         renewal_cycle_unit: unit,
-      });
+      };
+      if (key) renewalMappingsByCode.set(key, mapping);
+      if (n3Id) renewalMappingsByStockId.set(n3Id, mapping);
     }
+
+    const renewalMappings = renewalMappingsByCode; // legacy alias for downstream code paths
+
 
     counters.details.activeRenewalMappings = renewalMappings.size;
     counters.details.activeAdHocMappings = adHocStockCodes.size;
