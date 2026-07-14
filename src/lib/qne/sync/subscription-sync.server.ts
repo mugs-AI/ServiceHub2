@@ -303,7 +303,9 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     const totalLines = siMetrics.detailLinesStored + doMetrics.detailLinesStored;
 
     // ---- 4. Rebuild current subscription snapshots -------------------------
+    await heartbeat("Rebuilding Current Subscriptions");
     const rebuild = await rebuildCurrentSnapshots(tenantCode, dueSoonDays, customerNameByCode);
+    await heartbeat("Finalizing diagnostics");
     counters.inserted = rebuild.inserted;
     counters.updated = rebuild.updated;
     counters.skipped = rebuild.skipped;
