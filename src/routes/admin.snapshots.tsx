@@ -1039,6 +1039,7 @@ function DocumentVerifier() {
                       <th className="px-2 py-1 text-left">Category</th>
                       <th className="px-2 py-1 text-left">Cycle</th>
                       <th className="px-2 py-1 text-left">Event</th>
+                      <th className="px-2 py-1 text-left">Eligibility</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1054,6 +1055,13 @@ function DocumentVerifier() {
                         <td className="px-2 py-1">{String(l.subscription_category ?? "—")}</td>
                         <td className="px-2 py-1">{String(l.renewal_cycle ?? "—")}</td>
                         <td className="px-2 py-1">{l.renewal_event ? "yes" : "no"}</td>
+                        <td className="px-2 py-1">
+                          {l.eligible_for_renewal === "yes"
+                            ? "yes"
+                            : l.ineligible_reason
+                              ? `no · ${String(l.ineligible_reason).replaceAll("_", " ")}`
+                              : "—"}
+                        </td>
                       </tr>
                     ))}
 
