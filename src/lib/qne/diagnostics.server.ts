@@ -31,7 +31,9 @@ export async function getSnapshotHealth(tenantCode: string): Promise<{
   tenantCode: string;
   thresholds: Awaited<ReturnType<typeof loadFreshnessThresholds>>;
   snapshots: SnapshotHealthRow[];
+  activeLocks: Awaited<ReturnType<typeof import("./sync/log.server").listActiveLocks>>;
 }> {
+  const { listActiveLocks } = await import("./sync/log.server");
   const thresholds = await loadFreshnessThresholds(tenantCode);
   const { data, error } = await supabaseAdmin
     .from("snapshot_health")
@@ -61,7 +63,8 @@ export async function getSnapshotHealth(tenantCode: string): Promise<{
     };
   });
 
-  return { tenantCode, thresholds, snapshots: rows };
+  const activeLocks = await listActiveLocks(tenantCode);
+  return { tenantCode, thresholds, snapshots: rows, activeLocks };
 }
 
 export async function getSnapshotDiagnostics(
