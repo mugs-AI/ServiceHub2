@@ -948,19 +948,30 @@ interface VerifyDocResponse {
   error?: string;
 }
 
+interface DocCandidate {
+  document_no: string;
+  source_type: "invoice" | "delivery_order";
+  document_date: string | null;
+  customer_code: string | null;
+  customer_name: string | null;
+  total_lines: number;
+  eligible_lines: number;
+}
+
 function DocumentVerifier() {
   const [docNo, setDocNo] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VerifyDocResponse | null>(null);
+  const [candidates, setCandidates] = useState<DocCandidate[] | null>(null);
+  const [truncated, setTruncated] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!docNo.trim()) return;
+  const verifyByDocNo = async (docNumber: string) => {
     setBusy(true);
     setResult(null);
     try {
       const res = await authFetch(
-        `/api/diagnostics/verify-document?docNo=${encodeURIComponent(docNo.trim())}`,
+        `/api/diagnostics/verify-document?docNo=${encodeURIComponent(docNumber)}`,
       );
       const json = (await res.json()) as VerifyDocResponse;
       if (!res.ok) setResult({ ...json, found: false, error: json.error ?? `HTTP ${res.status}` });
@@ -968,7 +979,7 @@ function DocumentVerifier() {
     } catch (err) {
       setResult({
         tenantCode: "",
-        documentNo: docNo,
+        documentNo: docNumber,
         found: false,
         header: null,
         detailFetch: { operation: null, linesStored: 0 },
@@ -983,6 +994,41 @@ function DocumentVerifier() {
     }
   };
 
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = docNo.trim();
+    if (!q) return;
+    setSearchError(null);
+    setCandidates(null);
+    setResult(null);
+    setBusy(true);
+    try {
+      const res = await authFetch(
+        `/api/diagnostics/document-search?q=${encodeURIComponent(q)}`,
+      );
+      const json = (await res.json()) as {
+        candidates?: DocCandidate[];
+        truncated?: boolean;
+        error?: string;
+      };
+      if (!res.ok) {
+        setSearchError(json.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      const list = json.candidates ?? [];
+      setTruncated(!!json.truncated);
+      if (list.length === 1) {
+        await verifyByDocNo(list[0].document_no);
+      } else {
+        setCandidates(list);
+      }
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="rounded-lg border bg-card p-4">
       <h2 className="mb-3 text-sm font-semibold text-foreground">Document Verifier</h2>
@@ -990,16 +1036,71 @@ function DocumentVerifier() {
         <input
           value={docNo}
           onChange={(e) => setDocNo(e.target.value)}
-          placeholder="Enter Sales Invoice or Delivery Order No (e.g. MIS2606008)"
+          placeholder="Search by Doc No, Customer Name or Customer Code"
           className="min-h-10 min-w-72 flex-1 rounded-md border bg-background px-3 text-sm shadow-sm"
         />
         <button
           disabled={busy || !docNo.trim()}
           className="min-h-10 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {busy ? "Verifying…" : "Verify"}
+          {busy ? "Searching…" : "Search"}
         </button>
       </form>
+      {searchError && (
+        <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {searchError}
+        </p>
+      )}
+      {candidates && candidates.length === 0 && (
+        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          No matching documents. Sync Transaction Details first, or try a broader search.
+        </p>
+      )}
+      {candidates && candidates.length > 0 && (
+        <div className="mt-3 overflow-x-auto rounded-md border">
+          {truncated && (
+            <p className="border-b bg-amber-50 px-3 py-1 text-[11px] text-amber-800">
+              Showing the most recent matches only. Refine the search for a specific document.
+            </p>
+          )}
+          <table className="w-full text-xs">
+            <thead className="bg-muted uppercase text-muted-foreground">
+              <tr>
+                <th className="px-2 py-1 text-left">Document</th>
+                <th className="px-2 py-1 text-left">Source</th>
+                <th className="px-2 py-1 text-left">Date</th>
+                <th className="px-2 py-1 text-left">Customer</th>
+                <th className="px-2 py-1 text-right">Lines</th>
+                <th className="px-2 py-1 text-right">Eligible</th>
+                <th className="px-2 py-1" />
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.map((c) => (
+                <tr key={`${c.source_type}::${c.document_no}`} className="border-t">
+                  <td className="px-2 py-1 font-mono">{c.document_no}</td>
+                  <td className="px-2 py-1">{c.source_type}</td>
+                  <td className="px-2 py-1">{fmtDate(c.document_date ?? "")}</td>
+                  <td className="px-2 py-1">
+                    {c.customer_code ?? "—"} {c.customer_name ?? ""}
+                  </td>
+                  <td className="px-2 py-1 text-right">{c.total_lines}</td>
+                  <td className="px-2 py-1 text-right">{c.eligible_lines}</td>
+                  <td className="px-2 py-1 text-right">
+                    <button
+                      type="button"
+                      onClick={() => verifyByDocNo(c.document_no)}
+                      className="rounded-md border border-primary/40 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10"
+                    >
+                      Verify
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {result?.error && (
         <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {result.error}
