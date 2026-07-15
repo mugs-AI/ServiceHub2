@@ -230,6 +230,38 @@ function AdminSnapshots() {
     await reloadPreview();
   }, [running, reloadHealth, reloadPreview]);
 
+  const runFullSync = useCallback(async () => {
+    if (running) return;
+    setRunning("full");
+    setOrch(null);
+    try {
+      const res = await authFetch("/api/sync/full", { method: "POST" });
+      const json = (await res.json()) as { orchestration?: Record<string, unknown>; error?: string };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setOrch(json.orchestration ?? null);
+    } catch (err) {
+      setOrch({ overall_status: "failed", safe_error_summary: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setRunning(null);
+      await reloadHealth();
+      await reloadPreview();
+    }
+  }, [running, reloadHealth, reloadPreview]);
+
+  const loadIdentity = useCallback(async () => {
+    setIdentityBusy(true);
+    try {
+      const res = await authFetch("/api/diagnostics/identity");
+      const json = (await res.json()) as Record<string, unknown> & { error?: string };
+      if (!res.ok || json.error) throw new Error((json.error as string) ?? `HTTP ${res.status}`);
+      setIdentity(json);
+    } catch (err) {
+      setIdentity({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setIdentityBusy(false);
+    }
+  }, []);
+
   const openDiagnostics = useCallback(async (type: "customers" | "stock" | "contract") => {
     setDiagBusy(true);
     setDiag(null);
