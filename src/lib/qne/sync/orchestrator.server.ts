@@ -96,7 +96,7 @@ async function refreshEntitlementDisplay(tenantCode: string) {
       }
     }
     if (Object.keys(patch).length > 0) {
-      await supabaseAdmin.from("customer_subscription_snapshots").update(patch).eq("id", row.id);
+      await supabaseAdmin.from("customer_subscription_snapshots").update(patch as never).eq("id", row.id);
       refreshed += 1;
     }
   }
@@ -114,7 +114,7 @@ async function refreshEntitlementDisplay(tenantCode: string) {
     if (s.code && s.code !== m.stock_code) patch.stock_code = s.code;
     if (s.name && s.name !== m.stock_name) patch.stock_name = s.name;
     if (Object.keys(patch).length > 0) {
-      await supabaseAdmin.from("renewal_stock_mappings").update(patch).eq("id", m.id);
+      await supabaseAdmin.from("renewal_stock_mappings").update(patch as never).eq("id", m.id);
       refreshed += 1;
     }
   }
