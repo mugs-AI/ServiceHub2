@@ -135,13 +135,17 @@ function AdminSnapshots() {
   const [healthErr, setHealthErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [previewErr, setPreviewErr] = useState<string | null>(null);
-  const [running, setRunning] = useState<SnapshotKind | "all" | null>(null);
+  const [running, setRunning] = useState<SnapshotKind | "all" | "full" | null>(null);
   const [lastResults, setLastResults] = useState<Record<string, SyncResult>>({});
   const [diag, setDiag] = useState<DiagnosticsResponse | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
 
   const [recoverBusy, setRecoverBusy] = useState(false);
   const [recoverMsg, setRecoverMsg] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [orch, setOrch] = useState<Record<string, unknown> | null>(null);
+  const [identity, setIdentity] = useState<Record<string, unknown> | null>(null);
+  const [identityBusy, setIdentityBusy] = useState(false);
 
   const reloadHealth = useCallback(async () => {
     setHealthErr(null);
@@ -225,6 +229,38 @@ function AdminSnapshots() {
     await reloadHealth();
     await reloadPreview();
   }, [running, reloadHealth, reloadPreview]);
+
+  const runFullSync = useCallback(async () => {
+    if (running) return;
+    setRunning("full");
+    setOrch(null);
+    try {
+      const res = await authFetch("/api/sync/full", { method: "POST" });
+      const json = (await res.json()) as { orchestration?: Record<string, unknown>; error?: string };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setOrch(json.orchestration ?? null);
+    } catch (err) {
+      setOrch({ overall_status: "failed", safe_error_summary: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setRunning(null);
+      await reloadHealth();
+      await reloadPreview();
+    }
+  }, [running, reloadHealth, reloadPreview]);
+
+  const loadIdentity = useCallback(async () => {
+    setIdentityBusy(true);
+    try {
+      const res = await authFetch("/api/diagnostics/identity");
+      const json = (await res.json()) as Record<string, unknown> & { error?: string };
+      if (!res.ok || json.error) throw new Error((json.error as string) ?? `HTTP ${res.status}`);
+      setIdentity(json);
+    } catch (err) {
+      setIdentity({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setIdentityBusy(false);
+    }
+  }, []);
 
   const openDiagnostics = useCallback(async (type: "customers" | "stock" | "contract") => {
     setDiagBusy(true);
@@ -337,52 +373,141 @@ function AdminSnapshots() {
       )}
 
 
-      {/* Actions */}
+      {/* Unified Sync */}
       <section className="rounded-lg border bg-card p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Snapshot actions</h2>
+          <h2 className="text-sm font-semibold text-foreground">Sync N3 Data</h2>
           <div className="text-xs text-muted-foreground">
             {mappingCount} active renewal stock mapping{mappingCount === 1 ? "" : "s"} configured
           </div>
         </div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Runs the full pipeline in order: Customers → Stock → Subscriptions
+          (headers, details, events, rebuild) → Refresh display Codes and Names.
+          Safe to re-run at any time.
+        </p>
         <div className="flex flex-wrap gap-2">
           <button
             disabled={busy}
-            onClick={() => runSync("customers")}
-            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            onClick={runFullSync}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {running === "customers" ? "Syncing…" : "Sync Customers"}
-          </button>
-          <button
-            disabled={busy}
-            onClick={() => runSync("stock")}
-            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {running === "stock" ? "Syncing…" : "Sync Stock"}
-          </button>
-          <button
-            disabled={busy}
-            onClick={() => runSync("subscriptions")}
-            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {running === "subscriptions"
-              ? "Syncing…"
-              : "Sync Transaction Details & Recalculate Subscriptions"}
-          </button>
-          <button
-            disabled={busy}
-            onClick={runAll}
-            className="rounded-md border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
-          >
-            {running === "all" ? "Running all…" : "Run All"}
+            {running === "full" ? "Running full sync…" : "Sync N3 Data & Recalculate"}
           </button>
         </div>
         {mappingCount === 0 && (
           <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            No Renewal Stock Mapping is configured for this tenant. Contract
+            No Renewal Stock Mapping is configured for this tenant. Subscription
             recalculation will produce Unknown status for every customer until
             you add mappings.
           </p>
+        )}
+        {orch && (
+          <div className="mt-3 rounded-md border bg-muted/40 p-3 text-xs">
+            <div className="font-medium">
+              Last run: {String(orch.overall_status ?? "—")}
+              {typeof orch.total_duration_ms === "number"
+                ? ` · ${Math.round(orch.total_duration_ms / 1000)}s`
+                : ""}
+            </div>
+            {orch.safe_error_summary ? (
+              <div className="mt-1 text-red-700">Error: {String(orch.safe_error_summary)}</div>
+            ) : null}
+          </div>
+        )}
+        <details className="mt-4" open={showAdvanced} onToggle={(e) => setShowAdvanced((e.target as HTMLDetailsElement).open)}>
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+            Advanced — run stages individually
+          </summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              disabled={busy}
+              onClick={() => runSync("customers")}
+              className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              {running === "customers" ? "Syncing…" : "Sync Customers only"}
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => runSync("stock")}
+              className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              {running === "stock" ? "Syncing…" : "Sync Stock only"}
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => runSync("subscriptions")}
+              className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              {running === "subscriptions" ? "Syncing…" : "Sync Subscriptions only"}
+            </button>
+            <button
+              disabled={busy}
+              onClick={runAll}
+              className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              {running === "all" ? "Running all…" : "Run All (legacy)"}
+            </button>
+          </div>
+        </details>
+      </section>
+
+      {/* Identity Verification */}
+      <section className="rounded-lg border bg-card p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Identity Verification</h2>
+          <button
+            disabled={identityBusy}
+            onClick={loadIdentity}
+            className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+          >
+            {identityBusy ? "Loading…" : identity ? "Refresh" : "Load"}
+          </button>
+        </div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Shows N3 Identity (n3_customer_id / n3_stock_id) coverage across your
+          snapshot tables plus the most recent identity backfill and merge
+          activity. Rows without an N3 ID are legacy and will be linked on
+          the next sync when the matching N3 record is seen.
+        </p>
+        {identity && !("error" in identity) && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(["customers", "stock", "renewal_mappings"] as const).map((k) => {
+                const c = (identity.coverage as Record<string, { total: number; with_n3_id: number; without_n3_id: number }>)[k];
+                if (!c) return null;
+                const pct = c.total > 0 ? Math.round((c.with_n3_id / c.total) * 100) : 0;
+                return (
+                  <div key={k} className="rounded-md border p-2 text-xs">
+                    <div className="font-medium capitalize">{k.replace("_", " ")}</div>
+                    <div className="text-muted-foreground">
+                      {c.with_n3_id}/{c.total} linked ({pct}%)
+                    </div>
+                    {c.without_n3_id > 0 && (
+                      <div className="text-amber-700">{c.without_n3_id} legacy</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {Array.isArray(identity.recentBackfill) && identity.recentBackfill.length > 0 && (
+              <div>
+                <div className="mb-1 text-xs font-medium">Recent identity events</div>
+                <ul className="space-y-1 text-xs text-muted-foreground">
+                  {(identity.recentBackfill as Array<Record<string, unknown>>).slice(0, 10).map((b, i) => (
+                    <li key={i} className="font-mono">
+                      {String(b.entity_type)} · {String(b.match_method)} · {String(b.migration_status)}
+                      {b.natural_key ? ` · ${String(b.natural_key)}` : ""}
+                      {b.notes ? ` — ${String(b.notes).slice(0, 100)}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+        {identity && "error" in identity && (
+          <p className="text-xs text-red-700">Error: {String(identity.error)}</p>
         )}
       </section>
 

@@ -986,6 +986,78 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_orchestrations: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_stage: string | null
+          current_stage_index: number
+          current_stage_progress: Json
+          customer_result: Json | null
+          customer_run_id: string | null
+          id: string
+          last_heartbeat_at: string
+          orchestration_type: string
+          overall_status: string
+          safe_error_summary: string | null
+          started_at: string
+          stock_result: Json | null
+          stock_run_id: string | null
+          subscription_result: Json | null
+          subscription_run_id: string | null
+          tenant_code: string
+          total_duration_ms: number | null
+          total_stages: number
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_stage?: string | null
+          current_stage_index?: number
+          current_stage_progress?: Json
+          customer_result?: Json | null
+          customer_run_id?: string | null
+          id?: string
+          last_heartbeat_at?: string
+          orchestration_type?: string
+          overall_status?: string
+          safe_error_summary?: string | null
+          started_at?: string
+          stock_result?: Json | null
+          stock_run_id?: string | null
+          subscription_result?: Json | null
+          subscription_run_id?: string | null
+          tenant_code: string
+          total_duration_ms?: number | null
+          total_stages?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_stage?: string | null
+          current_stage_index?: number
+          current_stage_progress?: Json
+          customer_result?: Json | null
+          customer_run_id?: string | null
+          id?: string
+          last_heartbeat_at?: string
+          orchestration_type?: string
+          overall_status?: string
+          safe_error_summary?: string | null
+          started_at?: string
+          stock_result?: Json | null
+          stock_run_id?: string | null
+          subscription_result?: Json | null
+          subscription_run_id?: string | null
+          tenant_code?: string
+          total_duration_ms?: number | null
+          total_stages?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sync_runs: {
         Row: {
           completed_at: string | null

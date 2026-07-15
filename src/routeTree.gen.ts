@@ -25,6 +25,7 @@ import { Route as ApiWorkspaceCustomerSubscriptionsRouteImport } from './routes/
 import { Route as ApiSyncSubscriptionsRouteImport } from './routes/api/sync/subscriptions'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncRecoverStaleRouteImport } from './routes/api/sync/recover-stale'
+import { Route as ApiSyncFullRouteImport } from './routes/api/sync/full'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
 import { Route as ApiSettingsSubscriptionCategoriesRouteImport } from './routes/api/settings/subscription-categories'
@@ -34,6 +35,7 @@ import { Route as ApiDiagnosticsVerifyDocumentRouteImport } from './routes/api/d
 import { Route as ApiDiagnosticsSubscriptionRunRouteImport } from './routes/api/diagnostics/subscription-run'
 import { Route as ApiDiagnosticsSubscriptionPreviewRouteImport } from './routes/api/diagnostics/subscription-preview'
 import { Route as ApiDiagnosticsPreviewRouteImport } from './routes/api/diagnostics/preview'
+import { Route as ApiDiagnosticsIdentityRouteImport } from './routes/api/diagnostics/identity'
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
 import { Route as ApiDiagnosticsDocumentSearchRouteImport } from './routes/api/diagnostics/document-search'
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
@@ -121,6 +123,11 @@ const ApiSyncRecoverStaleRoute = ApiSyncRecoverStaleRouteImport.update({
   path: '/api/sync/recover-stale',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSyncFullRoute = ApiSyncFullRouteImport.update({
+  id: '/api/sync/full',
+  path: '/api/sync/full',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSyncCustomersRoute = ApiSyncCustomersRouteImport.update({
   id: '/api/sync/customers',
   path: '/api/sync/customers',
@@ -171,6 +178,11 @@ const ApiDiagnosticsPreviewRoute = ApiDiagnosticsPreviewRouteImport.update({
   path: '/api/diagnostics/preview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDiagnosticsIdentityRoute = ApiDiagnosticsIdentityRouteImport.update({
+  id: '/api/diagnostics/identity',
+  path: '/api/diagnostics/identity',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDiagnosticsHealthRoute = ApiDiagnosticsHealthRouteImport.update({
   id: '/api/diagnostics/health',
   path: '/api/diagnostics/health',
@@ -215,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
+  '/api/diagnostics/identity': typeof ApiDiagnosticsIdentityRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
@@ -224,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/full': typeof ApiSyncFullRoute
   '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
@@ -247,6 +261,7 @@ export interface FileRoutesByTo {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
+  '/api/diagnostics/identity': typeof ApiDiagnosticsIdentityRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
@@ -256,6 +271,7 @@ export interface FileRoutesByTo {
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/full': typeof ApiSyncFullRoute
   '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
@@ -280,6 +296,7 @@ export interface FileRoutesById {
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
+  '/api/diagnostics/identity': typeof ApiDiagnosticsIdentityRoute
   '/api/diagnostics/preview': typeof ApiDiagnosticsPreviewRoute
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
@@ -289,6 +306,7 @@ export interface FileRoutesById {
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
+  '/api/sync/full': typeof ApiSyncFullRoute
   '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
@@ -314,6 +332,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
+    | '/api/diagnostics/identity'
     | '/api/diagnostics/preview'
     | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
@@ -323,6 +342,7 @@ export interface FileRouteTypes {
     | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
+    | '/api/sync/full'
     | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
@@ -346,6 +366,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
+    | '/api/diagnostics/identity'
     | '/api/diagnostics/preview'
     | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
@@ -355,6 +376,7 @@ export interface FileRouteTypes {
     | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
+    | '/api/sync/full'
     | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
@@ -378,6 +400,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/$type'
     | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
+    | '/api/diagnostics/identity'
     | '/api/diagnostics/preview'
     | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
@@ -387,6 +410,7 @@ export interface FileRouteTypes {
     | '/api/settings/subscription-categories'
     | '/api/sync/contracts'
     | '/api/sync/customers'
+    | '/api/sync/full'
     | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
@@ -411,6 +435,7 @@ export interface RootRouteChildren {
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
   ApiDiagnosticsDocumentSearchRoute: typeof ApiDiagnosticsDocumentSearchRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
+  ApiDiagnosticsIdentityRoute: typeof ApiDiagnosticsIdentityRoute
   ApiDiagnosticsPreviewRoute: typeof ApiDiagnosticsPreviewRoute
   ApiDiagnosticsSubscriptionPreviewRoute: typeof ApiDiagnosticsSubscriptionPreviewRoute
   ApiDiagnosticsSubscriptionRunRoute: typeof ApiDiagnosticsSubscriptionRunRoute
@@ -420,6 +445,7 @@ export interface RootRouteChildren {
   ApiSettingsSubscriptionCategoriesRoute: typeof ApiSettingsSubscriptionCategoriesRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
+  ApiSyncFullRoute: typeof ApiSyncFullRoute
   ApiSyncRecoverStaleRoute: typeof ApiSyncRecoverStaleRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
   ApiSyncSubscriptionsRoute: typeof ApiSyncSubscriptionsRoute
@@ -541,6 +567,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSyncRecoverStaleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sync/full': {
+      id: '/api/sync/full'
+      path: '/api/sync/full'
+      fullPath: '/api/sync/full'
+      preLoaderRoute: typeof ApiSyncFullRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sync/customers': {
       id: '/api/sync/customers'
       path: '/api/sync/customers'
@@ -604,6 +637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDiagnosticsPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/diagnostics/identity': {
+      id: '/api/diagnostics/identity'
+      path: '/api/diagnostics/identity'
+      fullPath: '/api/diagnostics/identity'
+      preLoaderRoute: typeof ApiDiagnosticsIdentityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/diagnostics/health': {
       id: '/api/diagnostics/health'
       path: '/api/diagnostics/health'
@@ -659,6 +699,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
   ApiDiagnosticsDocumentSearchRoute: ApiDiagnosticsDocumentSearchRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
+  ApiDiagnosticsIdentityRoute: ApiDiagnosticsIdentityRoute,
   ApiDiagnosticsPreviewRoute: ApiDiagnosticsPreviewRoute,
   ApiDiagnosticsSubscriptionPreviewRoute:
     ApiDiagnosticsSubscriptionPreviewRoute,
@@ -670,6 +711,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiSettingsSubscriptionCategoriesRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
+  ApiSyncFullRoute: ApiSyncFullRoute,
   ApiSyncRecoverStaleRoute: ApiSyncRecoverStaleRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
   ApiSyncSubscriptionsRoute: ApiSyncSubscriptionsRoute,

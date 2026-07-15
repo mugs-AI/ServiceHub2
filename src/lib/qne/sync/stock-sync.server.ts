@@ -79,6 +79,9 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
     const BATCH = 200;
     let batch: Row[] = [];
     let processed = 0;
+    const seenApiIds = new Set<string>();
+    let renamed = 0;
+    let duplicates_from_api_ignored = 0;
 
     const flush = async () => {
       if (batch.length === 0) return;
@@ -95,8 +98,10 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
           counters.inserted += 1;
           toInsert.push(r);
         } else if (rowChanged(existing, r)) {
-          counters.updated += 1;
-          toUpdate.push({ id: existing.id, row: r, prevCode: (existing.stock_code as string) ?? null });
+          const prevCode = (existing.stock_code as string) ?? null;
+          if (r.n3_stock_id && prevCode && prevCode !== r.stock_code) renamed += 1;
+          else counters.updated += 1;
+          toUpdate.push({ id: existing.id, row: r, prevCode });
         } else {
           counters.skipped += 1;
         }
@@ -148,6 +153,13 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
         counters.skipped += 1;
         continue;
       }
+      if (norm.n3_stock_id) {
+        if (seenApiIds.has(norm.n3_stock_id)) {
+          duplicates_from_api_ignored += 1;
+          continue;
+        }
+        seenApiIds.add(norm.n3_stock_id);
+      }
       batch.push(norm);
       processed += 1;
       if (batch.length >= BATCH) {
@@ -174,6 +186,55 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
       }
     }
 
-    await heartbeat("completed", { processed, renamed: mappingUpdates.size });
+    // Merge lingering Supabase-side duplicates that share (tenant, n3_stock_id).
+    await heartbeat("merging legacy duplicate stock rows");
+    let merged = 0;
+    const { data: dupCheck } = await supabaseAdmin
+      .from("stock_snapshots")
+      .select("id, n3_stock_id, stock_code, updated_at")
+      .eq("tenant_code", tenantCode)
+      .not("n3_stock_id", "is", null);
+    const groups = new Map<string, Array<{ id: string; updated_at: string; stock_code: string }>>();
+    for (const r of dupCheck ?? []) {
+      if (!r.n3_stock_id) continue;
+      const arr = groups.get(r.n3_stock_id) ?? [];
+      arr.push(r as never);
+      groups.set(r.n3_stock_id, arr);
+    }
+    for (const [n3Id, rows] of groups) {
+      if (rows.length < 2) continue;
+      rows.sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
+      const keeper = rows[0];
+      for (const l of rows.slice(1)) {
+        const { error } = await supabaseAdmin.from("stock_snapshots").delete().eq("id", l.id);
+        if (error) {
+          console.warn("[stock-sync] merge delete failed", l.id, error.message);
+          continue;
+        }
+        merged += 1;
+        await supabaseAdmin.from("snapshot_identity_backfill").insert({
+          tenant_code: tenantCode,
+          entity_type: "stock",
+          entity_id: keeper.id,
+          natural_key: l.stock_code,
+          n3_id: n3Id,
+          match_method: "post_sync_dedupe",
+          confidence: "high",
+          migration_status: "merged",
+          notes: `Merged legacy duplicate stock row (code ${l.stock_code}) into canonical (code ${keeper.stock_code}).`,
+        });
+      }
+    }
+
+    counters.details = {
+      received: processed,
+      unique_n3_ids: seenApiIds.size,
+      renamed,
+      duplicates_from_api_ignored,
+      renamed_mappings_refreshed: mappingUpdates.size,
+      merged,
+    };
+
+    await heartbeat("completed", { processed, renamed, merged });
   });
 }
