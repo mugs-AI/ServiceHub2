@@ -4,6 +4,13 @@
 // a duplicate. Falls back to (tenant, customer_code) when the incoming row
 // has no id (legacy) or when backfilling an existing row that predates the
 // n3_customer_id column.
+//
+// Pass 3 additions:
+//   - Deduplicate incoming N3 rows by n3_customer_id before writing.
+//   - After the pull, merge any pre-existing Supabase duplicates that share
+//     the same (tenant, n3_customer_id) into a single canonical row so a
+//     rename never leaves the old code row behind.
+//   - Extended counters: renamed / duplicates_from_api_ignored / merged.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
@@ -78,28 +85,32 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
 
     const { data: existingRows, error: existingErr } = await supabaseAdmin
       .from("customer_snapshots")
-      .select("id, n3_customer_id, customer_code, customer_name, contact_person, phone, email, address, n3_status");
+      .select("id, n3_customer_id, customer_code, customer_name, contact_person, phone, email, address, n3_status, updated_at");
     if (existingErr) throw new Error(`Load existing customers failed: ${existingErr.message}`);
 
-    // Two lookup maps: primary by N3 ID (immutable), fallback by code (legacy).
     const byId = new Map<string, Record<string, unknown> & { id: string }>();
     const byCode = new Map<string, Record<string, unknown> & { id: string }>();
     for (const r of existingRows ?? []) {
-      if (r.n3_customer_id) byId.set(r.n3_customer_id, r as Record<string, unknown> & { id: string });
-      if (r.customer_code) byCode.set(r.customer_code, r as Record<string, unknown> & { id: string });
+      if (r.n3_customer_id) byId.set(r.n3_customer_id, r as never);
+      if (r.customer_code) byCode.set(r.customer_code, r as never);
     }
+
+    // Counters exposed on the sync log details.
+    let received = 0;
+    let renamed = 0;
+    let duplicates_from_api_ignored = 0;
+    let unchanged = 0;
 
     const BATCH = 200;
     let batch: Row[] = [];
-    let processed = 0;
+    const seenApiIds = new Set<string>();
 
     const flush = async () => {
       if (batch.length === 0) return;
       const toInsert: Row[] = [];
-      const toUpdate: Array<{ id: string; row: Row }> = [];
+      const toUpdate: Array<{ id: string; row: Row; prevCode: string | null; hadId: boolean }> = [];
 
       for (const r of batch) {
-        // Match order: N3 id → legacy code. Never both.
         const existing =
           (r.n3_customer_id && byId.get(r.n3_customer_id)) ||
           (r.customer_code && byCode.get(r.customer_code)) ||
@@ -109,9 +120,18 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
           counters.inserted += 1;
           toInsert.push(r);
         } else if (rowChanged(existing, r)) {
-          counters.updated += 1;
-          toUpdate.push({ id: existing.id, row: r });
+          const prevCode = (existing.customer_code as string) ?? null;
+          const isRename = !!r.n3_customer_id && prevCode !== null && prevCode !== r.customer_code;
+          if (isRename) renamed += 1;
+          else counters.updated += 1;
+          toUpdate.push({
+            id: existing.id,
+            row: r,
+            prevCode,
+            hadId: !!existing.n3_customer_id,
+          });
         } else {
+          unchanged += 1;
           counters.skipped += 1;
         }
       }
@@ -132,7 +152,7 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
         }
       }
 
-      for (const { id, row } of toUpdate) {
+      for (const { id, row, prevCode, hadId } of toUpdate) {
         const { error } = await supabaseAdmin
           .from("customer_snapshots")
           .update(row)
@@ -141,7 +161,20 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
           counters.failed += 1;
           throw new Error(`Update customer ${id} failed: ${error.message}`);
         }
-        // Refresh cache in case code changed (rename case).
+        // Legacy row backfilled with N3 ID → record it.
+        if (!hadId && row.n3_customer_id) {
+          await supabaseAdmin.from("snapshot_identity_backfill").insert({
+            tenant_code: tenantCode,
+            entity_type: "customer",
+            entity_id: id,
+            natural_key: prevCode,
+            n3_id: row.n3_customer_id,
+            match_method: "sync_pull_matched_code",
+            confidence: "high",
+            migration_status: "resolved",
+            notes: "Backfilled N3 Customer ID during sync (matched by Code).",
+          });
+        }
         if (row.n3_customer_id) byId.set(row.n3_customer_id, { id, ...row } as never);
         if (row.customer_code) byCode.set(row.customer_code, { id, ...row } as never);
       }
@@ -151,19 +184,86 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
 
     const ep = N3_ENDPOINTS["customers.list"];
     for await (const raw of n3IterateList<N3Customer>(ctx.token, ep.target, ep.path)) {
+      received += 1;
       const norm = normalise(raw, tenantCode);
       if (!norm.customer_code && !norm.n3_customer_id) {
         counters.skipped += 1;
         continue;
       }
+      // Dedupe the API stream by immutable ID (the same tenant should never
+      // list the same customer twice, but guard anyway).
+      if (norm.n3_customer_id) {
+        if (seenApiIds.has(norm.n3_customer_id)) {
+          duplicates_from_api_ignored += 1;
+          continue;
+        }
+        seenApiIds.add(norm.n3_customer_id);
+      }
       batch.push(norm);
-      processed += 1;
       if (batch.length >= BATCH) {
         await flush();
-        await heartbeat("upserting customers", { processed });
+        await heartbeat("upserting customers", { processed: received });
       }
     }
     await flush();
-    await heartbeat("completed", { processed });
+
+    // Post-pull merge: any lingering duplicates that share (tenant, n3_customer_id)
+    // from historic renames. Keep the canonical row (highest updated_at),
+    // delete the others. Renewal events / entitlements already carry
+    // n3_customer_id so display data is preserved.
+    await heartbeat("merging legacy duplicate customers");
+    let merged = 0;
+    const { data: dupCheck } = await supabaseAdmin
+      .from("customer_snapshots")
+      .select("id, n3_customer_id, customer_code, updated_at")
+      .eq("tenant_code", tenantCode)
+      .not("n3_customer_id", "is", null);
+
+    const groups = new Map<string, Array<{ id: string; updated_at: string; customer_code: string }>>();
+    for (const r of dupCheck ?? []) {
+      if (!r.n3_customer_id) continue;
+      const arr = groups.get(r.n3_customer_id) ?? [];
+      arr.push(r as never);
+      groups.set(r.n3_customer_id, arr);
+    }
+    for (const [n3Id, rows] of groups) {
+      if (rows.length < 2) continue;
+      rows.sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
+      const keeper = rows[0];
+      const losers = rows.slice(1);
+      for (const l of losers) {
+        const { error } = await supabaseAdmin
+          .from("customer_snapshots")
+          .delete()
+          .eq("id", l.id);
+        if (error) {
+          console.warn("[customer-sync] merge delete failed", l.id, error.message);
+          continue;
+        }
+        merged += 1;
+        await supabaseAdmin.from("snapshot_identity_backfill").insert({
+          tenant_code: tenantCode,
+          entity_type: "customer",
+          entity_id: keeper.id,
+          natural_key: l.customer_code,
+          n3_id: n3Id,
+          match_method: "post_sync_dedupe",
+          confidence: "high",
+          migration_status: "merged",
+          notes: `Merged legacy duplicate row (code ${l.customer_code}) into canonical row (code ${keeper.customer_code}).`,
+        });
+      }
+    }
+
+    counters.details = {
+      received,
+      unique_n3_ids: seenApiIds.size,
+      renamed,
+      unchanged,
+      merged,
+      duplicates_from_api_ignored,
+    };
+
+    await heartbeat("completed", { received, renamed, merged });
   });
 }
