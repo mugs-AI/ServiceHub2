@@ -135,13 +135,17 @@ function AdminSnapshots() {
   const [healthErr, setHealthErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [previewErr, setPreviewErr] = useState<string | null>(null);
-  const [running, setRunning] = useState<SnapshotKind | "all" | null>(null);
+  const [running, setRunning] = useState<SnapshotKind | "all" | "full" | null>(null);
   const [lastResults, setLastResults] = useState<Record<string, SyncResult>>({});
   const [diag, setDiag] = useState<DiagnosticsResponse | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
 
   const [recoverBusy, setRecoverBusy] = useState(false);
   const [recoverMsg, setRecoverMsg] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [orch, setOrch] = useState<Record<string, unknown> | null>(null);
+  const [identity, setIdentity] = useState<Record<string, unknown> | null>(null);
+  const [identityBusy, setIdentityBusy] = useState(false);
 
   const reloadHealth = useCallback(async () => {
     setHealthErr(null);
