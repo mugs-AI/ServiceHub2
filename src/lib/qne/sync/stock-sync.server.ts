@@ -79,6 +79,9 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
     const BATCH = 200;
     let batch: Row[] = [];
     let processed = 0;
+    const seenApiIds = new Set<string>();
+    let renamed = 0;
+    let duplicates_from_api_ignored = 0;
 
     const flush = async () => {
       if (batch.length === 0) return;
@@ -95,8 +98,10 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
           counters.inserted += 1;
           toInsert.push(r);
         } else if (rowChanged(existing, r)) {
-          counters.updated += 1;
-          toUpdate.push({ id: existing.id, row: r, prevCode: (existing.stock_code as string) ?? null });
+          const prevCode = (existing.stock_code as string) ?? null;
+          if (r.n3_stock_id && prevCode && prevCode !== r.stock_code) renamed += 1;
+          else counters.updated += 1;
+          toUpdate.push({ id: existing.id, row: r, prevCode });
         } else {
           counters.skipped += 1;
         }
