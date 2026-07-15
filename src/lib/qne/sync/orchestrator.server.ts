@@ -54,13 +54,6 @@ async function updateOrch(id: string, patch: Record<string, unknown>) {
  * are present so a code-only legacy row is never overwritten with NULL.
  */
 async function refreshEntitlementDisplay(tenantCode: string) {
-  // Customer display
-  await supabaseAdmin.rpc("void_noop").select().limit(0).then(() => {}).catch(() => {});
-  await supabaseAdmin
-    .from("customer_subscription_snapshots")
-    .select("id")
-    .limit(0); // warm-up no-op
-
   // Fetch masters
   const [{ data: cust }, { data: stock }] = await Promise.all([
     supabaseAdmin
