@@ -292,6 +292,7 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
       received,
       unique_n3_ids: seenApiIds.size,
       renamed,
+      legacy_name_merged,
       unchanged,
       merged,
       duplicates_from_api_ignored,
