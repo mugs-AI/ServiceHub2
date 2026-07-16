@@ -183,7 +183,7 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
         }
       }
 
-      for (const { id, row, prevCode, hadId } of toUpdate) {
+      for (const { id, row, prevCode, hadId, legacyName } of toUpdate) {
         const { error } = await supabaseAdmin
           .from("customer_snapshots")
           .update(row)
@@ -200,10 +200,12 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
             entity_id: id,
             natural_key: prevCode,
             n3_id: row.n3_customer_id,
-            match_method: "sync_pull_matched_code",
-            confidence: "high",
+            match_method: legacyName ? "sync_pull_matched_name" : "sync_pull_matched_code",
+            confidence: legacyName ? "medium" : "high",
             migration_status: "resolved",
-            notes: "Backfilled N3 Customer ID during sync (matched by Code).",
+            notes: legacyName
+              ? `Backfilled N3 Customer ID during sync (matched by unique customer_name; previous Code ${prevCode ?? "n/a"} → ${row.customer_code}).`
+              : "Backfilled N3 Customer ID during sync (matched by Code).",
           });
         }
         if (row.n3_customer_id) byId.set(row.n3_customer_id, { id, ...row } as never);
