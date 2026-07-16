@@ -90,14 +90,31 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
 
     const byId = new Map<string, Record<string, unknown> & { id: string }>();
     const byCode = new Map<string, Record<string, unknown> & { id: string }>();
+    // Legacy null-id rows keyed by normalised customer_name — used as a
+    // last-resort match for API rows whose immutable ID has not been linked
+    // to any existing snapshot yet AND whose current N3 Code no longer
+    // matches the stored (renamed) Code. Only entries where exactly ONE
+    // legacy null-id row shares that name are trusted.
+    const nameCounts = new Map<string, number>();
+    const nameToRow = new Map<string, Record<string, unknown> & { id: string }>();
+    const normName = (s: unknown) =>
+      typeof s === "string" ? s.trim().toLowerCase() : "";
     for (const r of existingRows ?? []) {
       if (r.n3_customer_id) byId.set(r.n3_customer_id, r as never);
       if (r.customer_code) byCode.set(r.customer_code, r as never);
+      if (!r.n3_customer_id) {
+        const key = normName(r.customer_name);
+        if (key) {
+          nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+          nameToRow.set(key, r as never);
+        }
+      }
     }
 
     // Counters exposed on the sync log details.
     let received = 0;
     let renamed = 0;
+    let legacy_name_merged = 0;
     let duplicates_from_api_ignored = 0;
     let unchanged = 0;
 
@@ -108,27 +125,41 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
     const flush = async () => {
       if (batch.length === 0) return;
       const toInsert: Row[] = [];
-      const toUpdate: Array<{ id: string; row: Row; prevCode: string | null; hadId: boolean }> = [];
+      const toUpdate: Array<{ id: string; row: Row; prevCode: string | null; hadId: boolean; legacyName: boolean }> = [];
 
       for (const r of batch) {
-        const existing =
+        let existing =
           (r.n3_customer_id && byId.get(r.n3_customer_id)) ||
           (r.customer_code && byCode.get(r.customer_code)) ||
           undefined;
+        let legacyName = false;
+        // Fallback: legacy null-id row with the same customer_name (unique).
+        if (!existing && r.n3_customer_id) {
+          const key = normName(r.customer_name);
+          if (key && nameCounts.get(key) === 1) {
+            const candidate = nameToRow.get(key);
+            if (candidate && !candidate.n3_customer_id) {
+              existing = candidate;
+              legacyName = true;
+            }
+          }
+        }
 
         if (!existing) {
           counters.inserted += 1;
           toInsert.push(r);
-        } else if (rowChanged(existing, r)) {
+        } else if (rowChanged(existing, r) || legacyName) {
           const prevCode = (existing.customer_code as string) ?? null;
           const isRename = !!r.n3_customer_id && prevCode !== null && prevCode !== r.customer_code;
-          if (isRename) renamed += 1;
+          if (legacyName) legacy_name_merged += 1;
+          else if (isRename) renamed += 1;
           else counters.updated += 1;
           toUpdate.push({
             id: existing.id,
             row: r,
             prevCode,
             hadId: !!existing.n3_customer_id,
+            legacyName,
           });
         } else {
           unchanged += 1;
