@@ -50,7 +50,7 @@ export const Route = createFileRoute("/api/workspace/customers")({
           const { data, error } = await supabaseAdmin
             .from("customer_snapshots")
             .select(
-              "customer_code, customer_name, contact_person, phone, email, last_synced_at",
+              "n3_customer_id, customer_code, customer_name, contact_person, phone, email, last_synced_at",
             )
             .eq("tenant_code", tenant)
             .or(
@@ -62,11 +62,26 @@ export const Route = createFileRoute("/api/workspace/customers")({
                 `email.ilike.${like}`,
               ].join(","),
             )
-            .limit(MAX_RESULTS);
+            .limit(MAX_RESULTS * 2);
           if (error) throw error;
 
+          // Deduplicate by immutable N3 Customer ID — prefer the row that
+          // already carries the ID (canonical) over any legacy null-id row
+          // that lingers before the next sync clears it.
+          const byIdentity = new Map<string, (typeof data)[number]>();
+          const legacyOnly: typeof data = [];
+          for (const r of data ?? []) {
+            if (r.n3_customer_id) {
+              const prev = byIdentity.get(r.n3_customer_id);
+              if (!prev) byIdentity.set(r.n3_customer_id, r);
+            } else {
+              legacyOnly.push(r);
+            }
+          }
+          const deduped = [...byIdentity.values(), ...legacyOnly];
+
           const qLower = qRaw.toLowerCase();
-          const rows = (data ?? [])
+          const rows = deduped
             .map((r) => ({
               ...r,
               _exact: (r.customer_code ?? "").toLowerCase() === qLower ? 0 : 1,
@@ -78,7 +93,8 @@ export const Route = createFileRoute("/api/workspace/customers")({
               if (an !== bn) return an < bn ? -1 : 1;
               return (a.customer_code ?? "").localeCompare(b.customer_code ?? "");
             })
-            .map(({ _exact: _e, ...rest }) => rest);
+            .slice(0, MAX_RESULTS)
+            .map(({ _exact: _e, n3_customer_id: _n, ...rest }) => rest);
 
           return Response.json({
             query: qRaw,
