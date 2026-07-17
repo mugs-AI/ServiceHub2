@@ -195,14 +195,32 @@ export async function syncContractSnapshots(
     //    that actually have a qualifying document. We NEVER manufacture
     //    Unknown rows for customers without qualifying documents.
     const targetKeys = Array.from(latestByCustomer.keys());
-    const { data: existingRows, error: existingErr } = await supabaseAdmin
-      .from("customer_contract_snapshots")
-      .select("customer_code, latest_document_no, latest_document_date, expiry_date, contract_status")
-      .eq("tenant_code", tenantCode)
-      .in("customer_code", targetKeys);
-    if (existingErr) throw new Error(`Load existing contracts failed: ${existingErr.message}`);
+    type ExistingContractRow = {
+      customer_code: string;
+      latest_document_no: string | null;
+      latest_document_date: string | null;
+      expiry_date: string | null;
+      contract_status: string | null;
+    };
+    const existingRows: ExistingContractRow[] = [];
+    const CHUNK = 500;
+    for (let i = 0; i < targetKeys.length; i += CHUNK) {
+      const slice = targetKeys.slice(i, i + CHUNK);
+      const chunkRows = await loadAllPaginated<ExistingContractRow>(
+        "customer_contract_snapshots.existingChunk",
+        (from, to) =>
+          supabaseAdmin
+            .from("customer_contract_snapshots")
+            .select("customer_code, latest_document_no, latest_document_date, expiry_date, contract_status")
+            .eq("tenant_code", tenantCode)
+            .in("customer_code", slice)
+            .order("customer_code", { ascending: true })
+            .range(from, to) as unknown as PromiseLike<{ data: ExistingContractRow[] | null; error: { message: string } | null }>,
+      );
+      existingRows.push(...chunkRows);
+    }
     const existingByCode = new Map<string, Record<string, unknown>>();
-    for (const r of existingRows ?? []) existingByCode.set(r.customer_code, r as Record<string, unknown>);
+    for (const r of existingRows) existingByCode.set(r.customer_code, r as unknown as Record<string, unknown>);
 
     const now = Date.now();
     const toUpsert: Array<Record<string, unknown>> = [];
