@@ -55,32 +55,60 @@ async function updateOrch(id: string, patch: Record<string, unknown>) {
  * are present so a code-only legacy row is never overwritten with NULL.
  */
 async function refreshEntitlementDisplay(tenantCode: string) {
-  // Fetch masters
-  const [{ data: cust }, { data: stock }] = await Promise.all([
-    supabaseAdmin
-      .from("customer_snapshots")
-      .select("n3_customer_id, customer_code, customer_name")
-      .eq("tenant_code", tenantCode)
-      .not("n3_customer_id", "is", null),
-    supabaseAdmin
-      .from("stock_snapshots")
-      .select("n3_stock_id, stock_code, stock_name")
-      .eq("tenant_code", tenantCode)
-      .not("n3_stock_id", "is", null),
+  type CustMaster = { n3_customer_id: string | null; customer_code: string; customer_name: string | null };
+  type StockMaster = { n3_stock_id: string | null; stock_code: string; stock_name: string | null };
+  const [cust, stock] = await Promise.all([
+    loadAllPaginated<CustMaster>(
+      "customer_snapshots.masterForDisplay",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_snapshots")
+          .select("n3_customer_id, customer_code, customer_name")
+          .eq("tenant_code", tenantCode)
+          .not("n3_customer_id", "is", null)
+          .order("n3_customer_id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: CustMaster[] | null; error: { message: string } | null }>,
+    ),
+    loadAllPaginated<StockMaster>(
+      "stock_snapshots.masterForDisplay",
+      (from, to) =>
+        supabaseAdmin
+          .from("stock_snapshots")
+          .select("n3_stock_id, stock_code, stock_name")
+          .eq("tenant_code", tenantCode)
+          .not("n3_stock_id", "is", null)
+          .order("n3_stock_id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: StockMaster[] | null; error: { message: string } | null }>,
+    ),
   ]);
 
   const custById = new Map<string, { code: string; name: string | null }>();
-  for (const c of cust ?? []) if (c.n3_customer_id) custById.set(c.n3_customer_id, { code: c.customer_code, name: c.customer_name });
+  for (const c of cust) if (c.n3_customer_id) custById.set(c.n3_customer_id, { code: c.customer_code, name: c.customer_name });
   const stockById = new Map<string, { code: string; name: string | null }>();
-  for (const s of stock ?? []) if (s.n3_stock_id) stockById.set(s.n3_stock_id, { code: s.stock_code, name: s.stock_name });
+  for (const s of stock) if (s.n3_stock_id) stockById.set(s.n3_stock_id, { code: s.stock_code, name: s.stock_name });
 
-  const { data: entRows } = await supabaseAdmin
-    .from("customer_subscription_snapshots")
-    .select("id, n3_customer_id, n3_stock_id, customer_code, customer_name, stock_code, stock_name")
-    .eq("tenant_code", tenantCode);
+  type EntRow = {
+    id: string;
+    n3_customer_id: string | null;
+    n3_stock_id: string | null;
+    customer_code: string | null;
+    customer_name: string | null;
+    stock_code: string | null;
+    stock_name: string | null;
+  };
+  const entRows = await loadAllPaginated<EntRow>(
+    "customer_subscription_snapshots.forDisplayRefresh",
+    (from, to) =>
+      supabaseAdmin
+        .from("customer_subscription_snapshots")
+        .select("id, n3_customer_id, n3_stock_id, customer_code, customer_name, stock_code, stock_name")
+        .eq("tenant_code", tenantCode)
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: EntRow[] | null; error: { message: string } | null }>,
+  );
 
   let refreshed = 0;
-  for (const row of entRows ?? []) {
+  for (const row of entRows) {
     const patch: Record<string, string | null> = {};
     if (row.n3_customer_id) {
       const c = custById.get(row.n3_customer_id);
@@ -102,13 +130,19 @@ async function refreshEntitlementDisplay(tenantCode: string) {
     }
   }
 
-  // Also refresh renewal_stock_mappings display fields when stock code differs.
-  const { data: mapRows } = await supabaseAdmin
-    .from("renewal_stock_mappings")
-    .select("id, n3_stock_id, stock_code, stock_name")
-    .eq("tenant_code", tenantCode)
-    .not("n3_stock_id", "is", null);
-  for (const m of mapRows ?? []) {
+  type MapDisplayRow = { id: string; n3_stock_id: string | null; stock_code: string | null; stock_name: string | null };
+  const mapRows = await loadAllPaginated<MapDisplayRow>(
+    "renewal_stock_mappings.forDisplayRefresh",
+    (from, to) =>
+      supabaseAdmin
+        .from("renewal_stock_mappings")
+        .select("id, n3_stock_id, stock_code, stock_name")
+        .eq("tenant_code", tenantCode)
+        .not("n3_stock_id", "is", null)
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: MapDisplayRow[] | null; error: { message: string } | null }>,
+  );
+  for (const m of mapRows) {
     const s = stockById.get(m.n3_stock_id!);
     if (!s) continue;
     const patch: Record<string, string | null> = {};
@@ -122,6 +156,7 @@ async function refreshEntitlementDisplay(tenantCode: string) {
 
   return refreshed;
 }
+
 
 function statusOf(r: SyncResult | null | undefined): "success" | "partial" | "failed" | "skipped" {
   if (!r) return "skipped";
