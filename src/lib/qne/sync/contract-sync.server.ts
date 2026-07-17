@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
 import { n3IterateList, type N3TenantContext } from "./n3.server";
 import { runWithSyncLog, SyncNotReadyError, type SyncResult } from "./log.server";
+import { loadAllPaginated } from "./pagination.server";
 
 interface N3DocLine {
   stockCode?: string;
@@ -95,14 +96,20 @@ export async function syncContractSnapshots(
   return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters) => {
     // 1. Load renewal_stock_mappings for this tenant. If none, refuse to
     //    produce Unknown-spam snapshots — surface a Warning and stop.
-    const { data: mappingRows, error: mapErr } = await supabaseAdmin
-      .from("renewal_stock_mappings")
-      .select("stock_code, contract_days, is_active")
-      .eq("tenant_code", tenantCode)
-      .eq("is_active", true);
-    if (mapErr) throw new Error(`Load renewal_stock_mappings failed: ${mapErr.message}`);
+    type MappingRow = { stock_code: string; contract_days: number | null; is_active: boolean | null };
+    const mappingRows = await loadAllPaginated<MappingRow>(
+      "renewal_stock_mappings.contract",
+      (from, to) =>
+        supabaseAdmin
+          .from("renewal_stock_mappings")
+          .select("stock_code, contract_days, is_active")
+          .eq("tenant_code", tenantCode)
+          .eq("is_active", true)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: MappingRow[] | null; error: { message: string } | null }>,
+    );
     const mappings = new Map<string, Mapping>();
-    for (const m of mappingRows ?? []) {
+    for (const m of mappingRows) {
       mappings.set(m.stock_code, { stock_code: m.stock_code, contract_days: m.contract_days });
     }
     if (mappings.size === 0) {
@@ -120,12 +127,18 @@ export async function syncContractSnapshots(
     const dueSoonDays = settings?.due_soon_days ?? 30;
 
     // 3. Load candidate customers from snapshots (tenant-scoped).
-    const { data: customers, error: custErr } = await supabaseAdmin
-      .from("customer_snapshots")
-      .select("customer_code")
-      .eq("tenant_code", tenantCode);
-    if (custErr) throw new Error(`Load customer_snapshots failed: ${custErr.message}`);
-    let customerCodes = (customers ?? []).map((c) => c.customer_code);
+    type CustCodeRow = { customer_code: string };
+    const customers = await loadAllPaginated<CustCodeRow>(
+      "customer_snapshots.contractCandidates",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_snapshots")
+          .select("customer_code")
+          .eq("tenant_code", tenantCode)
+          .order("customer_code", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: CustCodeRow[] | null; error: { message: string } | null }>,
+    );
+    let customerCodes = customers.map((c) => c.customer_code);
     if (options.customerCodes) {
       const filter = new Set(options.customerCodes);
       customerCodes = customerCodes.filter((c) => filter.has(c));
@@ -182,14 +195,32 @@ export async function syncContractSnapshots(
     //    that actually have a qualifying document. We NEVER manufacture
     //    Unknown rows for customers without qualifying documents.
     const targetKeys = Array.from(latestByCustomer.keys());
-    const { data: existingRows, error: existingErr } = await supabaseAdmin
-      .from("customer_contract_snapshots")
-      .select("customer_code, latest_document_no, latest_document_date, expiry_date, contract_status")
-      .eq("tenant_code", tenantCode)
-      .in("customer_code", targetKeys);
-    if (existingErr) throw new Error(`Load existing contracts failed: ${existingErr.message}`);
+    type ExistingContractRow = {
+      customer_code: string;
+      latest_document_no: string | null;
+      latest_document_date: string | null;
+      expiry_date: string | null;
+      contract_status: string | null;
+    };
+    const existingRows: ExistingContractRow[] = [];
+    const CHUNK = 500;
+    for (let i = 0; i < targetKeys.length; i += CHUNK) {
+      const slice = targetKeys.slice(i, i + CHUNK);
+      const chunkRows = await loadAllPaginated<ExistingContractRow>(
+        "customer_contract_snapshots.existingChunk",
+        (from, to) =>
+          supabaseAdmin
+            .from("customer_contract_snapshots")
+            .select("customer_code, latest_document_no, latest_document_date, expiry_date, contract_status")
+            .eq("tenant_code", tenantCode)
+            .in("customer_code", slice)
+            .order("customer_code", { ascending: true })
+            .range(from, to) as unknown as PromiseLike<{ data: ExistingContractRow[] | null; error: { message: string } | null }>,
+      );
+      existingRows.push(...chunkRows);
+    }
     const existingByCode = new Map<string, Record<string, unknown>>();
-    for (const r of existingRows ?? []) existingByCode.set(r.customer_code, r as Record<string, unknown>);
+    for (const r of existingRows) existingByCode.set(r.customer_code, r as unknown as Record<string, unknown>);
 
     const now = Date.now();
     const toUpsert: Array<Record<string, unknown>> = [];

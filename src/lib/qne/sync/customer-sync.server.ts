@@ -16,6 +16,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
 import { n3IterateList, type N3TenantContext } from "./n3.server";
 import { runWithSyncLog, type SyncResult } from "./log.server";
+import { loadAllPaginated } from "./pagination.server";
 
 interface N3Customer {
   id?: string | number;
@@ -87,8 +88,7 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
     // 1000 rows; without paging, tenants with >1000 snapshots build a
     // partial in-memory index, miss existing rows, push them to insert,
     // and collide on customer_snapshots_tenant_n3id_uidx.
-    const PAGE = 1000;
-    const existingRows: Array<{
+    type ExistingCustomerRow = {
       id: string;
       n3_customer_id: string | null;
       customer_code: string | null;
@@ -99,19 +99,17 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
       address: string | null;
       n3_status: string | null;
       updated_at: string | null;
-    }> = [];
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await supabaseAdmin
-        .from("customer_snapshots")
-        .select("id, n3_customer_id, customer_code, customer_name, contact_person, phone, email, address, n3_status, updated_at")
-        .eq("tenant_code", tenantCode)
-        .order("id", { ascending: true })
-        .range(from, from + PAGE - 1);
-      if (error) throw new Error(`Load existing customers failed: ${error.message}`);
-      if (!data || data.length === 0) break;
-      existingRows.push(...(data as unknown as typeof existingRows));
-      if (data.length < PAGE) break;
-    }
+    };
+    const existingRows = await loadAllPaginated<ExistingCustomerRow>(
+      "customer_snapshots.existing",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_snapshots")
+          .select("id, n3_customer_id, customer_code, customer_name, contact_person, phone, email, address, n3_status, updated_at")
+          .eq("tenant_code", tenantCode)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: ExistingCustomerRow[] | null; error: { message: string } | null }>,
+    );
 
     const byId = new Map<string, Record<string, unknown> & { id: string }>();
     const byCode = new Map<string, Record<string, unknown> & { id: string }>();
@@ -275,14 +273,21 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
     // n3_customer_id so display data is preserved.
     await heartbeat("merging legacy duplicate customers");
     let merged = 0;
-    const { data: dupCheck } = await supabaseAdmin
-      .from("customer_snapshots")
-      .select("id, n3_customer_id, customer_code, updated_at")
-      .eq("tenant_code", tenantCode)
-      .not("n3_customer_id", "is", null);
+    type DupRow = { id: string; n3_customer_id: string | null; customer_code: string; updated_at: string };
+    const dupCheck = await loadAllPaginated<DupRow>(
+      "customer_snapshots.dupCheck",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_snapshots")
+          .select("id, n3_customer_id, customer_code, updated_at")
+          .eq("tenant_code", tenantCode)
+          .not("n3_customer_id", "is", null)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: DupRow[] | null; error: { message: string } | null }>,
+    );
 
     const groups = new Map<string, Array<{ id: string; updated_at: string; customer_code: string }>>();
-    for (const r of dupCheck ?? []) {
+    for (const r of dupCheck) {
       if (!r.n3_customer_id) continue;
       const arr = groups.get(r.n3_customer_id) ?? [];
       arr.push(r as never);

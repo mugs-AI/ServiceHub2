@@ -22,6 +22,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
 import { n3Get, n3IterateList, type N3TenantContext } from "./n3.server";
 import { runWithSyncLog, SyncNotReadyError, type SyncResult } from "./log.server";
+import { loadAllPaginated } from "./pagination.server";
 
 // ---------------------------------------------------------------------------
 // N3 shapes (minimal, only the fields we depend on).
@@ -176,14 +177,29 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
   return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters, heartbeat) => {
     await heartbeat("Loading renewal mappings");
     // ---- 1. Load mappings ---------------------------------------------------
-    const { data: mappingRows, error: mapErr } = await supabaseAdmin
-      .from("renewal_stock_mappings")
-      .select(
-        "stock_code, n3_stock_id, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
-      )
-      .eq("tenant_code", tenantCode)
-      .eq("is_active", true);
-    if (mapErr) throw new Error(`Load renewal_stock_mappings failed: ${mapErr.message}`);
+    type MappingRow = {
+      stock_code: string;
+      n3_stock_id: string | null;
+      service_type: string | null;
+      subscription_category: string | null;
+      renewal_cycle_value: number | null;
+      renewal_cycle_unit: string | null;
+      contract_days: number | null;
+      is_active: boolean | null;
+    };
+    const mappingRows = await loadAllPaginated<MappingRow>(
+      "renewal_stock_mappings.active",
+      (from, to) =>
+        supabaseAdmin
+          .from("renewal_stock_mappings")
+          .select(
+            "stock_code, n3_stock_id, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
+          )
+          .eq("tenant_code", tenantCode)
+          .eq("is_active", true)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: MappingRow[] | null; error: { message: string } | null }>,
+    );
 
     // Two lookup maps for renewal mappings — prefer N3 Stock ID, fall back to
     // normalized Stock Code. Same value is stored in both so mapping match
@@ -192,7 +208,7 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     const renewalMappingsByCode = new Map<string, RenewalMapping>();
     const adHocStockCodes = new Set<string>();
     const adHocStockIds = new Set<string>();
-    for (const m of mappingRows ?? []) {
+    for (const m of mappingRows) {
       const key = normalizeStockKey(m.stock_code);
       const n3Id = (m.n3_stock_id ?? "").toString().trim() || null;
       if (!key && !n3Id) continue;
@@ -244,23 +260,36 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     await ensureDefaultCategories(tenantCode);
 
     // Category id lookup (tenant-scoped, case-insensitive).
-    const { data: catRows } = await supabaseAdmin
-      .from("subscription_categories")
-      .select("id, name")
-      .eq("tenant_code", tenantCode);
+    type CatRow = { id: string; name: string };
+    const catRows = await loadAllPaginated<CatRow>(
+      "subscription_categories.byTenant",
+      (from, to) =>
+        supabaseAdmin
+          .from("subscription_categories")
+          .select("id, name")
+          .eq("tenant_code", tenantCode)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: CatRow[] | null; error: { message: string } | null }>,
+    );
     const categoryIdByName = new Map<string, string>();
-    for (const c of catRows ?? []) categoryIdByName.set(c.name.toLowerCase(), c.id);
+    for (const c of catRows) categoryIdByName.set(c.name.toLowerCase(), c.id);
 
-    const { data: custRows, error: custErr } = await supabaseAdmin
-      .from("customer_snapshots")
-      .select("customer_code, customer_name, n3_customer_id")
-      .eq("tenant_code", tenantCode);
-    if (custErr) throw new Error(`Load customer_snapshots failed: ${custErr.message}`);
+    type CustRow = { customer_code: string; customer_name: string | null; n3_customer_id: string | null };
+    const custRows = await loadAllPaginated<CustRow>(
+      "customer_snapshots.forSubscription",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_snapshots")
+          .select("customer_code, customer_name, n3_customer_id")
+          .eq("tenant_code", tenantCode)
+          .order("customer_code", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: CustRow[] | null; error: { message: string } | null }>,
+    );
     const customerNameByCode = new Map<string, string | null>();
     const customerN3IdByCode = new Map<string, string | null>();
-    for (const c of custRows ?? []) {
+    for (const c of custRows) {
       customerNameByCode.set(c.customer_code, c.customer_name ?? null);
-      customerN3IdByCode.set(c.customer_code, (c.n3_customer_id ?? null) as string | null);
+      customerN3IdByCode.set(c.customer_code, c.n3_customer_id ?? null);
     }
     if (customerNameByCode.size === 0) {
       throw new SyncNotReadyError(
@@ -693,22 +722,43 @@ async function rebuildCurrentSnapshots(
   dueSoonDays: number,
   customerNameByCode: Map<string, string | null>,
 ): Promise<{ inserted: number; updated: number; skipped: number; bySource: RebuildBySource }> {
-  const { data: events, error } = await supabaseAdmin
-    .from("subscription_renewal_events")
-    .select(
-      "customer_code, customer_name, n3_customer_id, n3_stock_id, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
-    )
-    .eq("tenant_code", tenantCode)
-    .eq("is_source_void", false)
-    .order("source_document_date", { ascending: false });
-  if (error) throw new Error(`Load renewal events failed: ${error.message}`);
+  type RenewalEventRow = {
+    customer_code: string;
+    customer_name: string | null;
+    n3_customer_id: string | null;
+    n3_stock_id: string | null;
+    subscription_category_id: string | null;
+    subscription_category_name: string;
+    stock_code: string | null;
+    stock_name: string | null;
+    source_type: string;
+    source_document_id: string | null;
+    source_document_no: string | null;
+    source_document_date: string | null;
+    source_line_id: string | null;
+    renewal_cycle_value: number | null;
+    renewal_cycle_unit: string | null;
+    start_date: string | null;
+    expiry_date: string | null;
+    is_source_void: boolean | null;
+  };
+  const events = await loadAllPaginated<RenewalEventRow>(
+    "subscription_renewal_events.forRebuild",
+    (from, to) =>
+      supabaseAdmin
+        .from("subscription_renewal_events")
+        .select(
+          "customer_code, customer_name, n3_customer_id, n3_stock_id, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
+        )
+        .eq("tenant_code", tenantCode)
+        .eq("is_source_void", false)
+        .order("source_document_date", { ascending: false })
+        .order("source_line_id", { ascending: false })
+        .range(from, to) as unknown as PromiseLike<{ data: RenewalEventRow[] | null; error: { message: string } | null }>,
+  );
 
-  // Pick latest per (customer, category, stock_code) — ordered descending,
-  // so first wins. Sales Invoice and Delivery Order events are equal peers;
-  // whichever has the newer source_document_date wins. Different Stock
-  // Codes remain independent entitlements even inside the same category.
-  const latestByKey = new Map<string, (typeof events)[number]>();
-  for (const ev of events ?? []) {
+  const latestByKey = new Map<string, RenewalEventRow>();
+  for (const ev of events) {
     const key = `${ev.customer_code}::${ev.subscription_category_name}::${ev.stock_code ?? ""}`;
     if (!latestByKey.has(key)) latestByKey.set(key, ev);
   }
@@ -724,19 +774,41 @@ async function rebuildCurrentSnapshots(
   const targetCustomers = Array.from(
     new Set(Array.from(latestByKey.values()).map((e) => e.customer_code)),
   );
-  const { data: existingRows, error: existingErr } = await supabaseAdmin
-    .from("customer_subscription_snapshots")
-    .select(
-      "customer_code, subscription_category, stock_code, latest_document_no, latest_document_date, expiry_date, subscription_status",
-    )
-    .eq("tenant_code", tenantCode)
-    .in("customer_code", targetCustomers);
-  if (existingErr) throw new Error(`Load existing subscriptions failed: ${existingErr.message}`);
+  type ExistingSubRow = {
+    customer_code: string;
+    subscription_category: string;
+    stock_code: string | null;
+    latest_document_no: string | null;
+    latest_document_date: string | null;
+    expiry_date: string | null;
+    subscription_status: string | null;
+  };
+  const existingRows: ExistingSubRow[] = [];
+  const CHUNK = 500;
+  for (let i = 0; i < targetCustomers.length; i += CHUNK) {
+    const slice = targetCustomers.slice(i, i + CHUNK);
+    const chunkRows = await loadAllPaginated<ExistingSubRow>(
+      "customer_subscription_snapshots.existingChunk",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_subscription_snapshots")
+          .select(
+            "customer_code, subscription_category, stock_code, latest_document_no, latest_document_date, expiry_date, subscription_status",
+          )
+          .eq("tenant_code", tenantCode)
+          .in("customer_code", slice)
+          .order("customer_code", { ascending: true })
+          .order("subscription_category", { ascending: true })
+          .order("stock_code", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: ExistingSubRow[] | null; error: { message: string } | null }>,
+    );
+    existingRows.push(...chunkRows);
+  }
   const existingByKey = new Map<string, Record<string, unknown>>();
-  for (const r of existingRows ?? []) {
+  for (const r of existingRows) {
     existingByKey.set(
       `${r.customer_code}::${r.subscription_category}::${r.stock_code ?? ""}`,
-      r as Record<string, unknown>,
+      r as unknown as Record<string, unknown>,
     );
   }
 
@@ -747,7 +819,7 @@ async function rebuildCurrentSnapshots(
   const toUpsert: Array<Record<string, unknown>> = [];
 
   for (const [key, ev] of latestByKey) {
-    const expiryMs = new Date(ev.expiry_date).getTime();
+    const expiryMs = new Date(ev.expiry_date ?? 0).getTime();
     const daysLeft = Math.ceil((expiryMs - now) / 86400000);
     const status = computeStatus(daysLeft, dueSoonDays);
     const row = {
