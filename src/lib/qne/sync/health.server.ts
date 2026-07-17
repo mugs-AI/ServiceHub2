@@ -73,11 +73,17 @@ export interface ValidationReport {
 }
 
 async function validateCustomers(tenantCode: string): Promise<ValidationReport> {
-  const { data, count } = await supabaseAdmin
-    .from("customer_snapshots")
-    .select("customer_code, customer_name", { count: "exact" })
-    .eq("tenant_code", tenantCode);
-  const rows = data ?? [];
+  type Row = { customer_code: string | null; customer_name: string | null };
+  const rows = await loadAllPaginated<Row>(
+    "customer_snapshots.validate",
+    (from, to) =>
+      supabaseAdmin
+        .from("customer_snapshots")
+        .select("customer_code, customer_name")
+        .eq("tenant_code", tenantCode)
+        .order("customer_code", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  );
   const issues: ValidationIssue[] = [];
   const missingCode = rows.filter((r) => !r.customer_code || !r.customer_code.trim()).length;
   const missingName = rows.filter((r) => !r.customer_name || !String(r.customer_name).trim()).length;
@@ -90,15 +96,21 @@ async function validateCustomers(tenantCode: string): Promise<ValidationReport> 
   if (missingCode) issues.push({ code: "missing_customer_code", message: "Customers with missing customer_code", count: missingCode });
   if (missingName) issues.push({ code: "missing_customer_name", message: "Customers with missing customer_name", count: missingName });
   if (duplicates) issues.push({ code: "duplicate_customer_code", message: "Duplicate customer_code within tenant", count: duplicates });
-  return { issues, staleRecords: 0, calculationErrors: 0, recordsTotal: count ?? rows.length };
+  return { issues, staleRecords: 0, calculationErrors: 0, recordsTotal: rows.length };
 }
 
 async function validateStock(tenantCode: string): Promise<ValidationReport> {
-  const { data, count } = await supabaseAdmin
-    .from("stock_snapshots")
-    .select("stock_code", { count: "exact" })
-    .eq("tenant_code", tenantCode);
-  const rows = data ?? [];
+  type Row = { stock_code: string | null };
+  const rows = await loadAllPaginated<Row>(
+    "stock_snapshots.validate",
+    (from, to) =>
+      supabaseAdmin
+        .from("stock_snapshots")
+        .select("stock_code")
+        .eq("tenant_code", tenantCode)
+        .order("stock_code", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  );
   const issues: ValidationIssue[] = [];
   const missingCode = rows.filter((r) => !r.stock_code || !r.stock_code.trim()).length;
   const seen = new Map<string, number>();
@@ -109,18 +121,32 @@ async function validateStock(tenantCode: string): Promise<ValidationReport> {
   const duplicates = Array.from(seen.values()).filter((n) => n > 1).length;
   if (missingCode) issues.push({ code: "missing_stock_code", message: "Stock with missing stock_code", count: missingCode });
   if (duplicates) issues.push({ code: "duplicate_stock_code", message: "Duplicate stock_code within tenant", count: duplicates });
-  return { issues, staleRecords: 0, calculationErrors: 0, recordsTotal: count ?? rows.length };
+  return { issues, staleRecords: 0, calculationErrors: 0, recordsTotal: rows.length };
 }
 
 async function validateContracts(tenantCode: string): Promise<ValidationReport> {
-  const { data, count } = await supabaseAdmin
-    .from("customer_contract_snapshots")
-    .select(
-      "latest_document_no, latest_document_date, expiry_date, contract_days, remaining_days, contract_status, is_stale, calculation_error",
-      { count: "exact" },
-    )
-    .eq("tenant_code", tenantCode);
-  const rows = data ?? [];
+  type Row = {
+    latest_document_no: string | null;
+    latest_document_date: string | null;
+    expiry_date: string | null;
+    contract_days: number | null;
+    remaining_days: number | null;
+    contract_status: string | null;
+    is_stale: boolean | null;
+    calculation_error: string | null;
+  };
+  const rows = await loadAllPaginated<Row>(
+    "customer_contract_snapshots.validate",
+    (from, to) =>
+      supabaseAdmin
+        .from("customer_contract_snapshots")
+        .select(
+          "latest_document_no, latest_document_date, expiry_date, contract_days, remaining_days, contract_status, is_stale, calculation_error",
+        )
+        .eq("tenant_code", tenantCode)
+        .order("customer_code", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  );
   const issues: ValidationIssue[] = [];
   const staleRecords = rows.filter((r) => r.is_stale === true).length;
   const calculationErrors = rows.filter((r) => r.calculation_error != null).length;
