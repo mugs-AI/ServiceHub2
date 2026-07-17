@@ -774,19 +774,41 @@ async function rebuildCurrentSnapshots(
   const targetCustomers = Array.from(
     new Set(Array.from(latestByKey.values()).map((e) => e.customer_code)),
   );
-  const { data: existingRows, error: existingErr } = await supabaseAdmin
-    .from("customer_subscription_snapshots")
-    .select(
-      "customer_code, subscription_category, stock_code, latest_document_no, latest_document_date, expiry_date, subscription_status",
-    )
-    .eq("tenant_code", tenantCode)
-    .in("customer_code", targetCustomers);
-  if (existingErr) throw new Error(`Load existing subscriptions failed: ${existingErr.message}`);
+  type ExistingSubRow = {
+    customer_code: string;
+    subscription_category: string;
+    stock_code: string | null;
+    latest_document_no: string | null;
+    latest_document_date: string | null;
+    expiry_date: string | null;
+    subscription_status: string | null;
+  };
+  const existingRows: ExistingSubRow[] = [];
+  const CHUNK = 500;
+  for (let i = 0; i < targetCustomers.length; i += CHUNK) {
+    const slice = targetCustomers.slice(i, i + CHUNK);
+    const chunkRows = await loadAllPaginated<ExistingSubRow>(
+      "customer_subscription_snapshots.existingChunk",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_subscription_snapshots")
+          .select(
+            "customer_code, subscription_category, stock_code, latest_document_no, latest_document_date, expiry_date, subscription_status",
+          )
+          .eq("tenant_code", tenantCode)
+          .in("customer_code", slice)
+          .order("customer_code", { ascending: true })
+          .order("subscription_category", { ascending: true })
+          .order("stock_code", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: ExistingSubRow[] | null; error: { message: string } | null }>,
+    );
+    existingRows.push(...chunkRows);
+  }
   const existingByKey = new Map<string, Record<string, unknown>>();
-  for (const r of existingRows ?? []) {
+  for (const r of existingRows) {
     existingByKey.set(
       `${r.customer_code}::${r.subscription_category}::${r.stock_code ?? ""}`,
-      r as Record<string, unknown>,
+      r as unknown as Record<string, unknown>,
     );
   }
 
