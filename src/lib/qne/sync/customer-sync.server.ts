@@ -287,7 +287,7 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
     );
 
     const groups = new Map<string, Array<{ id: string; updated_at: string; customer_code: string }>>();
-    for (const r of dupCheck ?? []) {
+    for (const r of dupCheck) {
       if (!r.n3_customer_id) continue;
       const arr = groups.get(r.n3_customer_id) ?? [];
       arr.push(r as never);
