@@ -226,11 +226,6 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
       arr.push(r as never);
       groups.set(r.n3_stock_id, arr);
     }
-      if (!r.n3_stock_id) continue;
-      const arr = groups.get(r.n3_stock_id) ?? [];
-      arr.push(r as never);
-      groups.set(r.n3_stock_id, arr);
-    }
     for (const [n3Id, rows] of groups) {
       if (rows.length < 2) continue;
       rows.sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
