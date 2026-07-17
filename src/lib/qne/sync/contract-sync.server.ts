@@ -96,14 +96,20 @@ export async function syncContractSnapshots(
   return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters) => {
     // 1. Load renewal_stock_mappings for this tenant. If none, refuse to
     //    produce Unknown-spam snapshots — surface a Warning and stop.
-    const { data: mappingRows, error: mapErr } = await supabaseAdmin
-      .from("renewal_stock_mappings")
-      .select("stock_code, contract_days, is_active")
-      .eq("tenant_code", tenantCode)
-      .eq("is_active", true);
-    if (mapErr) throw new Error(`Load renewal_stock_mappings failed: ${mapErr.message}`);
+    type MappingRow = { stock_code: string; contract_days: number | null; is_active: boolean | null };
+    const mappingRows = await loadAllPaginated<MappingRow>(
+      "renewal_stock_mappings.contract",
+      (from, to) =>
+        supabaseAdmin
+          .from("renewal_stock_mappings")
+          .select("stock_code, contract_days, is_active")
+          .eq("tenant_code", tenantCode)
+          .eq("is_active", true)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: MappingRow[] | null; error: { message: string } | null }>,
+    );
     const mappings = new Map<string, Mapping>();
-    for (const m of mappingRows ?? []) {
+    for (const m of mappingRows) {
       mappings.set(m.stock_code, { stock_code: m.stock_code, contract_days: m.contract_days });
     }
     if (mappings.size === 0) {
