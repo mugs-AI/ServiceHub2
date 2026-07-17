@@ -177,14 +177,29 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
   return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters, heartbeat) => {
     await heartbeat("Loading renewal mappings");
     // ---- 1. Load mappings ---------------------------------------------------
-    const { data: mappingRows, error: mapErr } = await supabaseAdmin
-      .from("renewal_stock_mappings")
-      .select(
-        "stock_code, n3_stock_id, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
-      )
-      .eq("tenant_code", tenantCode)
-      .eq("is_active", true);
-    if (mapErr) throw new Error(`Load renewal_stock_mappings failed: ${mapErr.message}`);
+    type MappingRow = {
+      stock_code: string;
+      n3_stock_id: string | null;
+      service_type: string | null;
+      subscription_category: string | null;
+      renewal_cycle_value: number | null;
+      renewal_cycle_unit: string | null;
+      contract_days: number | null;
+      is_active: boolean | null;
+    };
+    const mappingRows = await loadAllPaginated<MappingRow>(
+      "renewal_stock_mappings.active",
+      (from, to) =>
+        supabaseAdmin
+          .from("renewal_stock_mappings")
+          .select(
+            "stock_code, n3_stock_id, service_type, subscription_category, renewal_cycle_value, renewal_cycle_unit, contract_days, is_active",
+          )
+          .eq("tenant_code", tenantCode)
+          .eq("is_active", true)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: MappingRow[] | null; error: { message: string } | null }>,
+    );
 
     // Two lookup maps for renewal mappings — prefer N3 Stock ID, fall back to
     // normalized Stock Code. Same value is stored in both so mapping match
