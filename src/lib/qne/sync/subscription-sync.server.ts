@@ -797,7 +797,7 @@ async function rebuildCurrentSnapshots(
   const toUpsert: Array<Record<string, unknown>> = [];
 
   for (const [key, ev] of latestByKey) {
-    const expiryMs = new Date(ev.expiry_date).getTime();
+    const expiryMs = new Date(ev.expiry_date ?? 0).getTime();
     const daysLeft = Math.ceil((expiryMs - now) / 86400000);
     const status = computeStatus(daysLeft, dueSoonDays);
     const row = {
