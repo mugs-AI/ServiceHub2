@@ -722,22 +722,43 @@ async function rebuildCurrentSnapshots(
   dueSoonDays: number,
   customerNameByCode: Map<string, string | null>,
 ): Promise<{ inserted: number; updated: number; skipped: number; bySource: RebuildBySource }> {
-  const { data: events, error } = await supabaseAdmin
-    .from("subscription_renewal_events")
-    .select(
-      "customer_code, customer_name, n3_customer_id, n3_stock_id, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
-    )
-    .eq("tenant_code", tenantCode)
-    .eq("is_source_void", false)
-    .order("source_document_date", { ascending: false });
-  if (error) throw new Error(`Load renewal events failed: ${error.message}`);
+  type RenewalEventRow = {
+    customer_code: string;
+    customer_name: string | null;
+    n3_customer_id: string | null;
+    n3_stock_id: string | null;
+    subscription_category_id: string | null;
+    subscription_category_name: string;
+    stock_code: string | null;
+    stock_name: string | null;
+    source_type: string;
+    source_document_id: string | null;
+    source_document_no: string | null;
+    source_document_date: string | null;
+    source_line_id: string | null;
+    renewal_cycle_value: number | null;
+    renewal_cycle_unit: string | null;
+    start_date: string | null;
+    expiry_date: string | null;
+    is_source_void: boolean | null;
+  };
+  const events = await loadAllPaginated<RenewalEventRow>(
+    "subscription_renewal_events.forRebuild",
+    (from, to) =>
+      supabaseAdmin
+        .from("subscription_renewal_events")
+        .select(
+          "customer_code, customer_name, n3_customer_id, n3_stock_id, subscription_category_id, subscription_category_name, stock_code, stock_name, source_type, source_document_id, source_document_no, source_document_date, source_line_id, renewal_cycle_value, renewal_cycle_unit, start_date, expiry_date, is_source_void",
+        )
+        .eq("tenant_code", tenantCode)
+        .eq("is_source_void", false)
+        .order("source_document_date", { ascending: false })
+        .order("source_line_id", { ascending: false })
+        .range(from, to) as unknown as PromiseLike<{ data: RenewalEventRow[] | null; error: { message: string } | null }>,
+  );
 
-  // Pick latest per (customer, category, stock_code) — ordered descending,
-  // so first wins. Sales Invoice and Delivery Order events are equal peers;
-  // whichever has the newer source_document_date wins. Different Stock
-  // Codes remain independent entitlements even inside the same category.
-  const latestByKey = new Map<string, (typeof events)[number]>();
-  for (const ev of events ?? []) {
+  const latestByKey = new Map<string, RenewalEventRow>();
+  for (const ev of events) {
     const key = `${ev.customer_code}::${ev.subscription_category_name}::${ev.stock_code ?? ""}`;
     if (!latestByKey.has(key)) latestByKey.set(key, ev);
   }
