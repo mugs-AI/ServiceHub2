@@ -172,7 +172,7 @@ async function validateContracts(tenantCode: string): Promise<ValidationReport> 
   if (invalidStatus) issues.push({ code: "invalid_contract_status", message: "Rows with unrecognised contract_status", count: invalidStatus });
   if (unknownCustomers) issues.push({ code: "possible_missing_mapping", message: "Customers with Unknown status (possible missing renewal_stock_mapping)", count: unknownCustomers });
 
-  return { issues, staleRecords, calculationErrors, recordsTotal: count ?? rows.length };
+  return { issues, staleRecords, calculationErrors, recordsTotal: rows.length };
 }
 
 export async function runValidation(
