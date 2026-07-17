@@ -208,7 +208,7 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     const renewalMappingsByCode = new Map<string, RenewalMapping>();
     const adHocStockCodes = new Set<string>();
     const adHocStockIds = new Set<string>();
-    for (const m of mappingRows ?? []) {
+    for (const m of mappingRows) {
       const key = normalizeStockKey(m.stock_code);
       const n3Id = (m.n3_stock_id ?? "").toString().trim() || null;
       if (!key && !n3Id) continue;
