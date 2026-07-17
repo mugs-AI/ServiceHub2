@@ -207,13 +207,25 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
     // Merge lingering Supabase-side duplicates that share (tenant, n3_stock_id).
     await heartbeat("merging legacy duplicate stock rows");
     let merged = 0;
-    const { data: dupCheck } = await supabaseAdmin
-      .from("stock_snapshots")
-      .select("id, n3_stock_id, stock_code, updated_at")
-      .eq("tenant_code", tenantCode)
-      .not("n3_stock_id", "is", null);
+    type DupStockRow = { id: string; n3_stock_id: string | null; stock_code: string; updated_at: string };
+    const dupCheck = await loadAllPaginated<DupStockRow>(
+      "stock_snapshots.dupCheck",
+      (from, to) =>
+        supabaseAdmin
+          .from("stock_snapshots")
+          .select("id, n3_stock_id, stock_code, updated_at")
+          .eq("tenant_code", tenantCode)
+          .not("n3_stock_id", "is", null)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: DupStockRow[] | null; error: { message: string } | null }>,
+    );
     const groups = new Map<string, Array<{ id: string; updated_at: string; stock_code: string }>>();
-    for (const r of dupCheck ?? []) {
+    for (const r of dupCheck) {
+      if (!r.n3_stock_id) continue;
+      const arr = groups.get(r.n3_stock_id) ?? [];
+      arr.push(r as never);
+      groups.set(r.n3_stock_id, arr);
+    }
       if (!r.n3_stock_id) continue;
       const arr = groups.get(r.n3_stock_id) ?? [];
       arr.push(r as never);
