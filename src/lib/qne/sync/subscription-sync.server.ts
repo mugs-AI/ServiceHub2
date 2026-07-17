@@ -260,23 +260,36 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
     await ensureDefaultCategories(tenantCode);
 
     // Category id lookup (tenant-scoped, case-insensitive).
-    const { data: catRows } = await supabaseAdmin
-      .from("subscription_categories")
-      .select("id, name")
-      .eq("tenant_code", tenantCode);
+    type CatRow = { id: string; name: string };
+    const catRows = await loadAllPaginated<CatRow>(
+      "subscription_categories.byTenant",
+      (from, to) =>
+        supabaseAdmin
+          .from("subscription_categories")
+          .select("id, name")
+          .eq("tenant_code", tenantCode)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: CatRow[] | null; error: { message: string } | null }>,
+    );
     const categoryIdByName = new Map<string, string>();
-    for (const c of catRows ?? []) categoryIdByName.set(c.name.toLowerCase(), c.id);
+    for (const c of catRows) categoryIdByName.set(c.name.toLowerCase(), c.id);
 
-    const { data: custRows, error: custErr } = await supabaseAdmin
-      .from("customer_snapshots")
-      .select("customer_code, customer_name, n3_customer_id")
-      .eq("tenant_code", tenantCode);
-    if (custErr) throw new Error(`Load customer_snapshots failed: ${custErr.message}`);
+    type CustRow = { customer_code: string; customer_name: string | null; n3_customer_id: string | null };
+    const custRows = await loadAllPaginated<CustRow>(
+      "customer_snapshots.forSubscription",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_snapshots")
+          .select("customer_code, customer_name, n3_customer_id")
+          .eq("tenant_code", tenantCode)
+          .order("customer_code", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: CustRow[] | null; error: { message: string } | null }>,
+    );
     const customerNameByCode = new Map<string, string | null>();
     const customerN3IdByCode = new Map<string, string | null>();
-    for (const c of custRows ?? []) {
+    for (const c of custRows) {
       customerNameByCode.set(c.customer_code, c.customer_name ?? null);
-      customerN3IdByCode.set(c.customer_code, (c.n3_customer_id ?? null) as string | null);
+      customerN3IdByCode.set(c.customer_code, c.n3_customer_id ?? null);
     }
     if (customerNameByCode.size === 0) {
       throw new SyncNotReadyError(
