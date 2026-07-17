@@ -83,10 +83,35 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
   return runWithSyncLog({ tenantCode, snapshotType: "customer" }, async (counters, heartbeat) => {
     await heartbeat("loading existing customer snapshots");
 
-    const { data: existingRows, error: existingErr } = await supabaseAdmin
-      .from("customer_snapshots")
-      .select("id, n3_customer_id, customer_code, customer_name, contact_person, phone, email, address, n3_status, updated_at");
-    if (existingErr) throw new Error(`Load existing customers failed: ${existingErr.message}`);
+    // Paginated + tenant-scoped load. PostgREST caps a single select at
+    // 1000 rows; without paging, tenants with >1000 snapshots build a
+    // partial in-memory index, miss existing rows, push them to insert,
+    // and collide on customer_snapshots_tenant_n3id_uidx.
+    const PAGE = 1000;
+    const existingRows: Array<{
+      id: string;
+      n3_customer_id: string | null;
+      customer_code: string | null;
+      customer_name: string | null;
+      contact_person: string | null;
+      phone: string | null;
+      email: string | null;
+      address: string | null;
+      n3_status: string | null;
+      updated_at: string | null;
+    }> = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabaseAdmin
+        .from("customer_snapshots")
+        .select("id, n3_customer_id, customer_code, customer_name, contact_person, phone, email, address, n3_status, updated_at")
+        .eq("tenant_code", tenantCode)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(`Load existing customers failed: ${error.message}`);
+      if (!data || data.length === 0) break;
+      existingRows.push(...(data as never));
+      if (data.length < PAGE) break;
+    }
 
     const byId = new Map<string, Record<string, unknown> & { id: string }>();
     const byCode = new Map<string, Record<string, unknown> & { id: string }>();
