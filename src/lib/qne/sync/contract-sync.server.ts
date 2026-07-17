@@ -127,12 +127,18 @@ export async function syncContractSnapshots(
     const dueSoonDays = settings?.due_soon_days ?? 30;
 
     // 3. Load candidate customers from snapshots (tenant-scoped).
-    const { data: customers, error: custErr } = await supabaseAdmin
-      .from("customer_snapshots")
-      .select("customer_code")
-      .eq("tenant_code", tenantCode);
-    if (custErr) throw new Error(`Load customer_snapshots failed: ${custErr.message}`);
-    let customerCodes = (customers ?? []).map((c) => c.customer_code);
+    type CustCodeRow = { customer_code: string };
+    const customers = await loadAllPaginated<CustCodeRow>(
+      "customer_snapshots.contractCandidates",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_snapshots")
+          .select("customer_code")
+          .eq("tenant_code", tenantCode)
+          .order("customer_code", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: CustCodeRow[] | null; error: { message: string } | null }>,
+    );
+    let customerCodes = customers.map((c) => c.customer_code);
     if (options.customerCodes) {
       const filter = new Set(options.customerCodes);
       customerCodes = customerCodes.filter((c) => filter.has(c));
