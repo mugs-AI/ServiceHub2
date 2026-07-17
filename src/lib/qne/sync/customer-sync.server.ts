@@ -273,11 +273,18 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
     // n3_customer_id so display data is preserved.
     await heartbeat("merging legacy duplicate customers");
     let merged = 0;
-    const { data: dupCheck } = await supabaseAdmin
-      .from("customer_snapshots")
-      .select("id, n3_customer_id, customer_code, updated_at")
-      .eq("tenant_code", tenantCode)
-      .not("n3_customer_id", "is", null);
+    type DupRow = { id: string; n3_customer_id: string | null; customer_code: string; updated_at: string };
+    const dupCheck = await loadAllPaginated<DupRow>(
+      "customer_snapshots.dupCheck",
+      (from, to) =>
+        supabaseAdmin
+          .from("customer_snapshots")
+          .select("id, n3_customer_id, customer_code, updated_at")
+          .eq("tenant_code", tenantCode)
+          .not("n3_customer_id", "is", null)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: DupRow[] | null; error: { message: string } | null }>,
+    );
 
     const groups = new Map<string, Array<{ id: string; updated_at: string; customer_code: string }>>();
     for (const r of dupCheck ?? []) {
