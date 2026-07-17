@@ -6,6 +6,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { SnapshotType, SyncStatus } from "./log.server";
+import { loadAllPaginated } from "./pagination.server";
 
 // Public snapshot_type values live in the DB as capitalised words.
 export type HealthSnapshotType = "Customers" | "Stock" | "Contract";
