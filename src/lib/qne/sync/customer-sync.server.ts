@@ -83,10 +83,35 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
   return runWithSyncLog({ tenantCode, snapshotType: "customer" }, async (counters, heartbeat) => {
     await heartbeat("loading existing customer snapshots");
 
-    const { data: existingRows, error: existingErr } = await supabaseAdmin
-      .from("customer_snapshots")
-      .select("id, n3_customer_id, customer_code, customer_name, contact_person, phone, email, address, n3_status, updated_at");
-    if (existingErr) throw new Error(`Load existing customers failed: ${existingErr.message}`);
+    // Paginated + tenant-scoped load. PostgREST caps a single select at
+    // 1000 rows; without paging, tenants with >1000 snapshots build a
+    // partial in-memory index, miss existing rows, push them to insert,
+    // and collide on customer_snapshots_tenant_n3id_uidx.
+    const PAGE = 1000;
+    const existingRows: Array<{
+      id: string;
+      n3_customer_id: string | null;
+      customer_code: string | null;
+      customer_name: string | null;
+      contact_person: string | null;
+      phone: string | null;
+      email: string | null;
+      address: string | null;
+      n3_status: string | null;
+      updated_at: string | null;
+    }> = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabaseAdmin
+        .from("customer_snapshots")
+        .select("id, n3_customer_id, customer_code, customer_name, contact_person, phone, email, address, n3_status, updated_at")
+        .eq("tenant_code", tenantCode)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(`Load existing customers failed: ${error.message}`);
+      if (!data || data.length === 0) break;
+      existingRows.push(...(data as unknown as typeof existingRows));
+      if (data.length < PAGE) break;
+    }
 
     const byId = new Map<string, Record<string, unknown> & { id: string }>();
     const byCode = new Map<string, Record<string, unknown> & { id: string }>();
@@ -167,20 +192,24 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
         }
       }
 
-      if (toInsert.length > 0) {
+      // Per-row insert so a single unique-index collision cannot abort
+      // the whole batch and leave the sync stuck at the first BATCH boundary.
+      for (const row of toInsert) {
         const { data, error } = await supabaseAdmin
           .from("customer_snapshots")
-          .insert(toInsert)
-          .select("id, n3_customer_id, customer_code");
+          .insert(row)
+          .select("id, n3_customer_id, customer_code")
+          .single();
         if (error) {
-          counters.failed += toInsert.length;
-          counters.inserted = Math.max(0, counters.inserted - toInsert.length);
-          throw new Error(`Insert customers failed: ${error.message}`);
+          counters.failed += 1;
+          counters.inserted = Math.max(0, counters.inserted - 1);
+          console.warn(
+            `[customer-sync] insert failed tenant=${tenantCode} n3_id=${row.n3_customer_id ?? "null"} code=${row.customer_code}: ${error.message}`,
+          );
+          continue;
         }
-        for (const r of data ?? []) {
-          if (r.n3_customer_id) byId.set(r.n3_customer_id, r as never);
-          if (r.customer_code) byCode.set(r.customer_code, r as never);
-        }
+        if (data?.n3_customer_id) byId.set(data.n3_customer_id, data as never);
+        if (data?.customer_code) byCode.set(data.customer_code, data as never);
       }
 
       for (const { id, row, prevCode, hadId, legacyName } of toUpdate) {
