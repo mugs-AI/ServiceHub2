@@ -109,7 +109,7 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
         .range(from, from + PAGE - 1);
       if (error) throw new Error(`Load existing customers failed: ${error.message}`);
       if (!data || data.length === 0) break;
-      existingRows.push(...(data as never));
+      existingRows.push(...(data as unknown as typeof existingRows));
       if (data.length < PAGE) break;
     }
 
