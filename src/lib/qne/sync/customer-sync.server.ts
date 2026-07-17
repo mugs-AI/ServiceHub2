@@ -192,20 +192,24 @@ export async function syncCustomerSnapshots(ctx: N3TenantContext): Promise<SyncR
         }
       }
 
-      if (toInsert.length > 0) {
+      // Per-row insert so a single unique-index collision cannot abort
+      // the whole batch and leave the sync stuck at the first BATCH boundary.
+      for (const row of toInsert) {
         const { data, error } = await supabaseAdmin
           .from("customer_snapshots")
-          .insert(toInsert)
-          .select("id, n3_customer_id, customer_code");
+          .insert(row)
+          .select("id, n3_customer_id, customer_code")
+          .single();
         if (error) {
-          counters.failed += toInsert.length;
-          counters.inserted = Math.max(0, counters.inserted - toInsert.length);
-          throw new Error(`Insert customers failed: ${error.message}`);
+          counters.failed += 1;
+          counters.inserted = Math.max(0, counters.inserted - 1);
+          console.warn(
+            `[customer-sync] insert failed tenant=${tenantCode} n3_id=${row.n3_customer_id ?? "null"} code=${row.customer_code}: ${error.message}`,
+          );
+          continue;
         }
-        for (const r of data ?? []) {
-          if (r.n3_customer_id) byId.set(r.n3_customer_id, r as never);
-          if (r.customer_code) byCode.set(r.customer_code, r as never);
-        }
+        if (data?.n3_customer_id) byId.set(data.n3_customer_id, data as never);
+        if (data?.customer_code) byCode.set(data.customer_code, data as never);
       }
 
       for (const { id, row, prevCode, hadId, legacyName } of toUpdate) {
