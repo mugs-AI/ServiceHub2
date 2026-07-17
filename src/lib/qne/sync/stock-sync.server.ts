@@ -60,10 +60,27 @@ export async function syncStockSnapshots(ctx: N3TenantContext): Promise<SyncResu
   return runWithSyncLog({ tenantCode, snapshotType: "stock" }, async (counters, heartbeat) => {
     await heartbeat("loading existing stock snapshots");
 
-    const { data: existingRows, error: existingErr } = await supabaseAdmin
-      .from("stock_snapshots")
-      .select("id, n3_stock_id, stock_code, stock_name, description, is_active");
-    if (existingErr) throw new Error(`Load existing stock failed: ${existingErr.message}`);
+    // Paginated + tenant-scoped load — mirrors customer-sync fix so tenants
+    // with >1000 stock rows keep a complete in-memory index and cannot
+    // collide on stock_snapshots_tenant_n3id_uidx.
+    type ExistingStockRow = {
+      id: string;
+      n3_stock_id: string | null;
+      stock_code: string | null;
+      stock_name: string | null;
+      description: string | null;
+      is_active: boolean | null;
+    };
+    const existingRows = await loadAllPaginated<ExistingStockRow>(
+      "stock_snapshots.existing",
+      (from, to) =>
+        supabaseAdmin
+          .from("stock_snapshots")
+          .select("id, n3_stock_id, stock_code, stock_name, description, is_active")
+          .eq("tenant_code", tenantCode)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: ExistingStockRow[] | null; error: { message: string } | null }>,
+    );
 
     const byId = new Map<string, Record<string, unknown> & { id: string }>();
     const byCode = new Map<string, Record<string, unknown> & { id: string }>();
