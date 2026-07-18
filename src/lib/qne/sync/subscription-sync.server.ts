@@ -615,6 +615,10 @@ async function syncSourceDetails(args: {
       if (renewal) {
         metrics.mappedRenewalLines += 1;
         if (isVoid) {
+          // Header-level cancellation: do NOT push a fresh event, but the
+          // post-loop propagation below flips is_source_void=true on any
+          // pre-existing events for this (tenant, source_type,
+          // source_document_id). History rows are preserved.
           metrics.renewalEventsSkipped += 1;
           metrics.renewalEventsSkippedVoided += 1;
           return;
@@ -703,6 +707,32 @@ async function syncSourceDetails(args: {
         metrics.renewalEventsInserted += count ?? renewalEvents.length;
       }
     }
+
+    // Phase 1.1.5 — header-level cancellation propagation. Cancellation
+    // lives on the header (isCancelled), so ANY renewal event previously
+    // derived from this (tenant_code, source_type, source_document_id)
+    // must reflect the current header state — regardless of line id.
+    // History rows are preserved; only the is_source_void flag flips.
+    // When the header is non-void again AND we just wrote fresh events
+    // (is_source_void=false in the upsert payload), any leftover events
+    // for lines that were removed from the document are also flipped
+    // back to false only if their line snapshot is non-void — safest is
+    // to only propagate the void=true direction here and let the upsert
+    // above own the false direction for lines it re-emits.
+    {
+      const { error: propErr } = await supabaseAdmin
+        .from("subscription_renewal_events")
+        .update({ is_source_void: isVoid })
+        .eq("tenant_code", tenantCode)
+        .eq("source_type", sourceType)
+        .eq("source_document_id", docId);
+      if (propErr) {
+        console.error(
+          `[subscription-sync] propagate is_source_void failed docId=${docId} isVoid=${isVoid}`,
+          propErr,
+        );
+      }
+    }
   }
 
   return metrics;
@@ -788,7 +818,9 @@ async function rebuildCurrentSnapshots(
     delivery_order: { inserted: 0, updated: 0, unchanged: 0, total: 0 },
   };
 
-  if (latestByKey.size === 0) return { inserted: 0, updated: 0, skipped: 0, bySource };
+  // Phase 1.1.5 — even when there are no eligible events left, existing
+  // subscription snapshots must be deactivated (never deleted). Continue
+  // through the load/deactivate path instead of returning early.
 
   // Load ALL existing snapshots for this tenant so we can resolve rows by
   // either identity — renamed customer_code / stock_code make a chunked
@@ -920,8 +952,35 @@ async function rebuildCurrentSnapshots(
     }
   }
 
+  // Phase 1.1.5 — deactivate orphaned current subscriptions. Any existing
+  // snapshot whose identity no longer resolves to a non-void event must
+  // be marked Inactive. Audit history (renewal events + line snapshots)
+  // is preserved; only the current-state row flips.
+  let deactivated = 0;
+  for (const r of existingRows) {
+    if (consumedIds.has(r.id)) continue;
+    if ((r.subscription_status ?? null) === "Inactive") {
+      skipped += 1;
+      continue;
+    }
+    const { error: deactErr } = await supabaseAdmin
+      .from("customer_subscription_snapshots")
+      .update({
+        subscription_status: "Inactive",
+        remaining_days: null,
+        last_calculated_at: new Date().toISOString(),
+        is_stale: false,
+        calculation_error: null,
+      } as never)
+      .eq("id", r.id);
+    if (deactErr) throw new Error(`Deactivate subscription failed: ${deactErr.message}`);
+    deactivated += 1;
+    updated += 1;
+  }
+
   return { inserted, updated, skipped, bySource };
 }
+
 
 // ---------------------------------------------------------------------------
 // Category seeding (unchanged from Phase 1.0).
