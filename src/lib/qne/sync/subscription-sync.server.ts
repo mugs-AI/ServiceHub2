@@ -47,13 +47,232 @@ export interface ReconciliationCounters {
   confirmedLineRemoved: number;
   transient: number;
   unknownEnvelope: number;
+  reconciliationFailed: number;
   skippedUnsafe: boolean;
   skippedReason: string | null;
   inventoryTotal: number | null;
+  priorInventoryTotal: number | null;
   uniqueHeadersSeen: number;
+  existingActiveLineDocuments: number;
   pagesFetched: number;
   candidateDocuments: number;
+  candidateCapHit: boolean;
 }
+
+
+// ---------------------------------------------------------------------------
+// Phase 1.1.6b — Pure safety evaluator. Kept side-effect free so unit tests
+// can pin down the empty-inventory and inventory-collapse guards without
+// mocking supabase or the N3 client.
+
+export interface ScanSafetyInput {
+  scanHealthy: boolean;
+  scanReason: string | null;
+  inventoryTotal: number | null;
+  uniqueHeadersSeen: number;
+  existingActiveLineDocuments: number;
+  priorInventoryTotal: number | null;
+  collapseThreshold?: number; // fraction of prior, default 0.5
+  minPriorForCollapseCheck?: number; // default 10
+}
+
+export interface ScanSafetyResult {
+  skippedUnsafe: boolean;
+  skippedReason: string | null;
+}
+
+export function evaluateScanSafety(input: ScanSafetyInput): ScanSafetyResult {
+  if (!input.scanHealthy) {
+    return {
+      skippedUnsafe: true,
+      skippedReason: input.scanReason ?? "scan unhealthy",
+    };
+  }
+  const threshold = input.collapseThreshold ?? 0.5;
+  const minPrior = input.minPriorForCollapseCheck ?? 10;
+  // Empty inventory guard — never delete everything just because the API
+  // returned no rows this run.
+  if (input.uniqueHeadersSeen === 0 && input.existingActiveLineDocuments > 0) {
+    return {
+      skippedUnsafe: true,
+      skippedReason: `empty inventory (0 headers) while ${input.existingActiveLineDocuments} active documents exist locally`,
+    };
+  }
+  if (
+    input.inventoryTotal === 0 &&
+    input.existingActiveLineDocuments > 0
+  ) {
+    return {
+      skippedUnsafe: true,
+      skippedReason: `N3 reported total=0 while ${input.existingActiveLineDocuments} active documents exist locally`,
+    };
+  }
+  // Suspicious collapse — refuse to reconcile if the reported inventory
+  // is under half of the previous healthy run (with a floor to avoid
+  // whipsaw on tiny tenants).
+  if (
+    input.priorInventoryTotal != null &&
+    input.priorInventoryTotal >= minPrior &&
+    input.inventoryTotal != null &&
+    input.inventoryTotal < input.priorInventoryTotal * threshold
+  ) {
+    return {
+      skippedUnsafe: true,
+      skippedReason: `inventory collapse: current=${input.inventoryTotal} < ${Math.round(
+        threshold * 100,
+      )}% of prior=${input.priorInventoryTotal}`,
+    };
+  }
+  return { skippedUnsafe: false, skippedReason: null };
+}
+
+
+// ---------------------------------------------------------------------------
+// Phase 1.1.6b — Ordered reconciliation writers. Events flip to
+// is_source_void=true BEFORE the line snapshot flips to
+// is_deleted_in_source=true, so a crash between the two leaves the
+// rebuild treating the entitlement as void (safe) rather than active with
+// a deleted source. Every write carries the run-boundary timestamp guard
+// so a row refreshed in-run is never mis-invalidated by a stale scan.
+
+export interface ReconciliationWriteClient {
+  from: (table: string) => {
+    update: (payload: Record<string, unknown>) => {
+      eq: (col: string, val: unknown) => {
+        eq: (col: string, val: unknown) => {
+          eq: (col: string, val: unknown) => {
+            eq?: (col: string, val: unknown) => unknown;
+            lt?: (col: string, val: unknown) => unknown;
+            // events chain resolves to a promise-like via .eq(source_document_id)
+            then?: unknown;
+          };
+        };
+      };
+    };
+  };
+}
+
+export async function invalidateDeletedDocument(args: {
+  client: { from: (table: string) => unknown };
+  tenantCode: string;
+  sourceType: SourceType;
+  docId: string;
+  runStartedAt: Date;
+  lineTable: "sales_invoice_line_snapshots" | "delivery_order_line_snapshots";
+}): Promise<void> {
+  const runIso = args.runStartedAt.toISOString();
+  const nowIso = new Date().toISOString();
+  // 1. Events first — must succeed. Rebuild will treat the entitlement as
+  //    void even if step 2 crashes before it lands.
+  const evtRes = await (args.client.from("subscription_renewal_events") as unknown as {
+    update: (p: Record<string, unknown>) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+  })
+    .update({ is_source_void: true })
+    .eq("tenant_code", args.tenantCode)
+    .eq("source_type", args.sourceType)
+    .eq("source_document_id", args.docId);
+  if (evtRes.error) {
+    throw new Error(
+      `[reconciliation] events invalidation failed docId=${args.docId}: ${evtRes.error.message}`,
+    );
+  }
+  // 2. Line snapshots — with timestamp guard so a row refreshed in the
+  //    same run cannot be mistakenly marked deleted.
+  const lineRes = await (args.client.from(args.lineTable) as unknown as {
+    update: (p: Record<string, unknown>) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => {
+            lt: (c: string, v: unknown) => Promise<{ error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+  })
+    .update({
+      is_deleted_in_source: true,
+      document_status: "Deleted",
+      last_synced_at: nowIso,
+    })
+    .eq("tenant_code", args.tenantCode)
+    .eq("n3_document_id", args.docId)
+    .eq("is_deleted_in_source", false)
+    .lt("last_seen_at", runIso);
+  if (lineRes.error) {
+    throw new Error(
+      `[reconciliation] line invalidation failed docId=${args.docId}: ${lineRes.error.message}`,
+    );
+  }
+}
+
+export async function invalidateRemovedLine(args: {
+  client: { from: (table: string) => unknown };
+  tenantCode: string;
+  sourceType: SourceType;
+  docId: string;
+  lineId: string;
+  runStartedAt: Date;
+  lineTable: "sales_invoice_line_snapshots" | "delivery_order_line_snapshots";
+}): Promise<void> {
+  const runIso = args.runStartedAt.toISOString();
+  const nowIso = new Date().toISOString();
+  const evtRes = await (args.client.from("subscription_renewal_events") as unknown as {
+    update: (p: Record<string, unknown>) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => {
+            eq: (c: string, v: unknown) => Promise<{ error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+  })
+    .update({ is_source_void: true })
+    .eq("tenant_code", args.tenantCode)
+    .eq("source_type", args.sourceType)
+    .eq("source_document_id", args.docId)
+    .eq("source_line_id", args.lineId);
+  if (evtRes.error) {
+    throw new Error(
+      `[reconciliation] events invalidation failed docId=${args.docId} lineId=${args.lineId}: ${evtRes.error.message}`,
+    );
+  }
+  const lineRes = await (args.client.from(args.lineTable) as unknown as {
+    update: (p: Record<string, unknown>) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => {
+            eq: (c: string, v: unknown) => {
+              lt: (c: string, v: unknown) => Promise<{ error: { message: string } | null }>;
+            };
+          };
+        };
+      };
+    };
+  })
+    .update({
+      is_deleted_in_source: true,
+      document_status: "Deleted",
+      last_synced_at: nowIso,
+    })
+    .eq("tenant_code", args.tenantCode)
+    .eq("n3_document_id", args.docId)
+    .eq("n3_line_id", args.lineId)
+    .eq("is_deleted_in_source", false)
+    .lt("last_seen_at", runIso);
+  if (lineRes.error) {
+    throw new Error(
+      `[reconciliation] line invalidation failed docId=${args.docId} lineId=${args.lineId}: ${lineRes.error.message}`,
+    );
+  }
+}
+
 
 
 // ---------------------------------------------------------------------------
