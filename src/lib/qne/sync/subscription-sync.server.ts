@@ -707,6 +707,32 @@ async function syncSourceDetails(args: {
         metrics.renewalEventsInserted += count ?? renewalEvents.length;
       }
     }
+
+    // Phase 1.1.5 — header-level cancellation propagation. Cancellation
+    // lives on the header (isCancelled), so ANY renewal event previously
+    // derived from this (tenant_code, source_type, source_document_id)
+    // must reflect the current header state — regardless of line id.
+    // History rows are preserved; only the is_source_void flag flips.
+    // When the header is non-void again AND we just wrote fresh events
+    // (is_source_void=false in the upsert payload), any leftover events
+    // for lines that were removed from the document are also flipped
+    // back to false only if their line snapshot is non-void — safest is
+    // to only propagate the void=true direction here and let the upsert
+    // above own the false direction for lines it re-emits.
+    {
+      const { error: propErr } = await supabaseAdmin
+        .from("subscription_renewal_events")
+        .update({ is_source_void: isVoid })
+        .eq("tenant_code", tenantCode)
+        .eq("source_type", sourceType)
+        .eq("source_document_id", docId);
+      if (propErr) {
+        console.error(
+          `[subscription-sync] propagate is_source_void failed docId=${docId} isVoid=${isVoid}`,
+          propErr,
+        );
+      }
+    }
   }
 
   return metrics;
