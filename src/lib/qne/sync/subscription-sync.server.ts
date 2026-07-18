@@ -615,6 +615,10 @@ async function syncSourceDetails(args: {
       if (renewal) {
         metrics.mappedRenewalLines += 1;
         if (isVoid) {
+          // Header-level cancellation: do NOT push a fresh event, but the
+          // post-loop propagation below flips is_source_void=true on any
+          // pre-existing events for this (tenant, source_type,
+          // source_document_id). History rows are preserved.
           metrics.renewalEventsSkipped += 1;
           metrics.renewalEventsSkippedVoided += 1;
           return;
