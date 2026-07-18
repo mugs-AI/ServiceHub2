@@ -47,13 +47,232 @@ export interface ReconciliationCounters {
   confirmedLineRemoved: number;
   transient: number;
   unknownEnvelope: number;
+  reconciliationFailed: number;
   skippedUnsafe: boolean;
   skippedReason: string | null;
   inventoryTotal: number | null;
+  priorInventoryTotal: number | null;
   uniqueHeadersSeen: number;
+  existingActiveLineDocuments: number;
   pagesFetched: number;
   candidateDocuments: number;
+  candidateCapHit: boolean;
 }
+
+
+// ---------------------------------------------------------------------------
+// Phase 1.1.6b — Pure safety evaluator. Kept side-effect free so unit tests
+// can pin down the empty-inventory and inventory-collapse guards without
+// mocking supabase or the N3 client.
+
+export interface ScanSafetyInput {
+  scanHealthy: boolean;
+  scanReason: string | null;
+  inventoryTotal: number | null;
+  uniqueHeadersSeen: number;
+  existingActiveLineDocuments: number;
+  priorInventoryTotal: number | null;
+  collapseThreshold?: number; // fraction of prior, default 0.5
+  minPriorForCollapseCheck?: number; // default 10
+}
+
+export interface ScanSafetyResult {
+  skippedUnsafe: boolean;
+  skippedReason: string | null;
+}
+
+export function evaluateScanSafety(input: ScanSafetyInput): ScanSafetyResult {
+  if (!input.scanHealthy) {
+    return {
+      skippedUnsafe: true,
+      skippedReason: input.scanReason ?? "scan unhealthy",
+    };
+  }
+  const threshold = input.collapseThreshold ?? 0.5;
+  const minPrior = input.minPriorForCollapseCheck ?? 10;
+  // Empty inventory guard — never delete everything just because the API
+  // returned no rows this run.
+  if (input.uniqueHeadersSeen === 0 && input.existingActiveLineDocuments > 0) {
+    return {
+      skippedUnsafe: true,
+      skippedReason: `empty inventory (0 headers) while ${input.existingActiveLineDocuments} active documents exist locally`,
+    };
+  }
+  if (
+    input.inventoryTotal === 0 &&
+    input.existingActiveLineDocuments > 0
+  ) {
+    return {
+      skippedUnsafe: true,
+      skippedReason: `N3 reported total=0 while ${input.existingActiveLineDocuments} active documents exist locally`,
+    };
+  }
+  // Suspicious collapse — refuse to reconcile if the reported inventory
+  // is under half of the previous healthy run (with a floor to avoid
+  // whipsaw on tiny tenants).
+  if (
+    input.priorInventoryTotal != null &&
+    input.priorInventoryTotal >= minPrior &&
+    input.inventoryTotal != null &&
+    input.inventoryTotal < input.priorInventoryTotal * threshold
+  ) {
+    return {
+      skippedUnsafe: true,
+      skippedReason: `inventory collapse: current=${input.inventoryTotal} < ${Math.round(
+        threshold * 100,
+      )}% of prior=${input.priorInventoryTotal}`,
+    };
+  }
+  return { skippedUnsafe: false, skippedReason: null };
+}
+
+
+// ---------------------------------------------------------------------------
+// Phase 1.1.6b — Ordered reconciliation writers. Events flip to
+// is_source_void=true BEFORE the line snapshot flips to
+// is_deleted_in_source=true, so a crash between the two leaves the
+// rebuild treating the entitlement as void (safe) rather than active with
+// a deleted source. Every write carries the run-boundary timestamp guard
+// so a row refreshed in-run is never mis-invalidated by a stale scan.
+
+export interface ReconciliationWriteClient {
+  from: (table: string) => {
+    update: (payload: Record<string, unknown>) => {
+      eq: (col: string, val: unknown) => {
+        eq: (col: string, val: unknown) => {
+          eq: (col: string, val: unknown) => {
+            eq?: (col: string, val: unknown) => unknown;
+            lt?: (col: string, val: unknown) => unknown;
+            // events chain resolves to a promise-like via .eq(source_document_id)
+            then?: unknown;
+          };
+        };
+      };
+    };
+  };
+}
+
+export async function invalidateDeletedDocument(args: {
+  client: { from: (table: string) => unknown };
+  tenantCode: string;
+  sourceType: SourceType;
+  docId: string;
+  runStartedAt: Date;
+  lineTable: "sales_invoice_line_snapshots" | "delivery_order_line_snapshots";
+}): Promise<void> {
+  const runIso = args.runStartedAt.toISOString();
+  const nowIso = new Date().toISOString();
+  // 1. Events first — must succeed. Rebuild will treat the entitlement as
+  //    void even if step 2 crashes before it lands.
+  const evtRes = await (args.client.from("subscription_renewal_events") as unknown as {
+    update: (p: Record<string, unknown>) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+  })
+    .update({ is_source_void: true })
+    .eq("tenant_code", args.tenantCode)
+    .eq("source_type", args.sourceType)
+    .eq("source_document_id", args.docId);
+  if (evtRes.error) {
+    throw new Error(
+      `[reconciliation] events invalidation failed docId=${args.docId}: ${evtRes.error.message}`,
+    );
+  }
+  // 2. Line snapshots — with timestamp guard so a row refreshed in the
+  //    same run cannot be mistakenly marked deleted.
+  const lineRes = await (args.client.from(args.lineTable) as unknown as {
+    update: (p: Record<string, unknown>) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => {
+            lt: (c: string, v: unknown) => Promise<{ error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+  })
+    .update({
+      is_deleted_in_source: true,
+      document_status: "Deleted",
+      last_synced_at: nowIso,
+    })
+    .eq("tenant_code", args.tenantCode)
+    .eq("n3_document_id", args.docId)
+    .eq("is_deleted_in_source", false)
+    .lt("last_seen_at", runIso);
+  if (lineRes.error) {
+    throw new Error(
+      `[reconciliation] line invalidation failed docId=${args.docId}: ${lineRes.error.message}`,
+    );
+  }
+}
+
+export async function invalidateRemovedLine(args: {
+  client: { from: (table: string) => unknown };
+  tenantCode: string;
+  sourceType: SourceType;
+  docId: string;
+  lineId: string;
+  runStartedAt: Date;
+  lineTable: "sales_invoice_line_snapshots" | "delivery_order_line_snapshots";
+}): Promise<void> {
+  const runIso = args.runStartedAt.toISOString();
+  const nowIso = new Date().toISOString();
+  const evtRes = await (args.client.from("subscription_renewal_events") as unknown as {
+    update: (p: Record<string, unknown>) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => {
+            eq: (c: string, v: unknown) => Promise<{ error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+  })
+    .update({ is_source_void: true })
+    .eq("tenant_code", args.tenantCode)
+    .eq("source_type", args.sourceType)
+    .eq("source_document_id", args.docId)
+    .eq("source_line_id", args.lineId);
+  if (evtRes.error) {
+    throw new Error(
+      `[reconciliation] events invalidation failed docId=${args.docId} lineId=${args.lineId}: ${evtRes.error.message}`,
+    );
+  }
+  const lineRes = await (args.client.from(args.lineTable) as unknown as {
+    update: (p: Record<string, unknown>) => {
+      eq: (c: string, v: unknown) => {
+        eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => {
+            eq: (c: string, v: unknown) => {
+              lt: (c: string, v: unknown) => Promise<{ error: { message: string } | null }>;
+            };
+          };
+        };
+      };
+    };
+  })
+    .update({
+      is_deleted_in_source: true,
+      document_status: "Deleted",
+      last_synced_at: nowIso,
+    })
+    .eq("tenant_code", args.tenantCode)
+    .eq("n3_document_id", args.docId)
+    .eq("n3_line_id", args.lineId)
+    .eq("is_deleted_in_source", false)
+    .lt("last_seen_at", runIso);
+  if (lineRes.error) {
+    throw new Error(
+      `[reconciliation] line invalidation failed docId=${args.docId} lineId=${args.lineId}: ${lineRes.error.message}`,
+    );
+  }
+}
+
 
 
 // ---------------------------------------------------------------------------
@@ -561,17 +780,22 @@ async function syncSourceDetails(args: {
         { $top: PAGE_SIZE, $skip: skip },
       );
       pagesFetched += 1;
-      if (typeof total === "number" && total > 0) totalReported = total;
+      // Phase 1.1.6b correction #4: preserve the actual reported total,
+      // including a legitimate zero. Only a *missing* total stays null.
+      if (typeof total === "number") totalReported = total;
       for (const h of rows) {
         headers.push(h);
         const id = (h.id ?? "").toString().trim();
         if (id) seenDocumentIds.add(id);
       }
       if (rows.length < PAGE_SIZE) break;
-      if (totalReported != null && skip + rows.length >= totalReported) break;
+      if (totalReported != null && totalReported > 0 && skip + rows.length >= totalReported)
+        break;
       skip += rows.length;
     }
-    if (totalReported != null && seenDocumentIds.size !== totalReported) {
+    // Only the > 0 case has a mismatch invariant to check. total=0 is
+    // handled by the empty-inventory guard in evaluateScanSafety.
+    if (totalReported != null && totalReported > 0 && seenDocumentIds.size !== totalReported) {
       scanHealthy = false;
       scanReason = `unique headers ${seenDocumentIds.size} != API count ${totalReported}`;
     }
@@ -864,6 +1088,79 @@ async function syncSourceDetails(args: {
   // scan came back complete. A partial scan (transport error, unique count
   // mismatch, short/oversized page, etc.) is TREATED AS UNKNOWN — the
   // whole reconciliation phase is skipped, never inferred from partial data.
+  // -------------------------------------------------------------------------
+  // Phase 1.1.6b — Reconciliation gate.
+  //
+  // Runs ONLY when (a) the feature flag is on AND (b) evaluateScanSafety
+  // clears the run. Empty inventories with local data, suspicious
+  // collapses (< 50% of prior run) and any unhealthy scan are treated as
+  // UNKNOWN — the whole reconciliation phase is skipped, never inferred
+  // from partial or suspicious data.
+
+  // Count local active documents for this tenant + source. Used by both
+  // the empty-inventory guard and the operator-facing counters.
+  let existingActiveLineDocuments = 0;
+  {
+    const CHUNK = 1000;
+    let offset = 0;
+    const seen = new Set<string>();
+    for (;;) {
+      const { data, error } = await supabaseAdmin
+        .from(lineTable)
+        .select("n3_document_id")
+        .eq("tenant_code", tenantCode)
+        .eq("is_deleted_in_source", false)
+        .range(offset, offset + CHUNK - 1);
+      if (error) {
+        console.warn(
+          `[subscription-sync] existing-active load failed source=${sourceType}: ${error.message}`,
+        );
+        break;
+      }
+      const rows = data ?? [];
+      for (const r of rows) {
+        const id = String(r.n3_document_id ?? "").trim();
+        if (id) seen.add(id);
+      }
+      if (rows.length < CHUNK) break;
+      offset += CHUNK;
+    }
+    existingActiveLineDocuments = seen.size;
+  }
+
+  // Prior healthy inventory total for this source, from the most recent
+  // completed subscription sync log.
+  let priorInventoryTotal: number | null = null;
+  {
+    const { data } = await supabaseAdmin
+      .from("snapshot_sync_logs")
+      .select("details")
+      .eq("tenant_code", tenantCode)
+      .eq("snapshot_type", "contract")
+      .eq("status", "success")
+      .order("started_at", { ascending: false })
+      .limit(5);
+    const key = sourceType === "invoice" ? "salesInvoice" : "deliveryOrder";
+    for (const log of data ?? []) {
+      const details = (log.details ?? null) as Record<string, unknown> | null;
+      const src = details?.[key] as { reconciliation?: { inventoryTotal?: number | null } } | undefined;
+      const val = src?.reconciliation?.inventoryTotal;
+      if (typeof val === "number") {
+        priorInventoryTotal = val;
+        break;
+      }
+    }
+  }
+
+  const safety = evaluateScanSafety({
+    scanHealthy,
+    scanReason,
+    inventoryTotal: totalReported,
+    uniqueHeadersSeen: seenDocumentIds.size,
+    existingActiveLineDocuments,
+    priorInventoryTotal,
+  });
+
   const recon: ReconciliationCounters = {
     enabled: args.reconciliationEnabled,
     checked: 0,
@@ -871,12 +1168,16 @@ async function syncSourceDetails(args: {
     confirmedLineRemoved: 0,
     transient: 0,
     unknownEnvelope: 0,
-    skippedUnsafe: !scanHealthy,
-    skippedReason: scanReason,
+    reconciliationFailed: 0,
+    skippedUnsafe: safety.skippedUnsafe,
+    skippedReason: safety.skippedReason,
     inventoryTotal: totalReported,
+    priorInventoryTotal,
     uniqueHeadersSeen: seenDocumentIds.size,
+    existingActiveLineDocuments,
     pagesFetched,
     candidateDocuments: 0,
+    candidateCapHit: false,
   };
 
   if (!args.reconciliationEnabled) {
@@ -886,9 +1187,9 @@ async function syncSourceDetails(args: {
     return { ...metrics, reconciliation: recon };
   }
 
-  if (!scanHealthy) {
+  if (safety.skippedUnsafe) {
     console.warn(
-      `[subscription-sync] reconciliation skipped (unsafe scan) source=${sourceType} reason=${scanReason}`,
+      `[subscription-sync] reconciliation skipped (unsafe scan) source=${sourceType} reason=${safety.skippedReason}`,
     );
     return { ...metrics, reconciliation: recon };
   }
@@ -903,7 +1204,12 @@ async function syncSourceDetails(args: {
   // already flagged deleted, whose n3_document_id is not in the current
   // healthy inventory, AND whose last_seen_at < runStartedAt (so we never
   // race a row we just refreshed in this run).
+  //
+  // Order by last_seen_at ASC so the oldest missing documents are
+  // verified first. When the cap trims the list, the next run picks up
+  // where this one left off — deterministic progression, no starvation.
   const candidateDocIds: string[] = [];
+  const seenDocumentOrder = new Set<string>();
   {
     const CHUNK = 1000;
     let offset = 0;
@@ -914,6 +1220,8 @@ async function syncSourceDetails(args: {
         .eq("tenant_code", tenantCode)
         .lt("last_seen_at", args.runStartedAt.toISOString())
         .eq("is_deleted_in_source", false)
+        .order("last_seen_at", { ascending: true })
+        .order("n3_document_id", { ascending: true })
         .range(offset, offset + CHUNK - 1);
       if (error) {
         console.error(
@@ -925,28 +1233,27 @@ async function syncSourceDetails(args: {
         return { ...metrics, reconciliation: recon };
       }
       const rows = data ?? [];
-      const localSeen = new Set<string>();
       for (const r of rows) {
         const id = String(r.n3_document_id ?? "").trim();
         if (!id) continue;
-        if (localSeen.has(id)) continue;
-        localSeen.add(id);
+        if (seenDocumentOrder.has(id)) continue;
+        seenDocumentOrder.add(id);
         if (!seenDocumentIds.has(id)) candidateDocIds.push(id);
       }
       if (rows.length < CHUNK) break;
       offset += CHUNK;
     }
   }
-  // Dedupe across chunks.
-  const uniqueCandidates = Array.from(new Set(candidateDocIds));
-  recon.candidateDocuments = uniqueCandidates.length;
+  recon.candidateDocuments = candidateDocIds.length;
 
-  // Hard cap: never let a runaway missing-set torch the run.
+  // Hard cap: never let a runaway missing-set torch the run. Order-by
+  // last_seen_at guarantees the next run's cap window advances.
   const MAX_VERIFY = 500;
-  const toVerify = uniqueCandidates.slice(0, MAX_VERIFY);
-  if (uniqueCandidates.length > MAX_VERIFY) {
+  const toVerify = candidateDocIds.slice(0, MAX_VERIFY);
+  if (candidateDocIds.length > MAX_VERIFY) {
+    recon.candidateCapHit = true;
     console.warn(
-      `[subscription-sync] reconciliation candidate cap hit source=${sourceType} candidates=${uniqueCandidates.length} verified=${MAX_VERIFY}`,
+      `[subscription-sync] reconciliation candidate cap hit source=${sourceType} candidates=${candidateDocIds.length} verified=${MAX_VERIFY}`,
     );
   }
 
@@ -962,43 +1269,29 @@ async function syncSourceDetails(args: {
       recon.transient += 1;
     } catch (err) {
       if (isN3NotFound(err)) {
-        // Confirmed business-deletion. Mark the source_type + document_id
-        // scope as deleted. History rows in subscription_renewal_events
-        // are preserved; only is_source_void flips so entitlement rebuild
-        // treats them as inactive.
-        recon.confirmedDeleted += 1;
-        const nowIso = new Date().toISOString();
-        const { error: lineErr } = await supabaseAdmin
-          .from(lineTable)
-          .update({
-            is_deleted_in_source: true,
-            document_status: "Deleted",
-            last_synced_at: nowIso,
-          })
-          .eq("tenant_code", tenantCode)
-          .eq("n3_document_id", docId)
-          .eq("is_deleted_in_source", false);
-        if (lineErr) {
+        // Confirmed business-deletion. Ordered writer: events first, then
+        // line snapshots (with run-boundary timestamp guard).
+        try {
+          await invalidateDeletedDocument({
+            client: supabaseAdmin as unknown as { from: (t: string) => unknown },
+            tenantCode,
+            sourceType,
+            docId,
+            runStartedAt: args.runStartedAt,
+            lineTable,
+          });
+          recon.confirmedDeleted += 1;
+          console.info(
+            `[subscription-sync] reconciled_deleted source=${sourceType} docId=${docId} tenant=${tenantCode}`,
+          );
+        } catch (writeErr) {
+          recon.reconciliationFailed += 1;
+          metrics.detailRequestsFailed += 1;
           console.error(
-            `[subscription-sync] mark-deleted lines failed source=${sourceType} docId=${docId}`,
-            lineErr,
+            `[subscription-sync] reconciliation write failed source=${sourceType} docId=${docId}`,
+            writeErr,
           );
         }
-        const { error: evtErr } = await supabaseAdmin
-          .from("subscription_renewal_events")
-          .update({ is_source_void: true })
-          .eq("tenant_code", tenantCode)
-          .eq("source_type", sourceType)
-          .eq("source_document_id", docId);
-        if (evtErr) {
-          console.error(
-            `[subscription-sync] mark-deleted events failed source=${sourceType} docId=${docId}`,
-            evtErr,
-          );
-        }
-        console.info(
-          `[subscription-sync] reconciled_deleted source=${sourceType} docId=${docId} tenant=${tenantCode}`,
-        );
       } else if (err instanceof N3HttpError) {
         // 401/403/500/etc. — do NOT mark deleted. Log and move on.
         recon.transient += 1;
@@ -1047,49 +1340,39 @@ async function syncSourceDetails(args: {
         if (seen && !seen.has(line)) toDelete.push({ doc, line });
       }
       for (const t of toDelete) {
-        const { error: upErr } = await supabaseAdmin
-          .from(lineTable)
-          .update({
-            is_deleted_in_source: true,
-            last_synced_at: new Date().toISOString(),
-          })
-          .eq("tenant_code", tenantCode)
-          .eq("n3_document_id", t.doc)
-          .eq("n3_line_id", t.line);
-        if (upErr) {
-          console.error(
-            `[subscription-sync] mark-removed-line failed source=${sourceType} docId=${t.doc} lineId=${t.line}`,
-            upErr,
+        try {
+          await invalidateRemovedLine({
+            client: supabaseAdmin as unknown as { from: (t: string) => unknown },
+            tenantCode,
+            sourceType,
+            docId: t.doc,
+            lineId: t.line,
+            runStartedAt: args.runStartedAt,
+            lineTable,
+          });
+          recon.confirmedLineRemoved += 1;
+          console.info(
+            `[subscription-sync] reconciled_line_removed source=${sourceType} docId=${t.doc} lineId=${t.line} tenant=${tenantCode}`,
           );
-          continue;
-        }
-        recon.confirmedLineRemoved += 1;
-        const { error: evtErr } = await supabaseAdmin
-          .from("subscription_renewal_events")
-          .update({ is_source_void: true })
-          .eq("tenant_code", tenantCode)
-          .eq("source_type", sourceType)
-          .eq("source_document_id", t.doc)
-          .eq("source_line_id", t.line);
-        if (evtErr) {
+        } catch (writeErr) {
+          recon.reconciliationFailed += 1;
+          metrics.detailRequestsFailed += 1;
           console.error(
-            `[subscription-sync] mark-removed-line events failed source=${sourceType} docId=${t.doc} lineId=${t.line}`,
-            evtErr,
+            `[subscription-sync] reconciliation line-write failed source=${sourceType} docId=${t.doc} lineId=${t.line}`,
+            writeErr,
           );
         }
-        console.info(
-          `[subscription-sync] reconciled_line_removed source=${sourceType} docId=${t.doc} lineId=${t.line} tenant=${tenantCode}`,
-        );
       }
     }
   }
 
   console.info(
-    `[subscription-sync] reconciliation_complete source=${sourceType} tenant=${tenantCode} checked=${recon.checked} deleted=${recon.confirmedDeleted} linesRemoved=${recon.confirmedLineRemoved} transient=${recon.transient} unknown=${recon.unknownEnvelope} candidates=${recon.candidateDocuments} totalReported=${recon.inventoryTotal ?? "-"} unique=${recon.uniqueHeadersSeen}`,
+    `[subscription-sync] reconciliation_complete source=${sourceType} tenant=${tenantCode} checked=${recon.checked} deleted=${recon.confirmedDeleted} linesRemoved=${recon.confirmedLineRemoved} transient=${recon.transient} unknown=${recon.unknownEnvelope} failed=${recon.reconciliationFailed} candidates=${recon.candidateDocuments} capHit=${recon.candidateCapHit} totalReported=${recon.inventoryTotal ?? "-"} priorTotal=${recon.priorInventoryTotal ?? "-"} unique=${recon.uniqueHeadersSeen} existingActive=${recon.existingActiveLineDocuments}`,
   );
 
   return { ...metrics, reconciliation: recon };
 }
+
 
 
 // ---------------------------------------------------------------------------
