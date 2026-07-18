@@ -540,14 +540,48 @@ async function syncSourceDetails(args: {
   };
 
 
+  // Phase 1.1.6b — Gated Full-Inventory Scan. We must know whether the
+  // header list came back complete before we're allowed to treat any
+  // stored document as "missing". Any transport error, non-0000 envelope
+  // during paging, or short/oversized page invalidates the scan.
   const headers: N3DocHeader[] = [];
+  const seenDocumentIds = new Set<string>();
+  let scanHealthy = true;
+  let scanReason: string | null = null;
+  let totalReported: number | null = null;
+  let pagesFetched = 0;
+  const PAGE_SIZE = 200;
   try {
-    for await (const h of n3IterateList<N3DocHeader>(ctx.token, listEndpoint.target, listEndpoint.path)) {
-      headers.push(h);
+    let skip = 0;
+    for (let page = 0; page < 500; page++) {
+      const { rows, total } = await n3GetList<N3DocHeader>(
+        args.ctx.token,
+        listEndpoint.target,
+        listEndpoint.path,
+        { $top: PAGE_SIZE, $skip: skip },
+      );
+      pagesFetched += 1;
+      if (typeof total === "number" && total > 0) totalReported = total;
+      for (const h of rows) {
+        headers.push(h);
+        const id = (h.id ?? "").toString().trim();
+        if (id) seenDocumentIds.add(id);
+      }
+      if (rows.length < PAGE_SIZE) break;
+      if (totalReported != null && skip + rows.length >= totalReported) break;
+      skip += rows.length;
+    }
+    if (totalReported != null && seenDocumentIds.size !== totalReported) {
+      scanHealthy = false;
+      scanReason = `unique headers ${seenDocumentIds.size} != API count ${totalReported}`;
     }
   } catch (err) {
-    throw new Error(
-      `Fetch ${listEndpoint.resource} (${listEndpoint.path}) failed: ${err instanceof Error ? err.message : String(err)}`,
+    scanHealthy = false;
+    scanReason = `list transport error: ${err instanceof Error ? err.message : String(err)}`;
+    // Do NOT throw. We still upsert whatever headers we did fetch; we
+    // simply cannot safely run reconciliation on an incomplete scan.
+    console.warn(
+      `[subscription-sync] list scan unhealthy source=${sourceType} reason=${scanReason}`,
     );
   }
   metrics.headersScanned = headers.length;
@@ -558,11 +592,18 @@ async function syncSourceDetails(args: {
     processed: 0,
   });
 
+  // Track seen lines per successfully-fetched detail so line-removal
+  // reconciliation can compare stored line snapshots against the current
+  // document body without a second detail fetch.
+  const seenLineIdsByDoc = new Map<string, Set<string>>();
+  const detailFetchedDocs = new Set<string>();
+
   let processed = 0;
   for (const header of headers) {
     const docId = (header.id ?? "").toString().trim();
     if (!docId) continue;
     processed += 1;
+
     if (processed % 25 === 0 || processed === headers.length) {
       await heartbeat?.(
         `Fetching ${sourceType} details ${processed}/${headers.length}`,
