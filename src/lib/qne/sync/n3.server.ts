@@ -151,6 +151,20 @@ export async function n3Get<T>(token: string, target: N3Target, path: string, qu
   return unwrapApiResponse(await n3Fetch<T>(token, target, "GET", path, query));
 }
 
+/**
+ * Phase 1.1.6b — confirmed N3 business-deletion signal for Sales Invoices
+ * (probe results): HTTP 200 with envelope code "ERR_NOT_FOUND". Returns
+ * `true` ONLY for that exact contract. Do NOT treat raw HTTP 404, other
+ * envelope codes, transient failures, or malformed responses as deletions.
+ */
+export function isN3NotFound(err: unknown): boolean {
+  return (
+    err instanceof N3HttpError &&
+    err.status === 200 &&
+    err.envelopeCode === "ERR_NOT_FOUND"
+  );
+}
+
 export async function n3GetList<T>(
   token: string,
   target: N3Target,
