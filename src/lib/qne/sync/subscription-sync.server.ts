@@ -207,7 +207,17 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
   const { tenantCode } = ctx;
 
   return runWithSyncLog({ tenantCode, snapshotType: "contract" }, async (counters, heartbeat) => {
+    // Phase 1.1.6b — capture the run boundary. All reconciliation timestamp
+    // guards MUST compare against this exact moment so a late-arriving row
+    // (last_seen_at written moments after the check began) is never
+    // mis-classified as missing.
+    const runStartedAt = new Date();
+    counters.details.reconciliationRunStartedAt = runStartedAt.toISOString();
+    const reconEnabled = reconciliationEnabled();
+    counters.details.reconciliationEnabled = reconEnabled;
+
     await heartbeat("Loading renewal mappings");
+
     // ---- 1. Load mappings ---------------------------------------------------
     type MappingRow = {
       stock_code: string;
