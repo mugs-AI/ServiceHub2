@@ -561,17 +561,22 @@ async function syncSourceDetails(args: {
         { $top: PAGE_SIZE, $skip: skip },
       );
       pagesFetched += 1;
-      if (typeof total === "number" && total > 0) totalReported = total;
+      // Phase 1.1.6b correction #4: preserve the actual reported total,
+      // including a legitimate zero. Only a *missing* total stays null.
+      if (typeof total === "number") totalReported = total;
       for (const h of rows) {
         headers.push(h);
         const id = (h.id ?? "").toString().trim();
         if (id) seenDocumentIds.add(id);
       }
       if (rows.length < PAGE_SIZE) break;
-      if (totalReported != null && skip + rows.length >= totalReported) break;
+      if (totalReported != null && totalReported > 0 && skip + rows.length >= totalReported)
+        break;
       skip += rows.length;
     }
-    if (totalReported != null && seenDocumentIds.size !== totalReported) {
+    // Only the > 0 case has a mismatch invariant to check. total=0 is
+    // handled by the empty-inventory guard in evaluateScanSafety.
+    if (totalReported != null && totalReported > 0 && seenDocumentIds.size !== totalReported) {
       scanHealthy = false;
       scanReason = `unique headers ${seenDocumentIds.size} != API count ${totalReported}`;
     }
