@@ -719,20 +719,24 @@ async function syncSourceDetails(args: {
     // back to false only if their line snapshot is non-void — safest is
     // to only propagate the void=true direction here and let the upsert
     // above own the false direction for lines it re-emits.
-    {
+    // Only propagate the void=true direction. When the header is active,
+    // the upsert above already set is_source_void=false for the current
+    // valid detail lines; we must NOT blanket-flip old/removed lines
+    // back to false here.
+    if (isVoid) {
       const { error: propErr } = await supabaseAdmin
         .from("subscription_renewal_events")
-        .update({ is_source_void: isVoid })
+        .update({ is_source_void: true })
         .eq("tenant_code", tenantCode)
         .eq("source_type", sourceType)
         .eq("source_document_id", docId);
       if (propErr) {
-        console.error(
-          `[subscription-sync] propagate is_source_void failed docId=${docId} isVoid=${isVoid}`,
-          propErr,
+        throw new Error(
+          `[subscription-sync] propagate is_source_void=true failed docId=${docId}: ${propErr.message}`,
         );
       }
     }
+
   }
 
   return metrics;
