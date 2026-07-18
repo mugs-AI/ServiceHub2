@@ -20,9 +20,41 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { N3_ENDPOINTS } from "@/lib/qne/endpoints";
-import { n3Get, n3IterateList, type N3TenantContext } from "./n3.server";
+import {
+  isN3NotFound,
+  n3Get,
+  n3GetList,
+  N3HttpError,
+  type N3TenantContext,
+} from "./n3.server";
 import { runWithSyncLog, SyncNotReadyError, type SyncResult } from "./log.server";
 import { loadAllPaginated } from "./pagination.server";
+
+/**
+ * Server-side feature flag for Phase 1.1.6b reconciliation. Default: ON.
+ * Set RECONCILIATION_ENABLED=false to disable both document-deletion and
+ * line-removal reconciliation without touching Phase 1.1.5 cancellation.
+ */
+function reconciliationEnabled(): boolean {
+  const v = (process.env.RECONCILIATION_ENABLED ?? "").trim().toLowerCase();
+  return v !== "false" && v !== "0" && v !== "off";
+}
+
+export interface ReconciliationCounters {
+  enabled: boolean;
+  checked: number;
+  confirmedDeleted: number;
+  confirmedLineRemoved: number;
+  transient: number;
+  unknownEnvelope: number;
+  skippedUnsafe: boolean;
+  skippedReason: string | null;
+  inventoryTotal: number | null;
+  uniqueHeadersSeen: number;
+  pagesFetched: number;
+  candidateDocuments: number;
+}
+
 
 // ---------------------------------------------------------------------------
 // N3 shapes (minimal, only the fields we depend on).
