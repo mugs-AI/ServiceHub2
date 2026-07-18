@@ -818,7 +818,9 @@ async function rebuildCurrentSnapshots(
     delivery_order: { inserted: 0, updated: 0, unchanged: 0, total: 0 },
   };
 
-  if (latestByKey.size === 0) return { inserted: 0, updated: 0, skipped: 0, bySource };
+  // Phase 1.1.5 — even when there are no eligible events left, existing
+  // subscription snapshots must be deactivated (never deleted). Continue
+  // through the load/deactivate path instead of returning early.
 
   // Load ALL existing snapshots for this tenant so we can resolve rows by
   // either identity — renamed customer_code / stock_code make a chunked
