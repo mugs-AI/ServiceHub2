@@ -782,6 +782,17 @@ async function syncSourceDetails(args: {
 
     });
 
+    // Track the current line-id set the document just reported so the
+    // line-removal reconciliation phase can flag stored lines that N3 no
+    // longer returns. Recorded only for successful detail fetches.
+    detailFetchedDocs.add(docId);
+    const seenLines = new Set<string>();
+    for (const r of upsertRows) {
+      const lid = String((r as { n3_line_id: string }).n3_line_id);
+      if (lid) seenLines.add(lid);
+    }
+    seenLineIdsByDoc.set(docId, seenLines);
+
     // Batch upsert line snapshots.
     if (upsertRows.length > 0) {
       const { error } = await supabaseAdmin
@@ -794,6 +805,7 @@ async function syncSourceDetails(args: {
         metrics.detailLinesStored += upsertRows.length;
       }
     }
+
 
     // Batch upsert renewal events.
     if (renewalEvents.length > 0) {
