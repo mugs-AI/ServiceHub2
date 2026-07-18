@@ -1,152 +1,209 @@
-# Phase 1.1.5 — Cancelled Source Document Investigation Report
 
-## 1. Root cause (confirmed)
+# Phase 1.1.6 — Complete Source Document Lifecycle Investigation
 
-The Sales Invoice snapshot for `M1S2512026b` is refreshed correctly — the
-line row carries `document_status='Cancelled'`, `is_void=true`,
-`is_void_source=true` (verified via `sales_invoice_line_snapshots`).
+Investigation only. No code, schema, or data changes proposed for this phase.
+On approval I will persist this report verbatim to `.lovable/plan.md` (that
+write is the only file change; it replaces the Phase 1.1.5 report).
 
-The defect is in `subscription-sync.server.ts`. When a document that
-previously produced a renewal event later turns `isCancelled=true`, the
-per-line handler **skips emitting the renewal event but never invalidates
-the existing one**. The stale row in `subscription_renewal_events`
-therefore keeps `is_source_void = false` forever, is still picked by the
-rebuild's `latest event wins` selector, and continues to back the
-current-subscription snapshot.
+## 1. Confirmed facts (verified this turn)
 
-Verified in DB:
+- Live case `M1S2512026b` (cancelled) is correctly handled by Phase 1.1.5:
+  header-driven `is_source_void=true` propagation flips the event; rebuild
+  falls back or marks Inactive.
+- Live case `M1S2605009` (deleted in N3) is NOT handled. DB state today:
+  - `sales_invoice_line_snapshots`: `document_status=Active`,
+    `is_void=false`, `is_void_source=false`, `is_deleted_in_source=false`,
+    `last_seen_at=2026-07-18 09:12` (stale — never refreshed after delete).
+  - `subscription_renewal_events` row `d78c7a26…`:
+    `is_source_void=false`, `expiry_date=2027-04-30` → still wins the
+    rebuild for `700-K051` / Maintenance / `Q-SW-Warranty-Q-Maint`.
+- Sync pipeline (`subscription-sync.server.ts`) iterates only headers
+  returned by `GET /api/SalesInvoices/List` and `…/DeliveryOrders/List`.
+  Deleted documents disappear from those lists, so the header loop never
+  visits them, the detail call is never made, the void-propagation block
+  at L726 never fires, and `last_seen_at` is never refreshed. The row
+  sits frozen at its last pre-delete state forever.
+- Cancellation propagation is one-directional (`isVoid` → `true` only) —
+  correct per Phase 1.1.5, but does nothing for deletes.
 
-- Line snapshot: `document_status = 'Cancelled'`, `is_void = t`
-- Renewal event `e9269959-…` for the same `source_document_id`:
-  `is_source_void = f`, `expiry_date = 2026-12-30`
+## 2. Root cause of the `M1S2605009` case
 
-## 2. N3 cancellation field actually returned
+Deletion in N3 = record removed from the List endpoint. ServiceHub's
+sync is list-driven and has no reconciliation pass over previously-seen
+`source_document_id`s. There is currently no code path — anywhere — that
+can mark a persisted event or line as void/deleted when its header
+stops appearing. Result: any deleted SINV or DO keeps its entitlement.
 
-`GET /api/SalesInvoices/{id}` returns `isCancelled: boolean` on the
-header (also present on `/api/DeliveryOrders/{id}`). The sync reads it at
-`subscription-sync.server.ts:533`:
+The same bug applies symmetrically to Delivery Orders and to
+detail-line removal within a still-active header (a removed line's
+snapshot is never re-visited, and its event stays `is_source_void=false`).
 
-```ts
-const isVoid = Boolean(full.isCancelled ?? header.isCancelled);
-```
+## 3. Uncertain facts (need probe before build)
 
-No additional void / deleted / transfer field is consulted, and none is
-needed — the brief exposes cancellation via `isCancelled`.
+Endpoint registry only covers `List` / `GetByKey`. Before coding, verify
+against the live tenant (read-only, ≤ a few requests):
 
-## 3. Invoice snapshot refresh
+1. `GET /api/SalesInvoices/{deletedId}` — status code (404? 200 with a
+   flag? envelope `code!="0000"`?). Same for `/api/DeliveryOrders/{id}`.
+2. Whether the List endpoint exposes an `isDeleted` / `documentStatus`
+   / `deletedAt` field for any lifecycle state (spec review).
+3. Whether an Audit Trail / change-log endpoint exists in the OpenAPI
+   spec (not in current registry — likely no).
+4. Whether detail-line `id` is stable across edits (Phase 1.1.2 assumes
+   yes; needs one edit+resync probe).
+5. Whether DO→SINV transfer exposes a provenance field (`fromDocId`,
+   `sourceDocumentId`) on the SINV header/lines.
 
-Correct. `sales_invoice_line_snapshots` is upserted every run with the
-current `isVoid`, so `document_status`, `is_void` and `is_void_source`
-reflect the latest N3 state for `M1S2512026b`.
+These five probes are cheap (curl-equivalent) and are prerequisites for
+choosing between the deletion-detection options in §5.
 
-## 4. Renewal event lifecycle after cancellation
-
-Broken. `subscription-sync.server.ts:615-621`:
-
-```ts
-if (renewal) {
-  metrics.mappedRenewalLines += 1;
-  if (isVoid) {                              // ← early-return
-    metrics.renewalEventsSkipped += 1;
-    metrics.renewalEventsSkippedVoided += 1;
-    return;                                   // no event pushed
-  }
-  ...
-}
-```
-
-Because the void branch `return`s before pushing into `renewalEvents[]`,
-the batched upsert at line 689-704 never touches the pre-existing row.
-Nothing else in the pipeline sets `is_source_void = true` or deletes the
-row. There is no reconciliation pass that walks `subscription_renewal_events`
-against `*_line_snapshots.is_void`.
-
-## 5. Current renewal event for `M1S2512026b`
-
-```
-id                     : e9269959-69b6-49f0-b0a6-def9c55326e2
-source_document_id     : a9b0fb1e-4023-4075-e039-08dee1a9f0d4
-source_document_no     : M1S2512026b
-source_document_date   : 2025-12-31
-customer_code          : 700-K051
-stock_code             : Q-SW-Warranty-Q-Maint
-expiry_date            : 2026-12-30
-is_source_void         : false   ← stale, should be true
-```
-
-Eligible for the rebuild's `is_source_void = false` filter, so it wins.
-
-## 6. Why rebuild still selects it
-
-`rebuildCurrentSnapshots()` at `subscription-sync.server.ts:745-758`:
-
-```ts
-supabaseAdmin
-  .from("subscription_renewal_events")
-  .select(...)
-  .eq("tenant_code", tenantCode)
-  .eq("is_source_void", false)          // filter uses event flag only
-  .order("source_document_date", { ascending: false })
-  .order("source_line_id", { ascending: false })
-```
-
-Ordering: latest `source_document_date` wins per
-`(n3_customer_id, category, n3_stock_id)` (or legacy composite). No join
-against `*_line_snapshots.is_void` / `document_status`, and no
-`is_source_void` refresh anywhere upstream. Therefore the cancelled
-invoice — dated 2025-12-31, the most recent for this key — remains the
-effective source.
-
-## 7. Correct expected behaviour for `M1S2512026b`
-
-1. Keep the cancelled document and line snapshots for audit (already
-   correct).
-2. On every sync, reconcile `subscription_renewal_events.is_source_void`
-   from the authoritative line snapshot flag (`is_void` /
-   `is_void_source` / `document_status = 'Cancelled'`), for BOTH sources.
-3. Rebuild picks the latest non-void event, i.e. the most recent prior
-   valid SINV or DO for the same
-   `(tenant, n3_customer_id, category, n3_stock_id)`.
-4. If none remain, the current subscription row must be removed or
-   marked inactive — not left pointing at a cancelled document.
-5. Workspace must display the surviving prior source (or "No current
-   entitlement") rather than `M1S2512026b`.
-
-Schema already supports this: `is_source_void` exists on
-`subscription_renewal_events`; `is_void` / `document_status` exist on
-both `sales_invoice_line_snapshots` and `delivery_order_line_snapshots`.
-No migration is required for the fix — only reconciliation logic.
-
-The rebuild will also need a deactivation step for
-`customer_subscription_snapshots` rows whose `(n3_customer_id, category,
-n3_stock_id)` no longer has any non-void event. `subscription_status`
-already accepts a text value, so an `Inactive` / `Cancelled` status is
-possible without schema change; final wording is a separate decision.
-
-## 8. Delivery Order parity
-
-Same defect. `syncSourceDetails()` is source-agnostic — the void branch
-and the batched upsert are shared between Sales Invoices and Delivery
-Orders, and `rebuildCurrentSnapshots()` filters events by
-`is_source_void` regardless of `source_type`. A cancelled DO would leave
-an identical stale event. The fix must run against both line-snapshot
-tables in the same pass.
-
-## 9. Confidence
-
-**High.** DB rows confirm the stale `is_source_void = false` event
-alongside a correctly-flagged cancelled line snapshot, and the code path
-that would flip the flag does not exist. No additional N3 field or
-schema change is required to remediate.
-
-## Files and functions in scope for the eventual fix (no changes yet)
+## 4. Files & functions in scope
 
 - `src/lib/qne/sync/subscription-sync.server.ts`
-  - `syncSourceDetails()` — void branch at ~L615 must also invalidate
-    the existing event, not just skip.
-  - `rebuildCurrentSnapshots()` — must deactivate current subscription
-    rows whose immutable key no longer resolves to a non-void event.
-- `sales_invoice_line_snapshots`, `delivery_order_line_snapshots` —
-  already authoritative for cancellation; no schema change.
-- `subscription_renewal_events.is_source_void` — the flag that must be
-  written on cancellation (currently only set at insert time).
+  - `syncSubscriptionSnapshots` (L174) — top-level flow.
+  - `syncSourceDetails` (L416) — header loop, upsert, void propagation (L726).
+  - `rebuildCurrentSnapshots` (L754) — event selection + orphan deactivation.
+- `src/lib/qne/endpoints.ts` — endpoint registry (needs no new list
+  endpoint for deletion detection; may need audit-trail entry if it exists).
+- `src/lib/qne/sync/n3.server.ts` — `n3Get` currently throws on any
+  non-2xx; needs a way to distinguish `404` from transient failure.
+- Tables: `sales_invoice_line_snapshots`, `delivery_order_line_snapshots`,
+  `subscription_renewal_events`, `customer_subscription_snapshots`.
+- Existing columns already present and usable: `is_void`,
+  `is_void_source`, `is_deleted_in_source`, `document_status`,
+  `last_seen_at`, `last_synced_at`, `is_source_void`.
+
+## 5. Deletion-detection options
+
+| Option | Reliability | Cost | Verdict |
+| --- | --- | --- | --- |
+| A. Explicit N3 field (`isDeleted` on list) | Definitive if it exists | 0 | Adopt only if probe §3.2 confirms. |
+| B. Detail 404 after list-miss | Definitive when 404 is distinguishable from 401/5xx | 1 GET per suspected-missing doc | **Recommended primary signal.** |
+| C. Full inventory diff (list all IDs, diff against DB) | Definitive | 1 full list scan (already done) | Free reconciliation pass. |
+| D. Audit Trail API | Unknown existence | Unknown | Only if §3.3 confirms an endpoint. |
+| E. Watermark/tombstone stream | None documented | — | Not available. |
+
+Recommended architecture: **C + B**, gated.
+1. After every successful full list-scan, compute the set of
+   `source_document_id`s seen this run per source_type.
+2. For any persisted event/line snapshot whose id is missing from that
+   set AND whose `last_seen_at` is older than the run start, issue a
+   single `GET /api/{Resource}/{id}` confirmation call.
+3. Only on a confirmed 404 (parsed from `n3.server.ts`) mark the line
+   snapshot `is_deleted_in_source=true`, `document_status='Deleted'`,
+   and propagate `is_source_void=true` to all matching events. Any
+   other status (401, 5xx, network error, non-2xx without 404) is
+   treated as "temporarily missing" — leave state untouched, increment
+   a `sync_runs` warning counter, do NOT revoke entitlement.
+4. Skip the confirmation call entirely if the list-scan itself failed
+   or returned a suspiciously low `total` (guard against partial list).
+
+This preserves the invariants in the user's rules (§Part 5.13, §Part 5.15):
+temporary unavailability never revokes, partial sync never publishes.
+
+## 6. Lifecycle state table (target behaviour)
+
+| Header state | List | Detail | Line snapshot | Event | Current sub |
+| --- | --- | --- | --- | --- | --- |
+| Created | ✓ | 200 | upsert Active | insert non-void | Active/Due/Overdue |
+| Modified | ✓ | 200 | upsert Active | upsert on same line id | recompute |
+| Renamed doc no | ✓ | 200 | upsert (docNo changes) | upsert | recompute |
+| Cancelled | ✓ | 200 `isCancelled=true` | upsert Cancelled | propagate void=true | fallback / Inactive |
+| Un-cancelled | ✓ | 200 `isCancelled=false` | upsert Active | line-upsert re-emits non-void | recompute |
+| Deleted | ✗ | 404 | mark Deleted (after 404 confirm) | propagate void=true | fallback / Inactive |
+| Line removed (header active) | ✓ | 200, line absent | mark line Deleted (post-detail reconcile) | void=true for that line id | recompute |
+| Line stock changed, same id | ✓ | 200 | upsert new stock_code | upsert (mapping re-evaluated) | recompute |
+| Line replaced (new id) | ✓ | 200 | old id: mark Deleted; new id: upsert | old event void=true; new event insert | recompute |
+| Customer changed | ✓ | 200 | upsert new customer | new event under new (customer,category,stock) key; old-key sub deactivates | move |
+| Temporarily missing (401/5xx) | partial | — | leave; warn | leave | unchanged |
+
+## 7. Schema — additive only (no destructive change)
+
+Already sufficient today; only fill fields that exist:
+- `*_line_snapshots.is_deleted_in_source` (bool, exists) — set true only
+  on confirmed 404.
+- `*_line_snapshots.document_status` (text, exists) — extend accepted
+  values: `Active | Cancelled | Deleted`.
+- `subscription_renewal_events.is_source_void` (bool, exists) — remains
+  the single eligibility flag; `true` means "do not consider".
+- `customer_subscription_snapshots.subscription_status` (text, exists) —
+  extend accepted values: `Active | Due Soon | Overdue | Inactive`.
+
+Optional (recommended, but can defer): add
+`source_last_seen_at timestamptz` on both `*_line_snapshots` explicitly
+mirroring `last_seen_at` for the deletion-reconciliation query, plus a
+`snapshot_sync_logs.details.reconciliation` block. Not required for
+correctness; existing `last_seen_at` is sufficient.
+
+## 8. Risks of naive missing-record detection
+
+- Partial pagination (List truncated by 500-cap or transient 5xx mid-scan)
+  would look identical to a mass delete → mass entitlement revocation.
+- Permission change (Administrator loses SINV read) would delete every
+  entitlement on the next sync.
+- Filter drift (someone adds a date/branch filter to the List call) would
+  false-positive every out-of-window doc.
+
+Mitigation: run reconciliation ONLY when the list scan completed cleanly
+(no `detailRequestsFailed` from the list generator, `total` matches
+`headers.length`, and total headers ≥ some floor vs previous run — the
+sync log already tracks this).
+
+## 9. Implementation sequence (subsequent build phase — NOT this turn)
+
+1. Extend `n3.server.ts` to expose HTTP status on failures (typed
+   `N3HttpError` with `status`).
+2. Add "seen this run" set collection inside `syncSourceDetails`.
+3. After the header loop, run a reconciliation pass per source_type:
+   query `*_line_snapshots` for rows whose `n3_document_id NOT IN seen`
+   and `last_seen_at < runStart`; for each unique doc id, issue one
+   `n3Get`; on `N3HttpError(404)` update line rows + propagate
+   `is_source_void=true` to events; on any other error, log and skip.
+4. Gate the pass on list-scan health (see §8).
+5. Extend `rebuildCurrentSnapshots` — no logic change; it already
+   respects `is_source_void=false` and deactivates orphans.
+6. Extend `snapshot_sync_logs` counters:
+   `reconciliation.checked`, `.confirmedDeleted`, `.transient`,
+   `.skippedUnsafe`.
+7. Admin console: surface the four counters + a warning banner when
+   reconciliation is skipped for safety.
+
+## 10. Test matrix
+
+Automated (unit / integration where possible):
+- header-cancelled → event void, sub deactivated (regression).
+- header-deleted (mock 404) → event void, sub deactivated.
+- header-transient (mock 500) → no state change.
+- header-active, line removed → only that line's event voided.
+- list scan truncated → reconciliation skipped, warning counter set.
+- repeat sync → identical result.
+
+Live acceptance (700-K051 tenant):
+- `M1S2512026b` remains cancelled fallback (Phase 1.1.5 regression).
+- `M1S2605009` becomes deleted → Maintenance falls back or Inactive.
+- Restore/undelete of a doc (if N3 supports) → entitlement returns.
+- Delete a DO with no SINV twin → deactivates.
+- Delete a DO after SINV transfer → SINV keeps entitlement.
+
+## 11. Rollback
+
+Reconciliation is additive and gated. Rollback = feature-flag the
+reconciliation pass off; existing behaviour (Phase 1.1.5) is unchanged.
+No destructive migration proposed, so no data restore is needed.
+
+## 12. Recommendation
+
+**Split into two implementation phases.**
+
+- **Phase 1.1.6a — Probes & typed HTTP errors (small).** Confirm §3
+  facts against live N3; introduce `N3HttpError` with `status`. No
+  behavioural change. ~2 steps.
+- **Phase 1.1.6b — Reconciliation pass + admin telemetry (medium).**
+  Add gated deletion-reconciliation, extend counters, add banner.
+  ~6 steps.
+
+One-phase delivery is possible but risky: without §3 probes we may
+mis-code the 404 shape or miss an official `isDeleted` field and ship a
+reconciliation pass that either under-detects or, worse, over-revokes.
+Two phases keep credit spend low and let live probe results shape the
+build.
