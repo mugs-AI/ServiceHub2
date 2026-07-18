@@ -356,6 +356,8 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       customerNameByCode,
       customerN3IdByCode,
       heartbeat,
+      runStartedAt,
+      reconciliationEnabled: reconEnabled,
     });
     await heartbeat("Fetching Delivery Order details");
     const doMetrics = await syncSourceDetails({
@@ -373,12 +375,30 @@ export async function syncSubscriptionSnapshots(ctx: N3TenantContext): Promise<S
       customerNameByCode,
       customerN3IdByCode,
       heartbeat,
+      runStartedAt,
+      reconciliationEnabled: reconEnabled,
     });
 
 
     // Merge per-source metrics into the audit counters.
     counters.details.salesInvoice = siMetrics;
     counters.details.deliveryOrder = doMetrics;
+    counters.details.reconciliation = {
+      salesInvoice: siMetrics.reconciliation,
+      deliveryOrder: doMetrics.reconciliation,
+      totals: {
+        checked: siMetrics.reconciliation.checked + doMetrics.reconciliation.checked,
+        confirmedDeleted:
+          siMetrics.reconciliation.confirmedDeleted + doMetrics.reconciliation.confirmedDeleted,
+        confirmedLineRemoved:
+          siMetrics.reconciliation.confirmedLineRemoved +
+          doMetrics.reconciliation.confirmedLineRemoved,
+        transient: siMetrics.reconciliation.transient + doMetrics.reconciliation.transient,
+        unknownEnvelope:
+          siMetrics.reconciliation.unknownEnvelope + doMetrics.reconciliation.unknownEnvelope,
+      },
+    };
+
     counters.details.mappedRenewalLines = siMetrics.mappedRenewalLines + doMetrics.mappedRenewalLines;
     counters.details.mappedAdHocLines = siMetrics.mappedAdHocLines + doMetrics.mappedAdHocLines;
     counters.details.unmappedLinesIgnored =
