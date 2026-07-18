@@ -87,3 +87,29 @@ describe("n3Fetch typed error contract (Phase 1.1.6a)", () => {
     expect(data).toEqual({ hello: "world" });
   });
 });
+
+describe("isN3NotFound — Phase 1.1.6b deletion signal", () => {
+  it("returns true ONLY for HTTP 200 + envelope code ERR_NOT_FOUND", () => {
+    expect(
+      isN3NotFound(
+        new N3HttpError({ message: "x", status: 200, envelopeCode: "ERR_NOT_FOUND" }),
+      ),
+    ).toBe(true);
+  });
+  it("returns false for raw HTTP 404 (N3 does not use it for deletions)", () => {
+    expect(isN3NotFound(new N3HttpError({ message: "x", status: 404 }))).toBe(false);
+  });
+  it("returns false for other envelope codes", () => {
+    expect(
+      isN3NotFound(
+        new N3HttpError({ message: "x", status: 200, envelopeCode: "9001" }),
+      ),
+    ).toBe(false);
+  });
+  it("returns false for 401/403/500/network errors", () => {
+    expect(isN3NotFound(new N3HttpError({ message: "x", status: 401 }))).toBe(false);
+    expect(isN3NotFound(new N3HttpError({ message: "x", status: 500 }))).toBe(false);
+    expect(isN3NotFound(new Error("network"))).toBe(false);
+    expect(isN3NotFound(null)).toBe(false);
+  });
+});
