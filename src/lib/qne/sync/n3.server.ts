@@ -13,6 +13,42 @@ export interface N3TenantContext {
   email: string;
 }
 
+/**
+ * Typed error for all non-successful N3 responses. Preserves HTTP status,
+ * the envelope `code` (when the transport was HTTP 200 but the envelope
+ * signals a non-`0000` code), and the raw parsed / textual payload so
+ * callers (diagnostics probes, reconciliation) can classify lifecycle
+ * outcomes (404 = deleted, envelope `9xxx` = validation, etc.) without
+ * re-parsing error strings.
+ */
+export class N3HttpError extends Error {
+  status: number;
+  envelopeCode?: string;
+  rawResponse?: unknown;
+  resource?: string;
+  method?: string;
+  path?: string;
+
+  constructor(init: {
+    message: string;
+    status: number;
+    envelopeCode?: string;
+    rawResponse?: unknown;
+    resource?: string;
+    method?: string;
+    path?: string;
+  }) {
+    super(init.message);
+    this.name = "N3HttpError";
+    this.status = init.status;
+    this.envelopeCode = init.envelopeCode;
+    this.rawResponse = init.rawResponse;
+    this.resource = init.resource;
+    this.method = init.method;
+    this.path = init.path;
+  }
+}
+
 async function n3Fetch<T>(
   token: string,
   target: N3Target,
@@ -31,12 +67,84 @@ async function n3Fetch<T>(
     headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(body);
   }
+  const startedAt = Date.now();
   const res = await fetch(url, init);
   const text = await res.text();
+  const elapsedMs = Date.now() - startedAt;
+
   if (!res.ok) {
-    throw new Error(`N3 ${method} ${path} failed (${res.status}): ${text.slice(0, 200)}`);
+    let raw: unknown = text;
+    try {
+      raw = text ? JSON.parse(text) : null;
+    } catch {
+      /* keep raw as text */
+    }
+    const envelopeCode =
+      raw && typeof raw === "object" && typeof (raw as { code?: unknown }).code === "string"
+        ? (raw as { code: string }).code
+        : undefined;
+    const err = new N3HttpError({
+      message: `N3 ${method} ${path} failed (${res.status}): ${text.slice(0, 200)}`,
+      status: res.status,
+      envelopeCode,
+      rawResponse: raw,
+      method,
+      path,
+    });
+    console.warn("[n3Fetch] http_error", {
+      status: err.status,
+      envelopeCode: err.envelopeCode,
+      method,
+      path,
+      target,
+      elapsedMs,
+    });
+    throw err;
   }
-  return text ? (JSON.parse(text) as ApiEnvelope<T>) : ({ code: "0000", data: null as unknown as T } as ApiEnvelope<T>);
+
+  let parsed: ApiEnvelope<T>;
+  if (!text) {
+    parsed = { code: "0000", data: null as unknown as T } as ApiEnvelope<T>;
+  } else {
+    try {
+      parsed = JSON.parse(text) as ApiEnvelope<T>;
+    } catch {
+      throw new N3HttpError({
+        message: `N3 ${method} ${path} returned non-JSON (200)`,
+        status: 200,
+        rawResponse: text,
+        method,
+        path,
+      });
+    }
+  }
+
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    typeof parsed.code === "string" &&
+    parsed.code !== "0000"
+  ) {
+    const err = new N3HttpError({
+      message: `N3 ${method} ${path} envelope error (code ${parsed.code}): ${parsed.message ?? ""}`,
+      status: 200,
+      envelopeCode: parsed.code,
+      rawResponse: parsed,
+      method,
+      path,
+    });
+    console.warn("[n3Fetch] envelope_error", {
+      status: 200,
+      envelopeCode: parsed.code,
+      method,
+      path,
+      target,
+      elapsedMs,
+    });
+    throw err;
+  }
+
+  return parsed;
 }
 
 export async function n3Get<T>(token: string, target: N3Target, path: string, query?: Record<string, unknown>): Promise<T> {
