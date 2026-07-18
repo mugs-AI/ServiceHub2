@@ -857,8 +857,240 @@ async function syncSourceDetails(args: {
 
   }
 
-  return metrics;
+  // -------------------------------------------------------------------------
+  // Phase 1.1.6b — Reconciliation.
+  //
+  // Runs ONLY when (a) the feature flag is on AND (b) the header inventory
+  // scan came back complete. A partial scan (transport error, unique count
+  // mismatch, short/oversized page, etc.) is TREATED AS UNKNOWN — the
+  // whole reconciliation phase is skipped, never inferred from partial data.
+  const recon: ReconciliationCounters = {
+    enabled: args.reconciliationEnabled,
+    checked: 0,
+    confirmedDeleted: 0,
+    confirmedLineRemoved: 0,
+    transient: 0,
+    unknownEnvelope: 0,
+    skippedUnsafe: !scanHealthy,
+    skippedReason: scanReason,
+    inventoryTotal: totalReported,
+    uniqueHeadersSeen: seenDocumentIds.size,
+    pagesFetched,
+    candidateDocuments: 0,
+  };
+
+  if (!args.reconciliationEnabled) {
+    console.info(
+      `[subscription-sync] reconciliation disabled by RECONCILIATION_ENABLED source=${sourceType}`,
+    );
+    return { ...metrics, reconciliation: recon };
+  }
+
+  if (!scanHealthy) {
+    console.warn(
+      `[subscription-sync] reconciliation skipped (unsafe scan) source=${sourceType} reason=${scanReason}`,
+    );
+    return { ...metrics, reconciliation: recon };
+  }
+
+  await args.heartbeat?.(`Reconciling ${sourceType} deletions`, {
+    source: sourceType,
+    stage: "reconciliation",
+  });
+
+  // ---- Deleted-document reconciliation --------------------------------------
+  // Candidates: rows for THIS tenant + source whose parent document is not
+  // already flagged deleted, whose n3_document_id is not in the current
+  // healthy inventory, AND whose last_seen_at < runStartedAt (so we never
+  // race a row we just refreshed in this run).
+  const candidateDocIds: string[] = [];
+  {
+    const CHUNK = 1000;
+    let offset = 0;
+    for (;;) {
+      const { data, error } = await supabaseAdmin
+        .from(lineTable)
+        .select("n3_document_id, last_seen_at, is_deleted_in_source")
+        .eq("tenant_code", tenantCode)
+        .lt("last_seen_at", args.runStartedAt.toISOString())
+        .eq("is_deleted_in_source", false)
+        .range(offset, offset + CHUNK - 1);
+      if (error) {
+        console.error(
+          `[subscription-sync] reconciliation candidate load failed source=${sourceType}`,
+          error,
+        );
+        recon.skippedUnsafe = true;
+        recon.skippedReason = `candidate load failed: ${error.message}`;
+        return { ...metrics, reconciliation: recon };
+      }
+      const rows = data ?? [];
+      const localSeen = new Set<string>();
+      for (const r of rows) {
+        const id = String(r.n3_document_id ?? "").trim();
+        if (!id) continue;
+        if (localSeen.has(id)) continue;
+        localSeen.add(id);
+        if (!seenDocumentIds.has(id)) candidateDocIds.push(id);
+      }
+      if (rows.length < CHUNK) break;
+      offset += CHUNK;
+    }
+  }
+  // Dedupe across chunks.
+  const uniqueCandidates = Array.from(new Set(candidateDocIds));
+  recon.candidateDocuments = uniqueCandidates.length;
+
+  // Hard cap: never let a runaway missing-set torch the run.
+  const MAX_VERIFY = 500;
+  const toVerify = uniqueCandidates.slice(0, MAX_VERIFY);
+  if (uniqueCandidates.length > MAX_VERIFY) {
+    console.warn(
+      `[subscription-sync] reconciliation candidate cap hit source=${sourceType} candidates=${uniqueCandidates.length} verified=${MAX_VERIFY}`,
+    );
+  }
+
+  for (const docId of toVerify) {
+    recon.checked += 1;
+    try {
+      await n3Get<N3DocFull>(
+        args.ctx.token,
+        getEndpoint.target,
+        getEndpoint.path.replace("{key}", encodeURIComponent(docId)),
+      );
+      // Still exists — must be a transient list omission. Do NOT mark deleted.
+      recon.transient += 1;
+    } catch (err) {
+      if (isN3NotFound(err)) {
+        // Confirmed business-deletion. Mark the source_type + document_id
+        // scope as deleted. History rows in subscription_renewal_events
+        // are preserved; only is_source_void flips so entitlement rebuild
+        // treats them as inactive.
+        recon.confirmedDeleted += 1;
+        const nowIso = new Date().toISOString();
+        const { error: lineErr } = await supabaseAdmin
+          .from(lineTable)
+          .update({
+            is_deleted_in_source: true,
+            document_status: "Deleted",
+            last_synced_at: nowIso,
+          })
+          .eq("tenant_code", tenantCode)
+          .eq("n3_document_id", docId)
+          .eq("is_deleted_in_source", false);
+        if (lineErr) {
+          console.error(
+            `[subscription-sync] mark-deleted lines failed source=${sourceType} docId=${docId}`,
+            lineErr,
+          );
+        }
+        const { error: evtErr } = await supabaseAdmin
+          .from("subscription_renewal_events")
+          .update({ is_source_void: true })
+          .eq("tenant_code", tenantCode)
+          .eq("source_type", sourceType)
+          .eq("source_document_id", docId);
+        if (evtErr) {
+          console.error(
+            `[subscription-sync] mark-deleted events failed source=${sourceType} docId=${docId}`,
+            evtErr,
+          );
+        }
+        console.info(
+          `[subscription-sync] reconciled_deleted source=${sourceType} docId=${docId} tenant=${tenantCode}`,
+        );
+      } else if (err instanceof N3HttpError) {
+        // 401/403/500/etc. — do NOT mark deleted. Log and move on.
+        recon.transient += 1;
+        console.warn(
+          `[subscription-sync] recon transient http_error source=${sourceType} docId=${docId} status=${err.status} envelope=${err.envelopeCode ?? "-"}`,
+        );
+      } else {
+        recon.unknownEnvelope += 1;
+        console.warn(
+          `[subscription-sync] recon unknown error source=${sourceType} docId=${docId}`,
+          err,
+        );
+      }
+    }
+  }
+
+  // ---- Line-removal reconciliation -----------------------------------------
+  // For every document whose detail fetch succeeded in THIS run, any stored
+  // line snapshot whose n3_line_id is not in the freshly-seen line set —
+  // AND whose last_seen_at predates this run — must be flagged deleted.
+  {
+    const docIds = Array.from(detailFetchedDocs);
+    const BATCH = 100;
+    for (let i = 0; i < docIds.length; i += BATCH) {
+      const chunk = docIds.slice(i, i + BATCH);
+      const { data, error } = await supabaseAdmin
+        .from(lineTable)
+        .select("n3_document_id, n3_line_id")
+        .eq("tenant_code", tenantCode)
+        .in("n3_document_id", chunk)
+        .eq("is_deleted_in_source", false)
+        .lt("last_seen_at", args.runStartedAt.toISOString());
+      if (error) {
+        console.error(
+          `[subscription-sync] line-removal load failed source=${sourceType}`,
+          error,
+        );
+        continue;
+      }
+      const toDelete: Array<{ doc: string; line: string }> = [];
+      for (const r of data ?? []) {
+        const doc = String(r.n3_document_id ?? "");
+        const line = String(r.n3_line_id ?? "");
+        if (!doc || !line) continue;
+        const seen = seenLineIdsByDoc.get(doc);
+        if (seen && !seen.has(line)) toDelete.push({ doc, line });
+      }
+      for (const t of toDelete) {
+        const { error: upErr } = await supabaseAdmin
+          .from(lineTable)
+          .update({
+            is_deleted_in_source: true,
+            last_synced_at: new Date().toISOString(),
+          })
+          .eq("tenant_code", tenantCode)
+          .eq("n3_document_id", t.doc)
+          .eq("n3_line_id", t.line);
+        if (upErr) {
+          console.error(
+            `[subscription-sync] mark-removed-line failed source=${sourceType} docId=${t.doc} lineId=${t.line}`,
+            upErr,
+          );
+          continue;
+        }
+        recon.confirmedLineRemoved += 1;
+        const { error: evtErr } = await supabaseAdmin
+          .from("subscription_renewal_events")
+          .update({ is_source_void: true })
+          .eq("tenant_code", tenantCode)
+          .eq("source_type", sourceType)
+          .eq("source_document_id", t.doc)
+          .eq("source_line_id", t.line);
+        if (evtErr) {
+          console.error(
+            `[subscription-sync] mark-removed-line events failed source=${sourceType} docId=${t.doc} lineId=${t.line}`,
+            evtErr,
+          );
+        }
+        console.info(
+          `[subscription-sync] reconciled_line_removed source=${sourceType} docId=${t.doc} lineId=${t.line} tenant=${tenantCode}`,
+        );
+      }
+    }
+  }
+
+  console.info(
+    `[subscription-sync] reconciliation_complete source=${sourceType} tenant=${tenantCode} checked=${recon.checked} deleted=${recon.confirmedDeleted} linesRemoved=${recon.confirmedLineRemoved} transient=${recon.transient} unknown=${recon.unknownEnvelope} candidates=${recon.candidateDocuments} totalReported=${recon.inventoryTotal ?? "-"} unique=${recon.uniqueHeadersSeen}`,
+  );
+
+  return { ...metrics, reconciliation: recon };
 }
+
 
 // ---------------------------------------------------------------------------
 // Rebuild current customer_subscription_snapshots from the renewal event
