@@ -65,7 +65,7 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
             supabaseAdmin
               .from("subscription_renewal_events")
               .select(
-                "customer_code, subscription_category_name, stock_code, source_type, source_document_no, source_line_id, source_document_date, expiry_date",
+                "customer_code, subscription_category_name, stock_code, source_type, source_document_no, source_line_id, source_document_date, expiry_date, is_source_void",
               )
               .eq("tenant_code", tenant)
               .eq("source_document_no", docNo),
