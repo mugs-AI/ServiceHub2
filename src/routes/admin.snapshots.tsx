@@ -1006,6 +1006,8 @@ function TransactionDetailDiagnostics({ tenant }: { tenant: string }) {
           )}
 
           {renderSubscriptionSourceSplit(state.latest?.details)}
+          {renderReconciliationSummary(state.latest?.details)}
+
 
 
           {state.activeLocks.length > 0 && (
