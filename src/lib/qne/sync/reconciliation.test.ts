@@ -216,15 +216,16 @@ describe("evaluateScanSafety (Phase 1.1.6b guards)", () => {
     expect(r.skippedReason).toMatch(/empty inventory/);
   });
 
-  it("skips when N3 reports total=0 while active documents exist locally", () => {
+  it("skips when N3 reports total=0 even if a partial page slipped in (inconsistent API)", () => {
     const r = evaluateScanSafety({
       ...base,
       inventoryTotal: 0,
-      uniqueHeadersSeen: 0,
+      uniqueHeadersSeen: 3, // partial page; total=0 is authoritative here
     });
     expect(r.skippedUnsafe).toBe(true);
     expect(r.skippedReason).toMatch(/total=0/);
   });
+
 
   it("skips on suspicious collapse (<50% of prior)", () => {
     const r = evaluateScanSafety({
