@@ -470,7 +470,10 @@ async function syncSourceDetails(args: {
   customerNameByCode: Map<string, string | null>;
   customerN3IdByCode: Map<string, string | null>;
   heartbeat?: (stage: string, progress?: Record<string, unknown>) => Promise<void>;
-}): Promise<SourceMetrics> {
+  runStartedAt: Date;
+  reconciliationEnabled: boolean;
+}): Promise<SourceMetrics & { reconciliation: ReconciliationCounters }> {
+
   const {
     ctx,
     tenantCode,
