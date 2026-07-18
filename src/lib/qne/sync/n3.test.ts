@@ -43,21 +43,21 @@ describe("n3Fetch typed error contract (Phase 1.1.6a)", () => {
 
   it("throws N3HttpError with status=401", async () => {
     globalThis.fetch = mockFetch({ status: 401, body: "Unauthorized" }) as unknown as typeof fetch;
-    const err = await n3Get(TOKEN, "main", "/api/x").catch((e) => e);
+    const err = await n3Get(TOKEN, "main", "/api/x").catch((e: unknown) => e as N3HttpError);
     expect(err).toBeInstanceOf(N3HttpError);
     expect(err.status).toBe(401);
   });
 
   it("throws N3HttpError with status=403", async () => {
     globalThis.fetch = mockFetch({ status: 403, body: "Forbidden" }) as unknown as typeof fetch;
-    const err = await n3Get(TOKEN, "main", "/api/x").catch((e) => e);
+    const err = await n3Get(TOKEN, "main", "/api/x").catch((e: unknown) => e as N3HttpError);
     expect(err).toBeInstanceOf(N3HttpError);
     expect(err.status).toBe(403);
   });
 
   it("throws N3HttpError with status=500", async () => {
     globalThis.fetch = mockFetch({ status: 500, body: "boom" }) as unknown as typeof fetch;
-    const err = await n3Get(TOKEN, "main", "/api/x").catch((e) => e);
+    const err = await n3Get(TOKEN, "main", "/api/x").catch((e: unknown) => e as N3HttpError);
     expect(err).toBeInstanceOf(N3HttpError);
     expect(err.status).toBe(500);
   });
@@ -67,7 +67,7 @@ describe("n3Fetch typed error contract (Phase 1.1.6a)", () => {
       status: 200,
       body: JSON.stringify({ code: "9001", message: "Validation failed", data: null }),
     }) as unknown as typeof fetch;
-    const err = await n3Get(TOKEN, "main", "/api/x").catch((e) => e);
+    const err = await n3Get(TOKEN, "main", "/api/x").catch((e: unknown) => e as N3HttpError);
     expect(err).toBeInstanceOf(N3HttpError);
     expect(err.status).toBe(200);
     expect(err.envelopeCode).toBe("9001");
