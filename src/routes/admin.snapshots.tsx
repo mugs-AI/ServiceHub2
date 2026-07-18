@@ -1082,6 +1082,86 @@ function runSourceDetails(
   return v && typeof v === "object" ? (v as RunSourceDetails) : null;
 }
 
+interface ReconciliationSummary {
+  enabled?: boolean;
+  checked?: number;
+  confirmedDeleted?: number;
+  confirmedLineRemoved?: number;
+  transient?: number;
+  unknownEnvelope?: number;
+  skippedUnsafe?: boolean;
+  skippedReason?: string | null;
+  inventoryTotal?: number | null;
+  uniqueHeadersSeen?: number;
+  pagesFetched?: number;
+  candidateDocuments?: number;
+}
+
+function renderReconciliationSummary(
+  details: Record<string, unknown> | null | undefined,
+) {
+  if (!details) return null;
+  const r = details.reconciliation as
+    | {
+        salesInvoice?: ReconciliationSummary;
+        deliveryOrder?: ReconciliationSummary;
+        totals?: {
+          checked?: number;
+          confirmedDeleted?: number;
+          confirmedLineRemoved?: number;
+          transient?: number;
+          unknownEnvelope?: number;
+        };
+      }
+    | undefined;
+  if (!r) return null;
+  const si = r.salesInvoice ?? {};
+  const dord = r.deliveryOrder ?? {};
+  const t = r.totals ?? {};
+  const row = (label: string, s: ReconciliationSummary) => (
+    <div>
+      <div className="mb-1 font-medium text-foreground">{label}</div>
+      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-muted-foreground">
+        <span>Inventory total</span><span>{s.inventoryTotal ?? "—"}</span>
+        <span>Unique headers seen</span><span>{s.uniqueHeadersSeen ?? 0}</span>
+        <span>Pages fetched</span><span>{s.pagesFetched ?? 0}</span>
+        <span>Candidates checked</span><span>{s.checked ?? 0} / {s.candidateDocuments ?? 0}</span>
+        <span>Confirmed deleted</span><span>{s.confirmedDeleted ?? 0}</span>
+        <span>Lines removed</span><span>{s.confirmedLineRemoved ?? 0}</span>
+        <span>Transient</span><span>{s.transient ?? 0}</span>
+        <span>Unknown</span><span>{s.unknownEnvelope ?? 0}</span>
+        <span>Status</span>
+        <span>
+          {s.enabled === false
+            ? "disabled"
+            : s.skippedUnsafe
+              ? `skipped (${s.skippedReason ?? "unsafe scan"})`
+              : "ok"}
+        </span>
+      </div>
+    </div>
+  );
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <h4 className="mb-2 text-xs font-semibold text-foreground">
+        Reconciliation — deleted documents & removed lines (this run)
+      </h4>
+      <div className="mb-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground md:grid-cols-5">
+        <div><span className="font-medium text-foreground">Checked:</span> {t.checked ?? 0}</div>
+        <div><span className="font-medium text-foreground">Deleted:</span> {t.confirmedDeleted ?? 0}</div>
+        <div><span className="font-medium text-foreground">Lines removed:</span> {t.confirmedLineRemoved ?? 0}</div>
+        <div><span className="font-medium text-foreground">Transient:</span> {t.transient ?? 0}</div>
+        <div><span className="font-medium text-foreground">Unknown:</span> {t.unknownEnvelope ?? 0}</div>
+      </div>
+      <div className="grid gap-3 text-[11px] md:grid-cols-2">
+        {row("Sales Invoice", si)}
+        {row("Delivery Order", dord)}
+      </div>
+    </div>
+  );
+}
+
+
 function renderSubscriptionSourceSplit(
   details: Record<string, unknown> | null | undefined,
 ) {
