@@ -952,8 +952,35 @@ async function rebuildCurrentSnapshots(
     }
   }
 
+  // Phase 1.1.5 — deactivate orphaned current subscriptions. Any existing
+  // snapshot whose identity no longer resolves to a non-void event must
+  // be marked Inactive. Audit history (renewal events + line snapshots)
+  // is preserved; only the current-state row flips.
+  let deactivated = 0;
+  for (const r of existingRows) {
+    if (consumedIds.has(r.id)) continue;
+    if ((r.subscription_status ?? null) === "Inactive") {
+      skipped += 1;
+      continue;
+    }
+    const { error: deactErr } = await supabaseAdmin
+      .from("customer_subscription_snapshots")
+      .update({
+        subscription_status: "Inactive",
+        remaining_days: null,
+        last_calculated_at: new Date().toISOString(),
+        is_stale: false,
+        calculation_error: null,
+      } as never)
+      .eq("id", r.id);
+    if (deactErr) throw new Error(`Deactivate subscription failed: ${deactErr.message}`);
+    deactivated += 1;
+    updated += 1;
+  }
+
   return { inserted, updated, skipped, bySource };
 }
+
 
 // ---------------------------------------------------------------------------
 // Category seeding (unchanged from Phase 1.0).
