@@ -118,8 +118,10 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
                 } else if (m.service_type === "Ad Hoc") mappingResult = "ad_hoc";
               }
 
-              // Explicit eligibility reason: why did/didn't this line produce
-              // an entitlement event? Matches the sync skip branches 1:1.
+              // A line is eligible only if its renewal event exists and is not
+              // voided, matching the current-subscription rule.
+              const event = eventBySourceLine.get(r.n3_line_id ?? "");
+
               let eligible: "yes" | "no" = "no";
               let ineligibleReason:
                 | null
@@ -137,7 +139,8 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
               else if (mappingResult === "ad_hoc") ineligibleReason = "ad_hoc_stock_code";
               else if (mappingResult === "renewal_invalid_cycle")
                 ineligibleReason = "renewal_invalid_cycle";
-              else if (r.is_void) ineligibleReason = "voided_source_document";
+              else if (r.is_void || event?.is_source_void)
+                ineligibleReason = "voided_source_document";
               else if (!r.customer_code) ineligibleReason = "missing_customer_code";
               else if (!r.document_date) ineligibleReason = "invalid_document_date";
               else eligible = "yes";
