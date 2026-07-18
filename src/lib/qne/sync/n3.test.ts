@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { N3HttpError, n3Get } from "./n3.server";
+import { isN3NotFound, N3HttpError, n3Get } from "./n3.server";
+
 
 const TOKEN = "test.jwt.token";
 
