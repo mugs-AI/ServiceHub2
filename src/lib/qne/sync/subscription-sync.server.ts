@@ -757,9 +757,29 @@ async function rebuildCurrentSnapshots(
         .range(from, to) as unknown as PromiseLike<{ data: RenewalEventRow[] | null; error: { message: string } | null }>,
   );
 
+  // Phase 1.1.4 — subscription identity is (tenant, n3_customer_id, category,
+  // n3_stock_id) when BOTH immutable IDs exist. customer_code / stock_code
+  // are mutable display fields and MUST NOT participate in identity.
+  // Legacy rows (missing either immutable ID) fall back to
+  // (customer_code + category + stock_code) purely for migration.
+  const immutableKey = (
+    n3CustomerId: string | null | undefined,
+    category: string,
+    n3StockId: string | null | undefined,
+  ): string | null =>
+    n3CustomerId && n3StockId ? `id::${n3CustomerId}::${category}::${n3StockId}` : null;
+  const legacyKey = (
+    customerCode: string,
+    category: string,
+    stockCode: string | null | undefined,
+  ): string => `legacy::${customerCode}::${category}::${stockCode ?? ""}`;
+
+  // Latest-event grouping: prefer immutable identity; fall back to legacy.
   const latestByKey = new Map<string, RenewalEventRow>();
   for (const ev of events) {
-    const key = `${ev.customer_code}::${ev.subscription_category_name}::${ev.stock_code ?? ""}`;
+    const key =
+      immutableKey(ev.n3_customer_id, ev.subscription_category_name, ev.n3_stock_id) ??
+      legacyKey(ev.customer_code, ev.subscription_category_name, ev.stock_code);
     if (!latestByKey.has(key)) latestByKey.set(key, ev);
   }
 
@@ -770,59 +790,55 @@ async function rebuildCurrentSnapshots(
 
   if (latestByKey.size === 0) return { inserted: 0, updated: 0, skipped: 0, bySource };
 
-  // Load existing snapshots for change detection.
-  const targetCustomers = Array.from(
-    new Set(Array.from(latestByKey.values()).map((e) => e.customer_code)),
-  );
+  // Load ALL existing snapshots for this tenant so we can resolve rows by
+  // either identity — renamed customer_code / stock_code make a chunked
+  // IN(customer_code) filter unreliable.
   type ExistingSubRow = {
+    id: string;
     customer_code: string;
     subscription_category: string;
     stock_code: string | null;
+    n3_customer_id: string | null;
+    n3_stock_id: string | null;
     latest_document_no: string | null;
     latest_document_date: string | null;
     expiry_date: string | null;
     subscription_status: string | null;
   };
-  const existingRows: ExistingSubRow[] = [];
-  const CHUNK = 500;
-  for (let i = 0; i < targetCustomers.length; i += CHUNK) {
-    const slice = targetCustomers.slice(i, i + CHUNK);
-    const chunkRows = await loadAllPaginated<ExistingSubRow>(
-      "customer_subscription_snapshots.existingChunk",
-      (from, to) =>
-        supabaseAdmin
-          .from("customer_subscription_snapshots")
-          .select(
-            "customer_code, subscription_category, stock_code, latest_document_no, latest_document_date, expiry_date, subscription_status",
-          )
-          .eq("tenant_code", tenantCode)
-          .in("customer_code", slice)
-          .order("customer_code", { ascending: true })
-          .order("subscription_category", { ascending: true })
-          .order("stock_code", { ascending: true })
-          .range(from, to) as unknown as PromiseLike<{ data: ExistingSubRow[] | null; error: { message: string } | null }>,
-    );
-    existingRows.push(...chunkRows);
-  }
-  const existingByKey = new Map<string, Record<string, unknown>>();
+  const existingRows = await loadAllPaginated<ExistingSubRow>(
+    "customer_subscription_snapshots.allForTenant",
+    (from, to) =>
+      supabaseAdmin
+        .from("customer_subscription_snapshots")
+        .select(
+          "id, customer_code, subscription_category, stock_code, n3_customer_id, n3_stock_id, latest_document_no, latest_document_date, expiry_date, subscription_status",
+        )
+        .eq("tenant_code", tenantCode)
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: ExistingSubRow[] | null; error: { message: string } | null }>,
+  );
+  const existingByImmutable = new Map<string, ExistingSubRow>();
+  const existingByLegacy = new Map<string, ExistingSubRow[]>();
   for (const r of existingRows) {
-    existingByKey.set(
-      `${r.customer_code}::${r.subscription_category}::${r.stock_code ?? ""}`,
-      r as unknown as Record<string, unknown>,
-    );
+    const ik = immutableKey(r.n3_customer_id, r.subscription_category, r.n3_stock_id);
+    if (ik) existingByImmutable.set(ik, r);
+    const lk = legacyKey(r.customer_code, r.subscription_category, r.stock_code);
+    const arr = existingByLegacy.get(lk);
+    if (arr) arr.push(r);
+    else existingByLegacy.set(lk, [r]);
   }
 
   const now = Date.now();
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
-  const toUpsert: Array<Record<string, unknown>> = [];
+  const consumedIds = new Set<string>();
 
-  for (const [key, ev] of latestByKey) {
+  for (const [, ev] of latestByKey) {
     const expiryMs = new Date(ev.expiry_date ?? 0).getTime();
     const daysLeft = Math.ceil((expiryMs - now) / 86400000);
     const status = computeStatus(daysLeft, dueSoonDays);
-    const row = {
+    const row: Record<string, unknown> = {
       tenant_code: tenantCode,
       customer_code: ev.customer_code,
       customer_name: ev.customer_name ?? customerNameByCode.get(ev.customer_code) ?? null,
@@ -847,21 +863,46 @@ async function rebuildCurrentSnapshots(
       calculation_error: null,
     };
 
-
     const bucket =
       ev.source_type === "delivery_order" ? bySource.delivery_order : bySource.invoice;
     bucket.total += 1;
 
-    const existing = existingByKey.get(key);
-    if (!existing) {
-      inserted += 1;
-      bucket.inserted += 1;
-    } else {
+    // Resolve target row: immutable identity wins. If not found, fall back
+    // to the legacy (mutable) key and, when the event now has immutable
+    // IDs, adopt the legacy row in place (updating with immutable IDs) so
+    // no duplicate is created and the immutable unique index cannot be
+    // violated.
+    const ik = immutableKey(ev.n3_customer_id, ev.subscription_category_name, ev.n3_stock_id);
+    const lk = legacyKey(ev.customer_code, ev.subscription_category_name, ev.stock_code);
+    let target: ExistingSubRow | null = null;
+    if (ik) target = existingByImmutable.get(ik) ?? null;
+    if (!target) {
+      const legacyMatches = (existingByLegacy.get(lk) ?? []).filter(
+        (r) => !consumedIds.has(r.id),
+      );
+      // Prefer a legacy row that has no immutable IDs yet — safe to adopt.
+      target =
+        legacyMatches.find((r) => !r.n3_customer_id || !r.n3_stock_id) ??
+        legacyMatches[0] ??
+        null;
+    }
+
+    if (target) {
+      consumedIds.add(target.id);
       const changed =
-        (existing.latest_document_no ?? null) !== (row.latest_document_no ?? null) ||
-        (existing.latest_document_date ?? null) !== row.latest_document_date ||
-        (existing.expiry_date ?? null) !== row.expiry_date ||
-        (existing.subscription_status ?? null) !== row.subscription_status;
+        (target.latest_document_no ?? null) !== (row.latest_document_no ?? null) ||
+        (target.latest_document_date ?? null) !== row.latest_document_date ||
+        (target.expiry_date ?? null) !== row.expiry_date ||
+        (target.subscription_status ?? null) !== row.subscription_status ||
+        (target.customer_code ?? null) !== row.customer_code ||
+        (target.stock_code ?? null) !== row.stock_code ||
+        (target.n3_customer_id ?? null) !== (row.n3_customer_id ?? null) ||
+        (target.n3_stock_id ?? null) !== (row.n3_stock_id ?? null);
+      const { error: updErr } = await supabaseAdmin
+        .from("customer_subscription_snapshots")
+        .update(row as never)
+        .eq("id", target.id);
+      if (updErr) throw new Error(`Update subscription failed: ${updErr.message}`);
       if (changed) {
         updated += 1;
         bucket.updated += 1;
@@ -869,19 +910,14 @@ async function rebuildCurrentSnapshots(
         skipped += 1;
         bucket.unchanged += 1;
       }
+    } else {
+      const { error: insErr } = await supabaseAdmin
+        .from("customer_subscription_snapshots")
+        .insert(row as never);
+      if (insErr) throw new Error(`Insert subscription failed: ${insErr.message}`);
+      inserted += 1;
+      bucket.inserted += 1;
     }
-    toUpsert.push(row);
-  }
-
-  const BATCH = 200;
-  for (let i = 0; i < toUpsert.length; i += BATCH) {
-    const chunk = toUpsert.slice(i, i + BATCH);
-    const { error: upsertErr } = await supabaseAdmin
-      .from("customer_subscription_snapshots")
-      .upsert(chunk as never, {
-        onConflict: "tenant_code,customer_code,subscription_category,stock_code",
-      });
-    if (upsertErr) throw new Error(`Upsert subscriptions failed: ${upsertErr.message}`);
   }
 
   return { inserted, updated, skipped, bySource };

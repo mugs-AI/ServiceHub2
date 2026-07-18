@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.customer_subscription_snapshots_entitlement_key;
