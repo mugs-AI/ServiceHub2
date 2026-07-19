@@ -101,6 +101,12 @@ function JobDetailPage() {
     void reload();
   }, [reload]);
 
+  const { openJobTab } = useTabs();
+  useEffect(() => {
+    if (job?.job_number) openJobTab(jobId, job.job_number);
+  }, [jobId, job?.job_number, openJobTab]);
+
+
   if (loading && !job) {
     return <p className="text-sm text-muted-foreground">Loading job…</p>;
   }
