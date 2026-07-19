@@ -361,6 +361,34 @@ export function computeInclusiveExpiry(start: Date, value: number, unit: CycleUn
   return d;
 }
 
+/**
+ * Phase 1.1.6c — Resolve the effective renewal quantity from a raw N3 line
+ * `qty`. Returns an integer ≥ 1 when the line should produce entitlement,
+ * or a structured skip reason. Never rounds fractions.
+ *
+ *   null / undefined       → { effective: 1 }
+ *   integer ≥ 1            → { effective: qty }
+ *   0                      → skip "zero_quantity"
+ *   negative               → skip "negative_quantity" (package exchange
+ *                            is Phase 1.1.7 — existing entitlement stays)
+ *   fraction (e.g. 1.5)    → skip "fractional_quantity"
+ *   NaN / non-finite       → skip "invalid_quantity"
+ */
+export type QuantityResolution =
+  | { effective: number; skipReason?: undefined }
+  | { effective: null; skipReason: "zero_quantity" | "negative_quantity" | "fractional_quantity" | "invalid_quantity" };
+
+export function resolveEffectiveQuantity(qty: number | null | undefined): QuantityResolution {
+  if (qty === null || qty === undefined) return { effective: 1 };
+  if (typeof qty !== "number" || !Number.isFinite(qty)) {
+    return { effective: null, skipReason: "invalid_quantity" };
+  }
+  if (qty === 0) return { effective: null, skipReason: "zero_quantity" };
+  if (qty < 0) return { effective: null, skipReason: "negative_quantity" };
+  if (!Number.isInteger(qty)) return { effective: null, skipReason: "fractional_quantity" };
+  return { effective: qty };
+}
+
 function computeStatus(daysLeft: number, dueSoonDays: number): SubscriptionStatus {
   if (daysLeft < 0) return "Overdue";
   if (daysLeft <= dueSoonDays) return "Due Soon";
