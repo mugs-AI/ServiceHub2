@@ -241,13 +241,13 @@ function NewJobPage() {
                     }
                   }}
                   placeholder="Search by code, name, contact, phone or email…"
-                  className="min-h-11 flex-1 min-w-64 rounded-lg border bg-background px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-primary/40"
+                  className="input"
                 />
                 <button
                   type="button"
                   onClick={() => runSearch(q)}
                   disabled={searching || q.trim().length < 2}
-                  className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                  className="min-h-11 shrink-0 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
                 >
                   {searching ? "Searching…" : "Search"}
                 </button>
@@ -262,7 +262,7 @@ function NewJobPage() {
                       <button
                         type="button"
                         onClick={() => setCustomer(c)}
-                        className="flex w-full flex-col items-start border-b px-3 py-2 text-left text-sm hover:bg-accent"
+                        className="flex w-full flex-col items-start border-b p-3 text-left text-sm hover:bg-accent active:bg-accent/80"
                       >
                         <span className="font-medium">
                           {c.customer_name ?? "(no name)"}
@@ -323,14 +323,14 @@ function NewJobPage() {
                         <li key={s.id}>
                           <label
                             className={
-                              "flex cursor-pointer items-start gap-2 rounded-lg border p-2 text-sm " +
+                              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm " +
                               (checked ? "border-primary bg-primary/5" : "bg-background")
                             }
                           >
                             <input
                               type="radio"
                               name="entitlement"
-                              className="mt-1"
+                              className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
                               checked={checked}
                               onChange={() => setSelectedSubId(s.id)}
                             />
@@ -449,14 +449,14 @@ function NewJobPage() {
         </Section>
 
         {/* 6. Save */}
-        <div className="flex flex-wrap items-center justify-end gap-3">
+        <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {saveError && (
             <span className="text-sm text-destructive">{saveError}</span>
           )}
           <button
             type="submit"
             disabled={!canSubmit}
-            className="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            className="min-h-[52px] w-full rounded-lg bg-primary px-5 text-base font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 sm:w-auto"
           >
             {saving ? "Saving…" : "Save Draft"}
           </button>
@@ -466,15 +466,47 @@ function NewJobPage() {
       <style>{`
         .input {
           width: 100%;
-          min-height: 2.5rem;
+          min-height: 44px;
           border-radius: 0.5rem;
-          border: 1px solid hsl(var(--border));
-          background: hsl(var(--background));
-          padding: 0.5rem 0.75rem;
-          font-size: 0.875rem;
+          border: 1.5px solid #d1d5db;
+          background: #ffffff;
+          padding: 0.5rem 0.875rem;
+          font-size: 1rem;
+          color: #111827;
           outline: none;
+          transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+          box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
         }
-        .input:focus { box-shadow: 0 0 0 2px hsl(var(--primary) / 0.4); }
+        .input::placeholder {
+          color: #6b7280;
+        }
+        .input:focus {
+          border-color: #2563eb;
+          background: #eff6ff;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18), inset 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+        .input:disabled {
+          background: #f3f4f6;
+          border-color: #e5e7eb;
+          color: #9ca3af;
+        }
+        select.input {
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.75rem center;
+          padding-right: 2.25rem;
+        }
+        textarea.input {
+          min-height: 96px;
+          resize: vertical;
+        }
+        @media (max-width: 640px) {
+          .input {
+            font-size: 1rem;
+            padding: 0.625rem 0.875rem;
+          }
+        }
       `}</style>
     </div>
   );
@@ -483,7 +515,7 @@ function NewJobPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="mb-4 text-base font-bold uppercase tracking-wide text-foreground">
         {title}
       </h2>
       {children}
@@ -501,8 +533,8 @@ function Field({
   className?: string;
 }) {
   return (
-    <label className={"flex flex-col gap-1 " + className}>
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    <label className={"flex flex-col gap-1.5 " + className}>
+      <span className="text-sm font-semibold text-foreground">{label}</span>
       {children}
     </label>
   );
