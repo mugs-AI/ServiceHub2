@@ -241,3 +241,15 @@ function formatCell(v: unknown): string {
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
+
+/**
+ * Build an OData v4 `$filter` that ORs case-insensitive `contains(...)`
+ * across the given fields. OData string literals escape single quotes by
+ * doubling them.
+ */
+function buildODataFilter(fields: string[], term: string): string {
+  const escaped = term.toLowerCase().replace(/'/g, "''");
+  return fields
+    .map((f) => `contains(tolower(${f}),'${escaped}')`)
+    .join(" or ");
+}
