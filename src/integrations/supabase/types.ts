@@ -401,7 +401,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
-          n3_stock_id: string | null
+          n3_stock_id: string
           renewal_cycle_unit: string | null
           renewal_cycle_value: number | null
           service_type: string
@@ -416,7 +416,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
-          n3_stock_id?: string | null
+          n3_stock_id: string
           renewal_cycle_unit?: string | null
           renewal_cycle_value?: number | null
           service_type: string
@@ -431,7 +431,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
-          n3_stock_id?: string | null
+          n3_stock_id?: string
           renewal_cycle_unit?: string | null
           renewal_cycle_value?: number | null
           service_type?: string
