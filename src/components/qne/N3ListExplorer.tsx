@@ -13,6 +13,14 @@ interface Props {
   extraQuery?: Record<string, string | number>;
   /** Column keys to prioritise when the response fields are known. */
   preferredColumns?: string[];
+  /**
+   * N3 field names to include when building the OData `$filter` for the
+   * search box. Case-insensitive partial match via
+   * `contains(tolower(<field>), '<term>')`. When omitted, the search box
+   * is hidden — server-side search is a per-endpoint opt-in.
+   */
+  searchFields?: string[];
+  searchPlaceholder?: string;
 }
 
 /**
