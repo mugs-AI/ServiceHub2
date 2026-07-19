@@ -781,6 +781,10 @@ async function syncSourceDetails(args: {
     renewalEventsSkippedVoided: 0,
     renewalEventsSkippedMissingCustomer: 0,
     renewalEventsSkippedInvalidDate: 0,
+    renewalEventsSkippedZeroQty: 0,
+    renewalEventsSkippedNegativeQty: 0,
+    renewalEventsSkippedFractionalQty: 0,
+    renewalEventsSkippedInvalidQty: 0,
     lineTypeCounts: {
       stock: 0,
       description: 0,
