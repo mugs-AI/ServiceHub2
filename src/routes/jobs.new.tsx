@@ -449,14 +449,14 @@ function NewJobPage() {
         </Section>
 
         {/* 6. Save */}
-        <div className="flex flex-wrap items-center justify-end gap-3">
+        <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {saveError && (
             <span className="text-sm text-destructive">{saveError}</span>
           )}
           <button
             type="submit"
             disabled={!canSubmit}
-            className="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            className="min-h-[52px] w-full rounded-lg bg-primary px-5 text-base font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 sm:w-auto"
           >
             {saving ? "Saving…" : "Save Draft"}
           </button>
