@@ -74,9 +74,10 @@ describe("Monthly cycles — 28/29/30/31 day months", () => {
     );
   });
 
-  it("start in a 30-day month: Apr 30 + 1mo − 1d → May 30", () => {
+  it("start in a 30-day month: Apr 30 + 1mo − 1d → May 29", () => {
+    // Apr 30 + 1 month = May 30; -1 day = May 29.
     expect(iso(computeExpiryForQuantity(utc(2027, 3, 30), 1, "month", 1))).toBe(
-      "2027-05-30",
+      "2027-05-29",
     );
   });
 
