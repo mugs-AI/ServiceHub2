@@ -866,6 +866,7 @@ export type Database = {
           n3_document_id: string | null
           n3_line_id: string | null
           n3_stock_id: string | null
+          quantity_used: number
           renewal_cycle_unit: string
           renewal_cycle_value: number
           source_document_date: string
@@ -897,6 +898,7 @@ export type Database = {
           n3_document_id?: string | null
           n3_line_id?: string | null
           n3_stock_id?: string | null
+          quantity_used?: number
           renewal_cycle_unit: string
           renewal_cycle_value: number
           source_document_date: string
@@ -928,6 +930,7 @@ export type Database = {
           n3_document_id?: string | null
           n3_line_id?: string | null
           n3_stock_id?: string | null
+          quantity_used?: number
           renewal_cycle_unit?: string
           renewal_cycle_value?: number
           source_document_date?: string
