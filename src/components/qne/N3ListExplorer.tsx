@@ -126,12 +126,40 @@ export function N3ListExplorer({
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search…"
-          className="w-64 rounded-md border bg-background px-3 py-1.5 text-sm"
-        />
+        {canSearch && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSearch(searchDraft.trim());
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              placeholder={searchPlaceholder ?? "Search…"}
+              className="w-72 rounded-md border bg-background px-3 py-1.5 text-sm"
+            />
+            <button
+              type="submit"
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Search
+            </button>
+            {(searchDraft || search) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchDraft("");
+                  setSearch("");
+                }}
+                className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              >
+                Clear
+              </button>
+            )}
+          </form>
+        )}
         <select
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
