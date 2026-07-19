@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 
 import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
