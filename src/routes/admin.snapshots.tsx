@@ -1291,8 +1291,10 @@ interface VerifyDocResponse {
 
 interface DocCandidate {
   document_no: string;
+  n3_document_id: string;
   source_type: "invoice" | "delivery_order";
   document_date: string | null;
+  document_status: string | null;
   customer_code: string | null;
   customer_name: string | null;
   total_lines: number;
@@ -1304,23 +1306,28 @@ function DocumentVerifier() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VerifyDocResponse | null>(null);
   const [candidates, setCandidates] = useState<DocCandidate[] | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const verifyByDocNo = async (docNumber: string) => {
+  const verifyByDocument = async (c: DocCandidate) => {
     setBusy(true);
     setResult(null);
+    setSelectedKey(`${c.source_type}::${c.n3_document_id}`);
     try {
-      const res = await authFetch(
-        `/api/diagnostics/verify-document?docNo=${encodeURIComponent(docNumber)}`,
-      );
+      const params = new URLSearchParams({
+        docNo: c.document_no,
+        documentId: c.n3_document_id,
+        source: c.source_type,
+      });
+      const res = await authFetch(`/api/diagnostics/verify-document?${params.toString()}`);
       const json = (await res.json()) as VerifyDocResponse;
       if (!res.ok) setResult({ ...json, found: false, error: json.error ?? `HTTP ${res.status}` });
       else setResult(json);
     } catch (err) {
       setResult({
         tenantCode: "",
-        documentNo: docNumber,
+        documentNo: c.document_no,
         found: false,
         header: null,
         detailFetch: { operation: null, linesStored: 0 },
@@ -1341,6 +1348,7 @@ function DocumentVerifier() {
     if (!q) return;
     setSearchError(null);
     setCandidates(null);
+    setSelectedKey(null);
     setResult(null);
     setBusy(true);
     try {
@@ -1358,16 +1366,27 @@ function DocumentVerifier() {
       }
       const list = json.candidates ?? [];
       setTruncated(!!json.truncated);
+      setCandidates(list);
+      // Only auto-verify when exactly one record exists across all sources
+      // AND the document number itself is unique — otherwise let the admin
+      // pick to disambiguate reused document numbers.
       if (list.length === 1) {
-        await verifyByDocNo(list[0].document_no);
-      } else {
-        setCandidates(list);
+        await verifyByDocument(list[0]);
       }
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
+  };
+
+  const statusBadge = (status: string | null | undefined) => {
+    const s = (status ?? "").trim().toLowerCase();
+    if (s === "deleted")
+      return "bg-destructive/10 text-destructive border border-destructive/30";
+    if (s === "cancelled" || s === "canceled")
+      return "bg-amber-100 text-amber-800 border border-amber-300";
+    return "bg-emerald-100 text-emerald-800 border border-emerald-300";
   };
 
   return (
@@ -1408,7 +1427,9 @@ function DocumentVerifier() {
             <thead className="bg-muted uppercase text-muted-foreground">
               <tr>
                 <th className="px-2 py-1 text-left">Document</th>
+                <th className="px-2 py-1 text-left">N3 ID</th>
                 <th className="px-2 py-1 text-left">Source</th>
+                <th className="px-2 py-1 text-left">Status</th>
                 <th className="px-2 py-1 text-left">Date</th>
                 <th className="px-2 py-1 text-left">Customer</th>
                 <th className="px-2 py-1 text-right">Lines</th>
@@ -1417,27 +1438,47 @@ function DocumentVerifier() {
               </tr>
             </thead>
             <tbody>
-              {candidates.map((c) => (
-                <tr key={`${c.source_type}::${c.document_no}`} className="border-t">
-                  <td className="px-2 py-1 font-mono">{c.document_no}</td>
-                  <td className="px-2 py-1">{c.source_type}</td>
-                  <td className="px-2 py-1">{fmtDate(c.document_date ?? "")}</td>
-                  <td className="px-2 py-1">
-                    {c.customer_code ?? "—"} {c.customer_name ?? ""}
-                  </td>
-                  <td className="px-2 py-1 text-right">{c.total_lines}</td>
-                  <td className="px-2 py-1 text-right">{c.eligible_lines}</td>
-                  <td className="px-2 py-1 text-right">
-                    <button
-                      type="button"
-                      onClick={() => verifyByDocNo(c.document_no)}
-                      className="rounded-md border border-primary/40 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10"
+              {candidates.map((c) => {
+                const key = `${c.source_type}::${c.n3_document_id}`;
+                const isSelected = key === selectedKey;
+                return (
+                  <tr
+                    key={key}
+                    className={`border-t ${isSelected ? "bg-primary/5" : ""}`}
+                  >
+                    <td className="px-2 py-1 font-mono">{c.document_no}</td>
+                    <td
+                      className="px-2 py-1 font-mono text-[10px] text-muted-foreground"
+                      title={c.n3_document_id}
                     >
-                      Verify
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      {c.n3_document_id.slice(0, 8)}…
+                    </td>
+                    <td className="px-2 py-1">{c.source_type}</td>
+                    <td className="px-2 py-1">
+                      <span
+                        className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${statusBadge(c.document_status)}`}
+                      >
+                        {c.document_status ?? "Active"}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1">{fmtDate(c.document_date ?? "")}</td>
+                    <td className="px-2 py-1">
+                      {c.customer_code ?? "—"} {c.customer_name ?? ""}
+                    </td>
+                    <td className="px-2 py-1 text-right">{c.total_lines}</td>
+                    <td className="px-2 py-1 text-right">{c.eligible_lines}</td>
+                    <td className="px-2 py-1 text-right">
+                      <button
+                        type="button"
+                        onClick={() => verifyByDocument(c)}
+                        className="rounded-md border border-primary/40 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10"
+                      >
+                        {isSelected ? "Selected" : "Verify"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
