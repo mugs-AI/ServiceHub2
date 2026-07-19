@@ -235,7 +235,7 @@ export const Route = createFileRoute("/api/workspace/jobs")({
           const { data, error } = await supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, created_at",
+              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, assigned_user_id, assigned_user_name_snapshot, assigned_at, created_at",
             )
             .eq("tenant_code", user.tenantCode)
             .order("created_at", { ascending: false })
