@@ -88,8 +88,8 @@ describe("computeInclusiveExpiry with qty × cycle", () => {
     expect(iso(computeInclusiveExpiry(s, 1 * 12, "month"))).toBe("2027-01-14");
   });
 
-  it("leap-year rollover: 2028-02-29 + 1y − 1d", () => {
+  it("leap-year rollover: 2028-02-29 + 1y − 1d → 2029-02-28", () => {
     const s = new Date(Date.UTC(2028, 1, 29));
-    expect(iso(computeInclusiveExpiry(s, 1, "year"))).toBe("2029-02-27");
+    expect(iso(computeInclusiveExpiry(s, 1, "year"))).toBe("2029-02-28");
   });
 });
