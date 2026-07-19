@@ -13,6 +13,14 @@ interface Props {
   extraQuery?: Record<string, string | number>;
   /** Column keys to prioritise when the response fields are known. */
   preferredColumns?: string[];
+  /**
+   * N3 field names to include when building the OData `$filter` for the
+   * search box. Case-insensitive partial match via
+   * `contains(tolower(<field>), '<term>')`. When omitted, the search box
+   * is hidden — server-side search is a per-endpoint opt-in.
+   */
+  searchFields?: string[];
+  searchPlaceholder?: string;
 }
 
 /**
@@ -27,8 +35,14 @@ export function N3ListExplorer({
   target = "main",
   extraQuery,
   preferredColumns,
+  searchFields,
+  searchPlaceholder,
 }: Props) {
   const [path, setPath] = useState(defaultPath);
+  // `searchDraft` is the input value; `search` is the committed term used
+  // by the query. Committing on Enter / Search / Clear prevents a request
+  // per keystroke and matches the acceptance criteria in Phase 1.1.7a.
+  const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
   const [pageNo, setPageNo] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -37,9 +51,16 @@ export function N3ListExplorer({
     setPageNo(1);
   }, [path, search, pageSize]);
 
+  const canSearch = !!searchFields?.length;
+
   const query = useQuery({
     queryKey: ["n3-list", target, path, search, pageNo, pageSize, extraQuery],
     queryFn: async () => {
+      const trimmed = search.trim();
+      const filter =
+        canSearch && trimmed
+          ? buildODataFilter(searchFields!, trimmed)
+          : undefined;
       const env = await qneProxy<PageQueryResult<Record<string, unknown>>>(
         target,
         "GET",
@@ -48,7 +69,7 @@ export function N3ListExplorer({
           query: {
             $top: pageSize,
             $skip: (pageNo - 1) * pageSize,
-            ...(search ? { search } : {}),
+            ...(filter ? { $filter: filter } : {}),
             ...extraQuery,
           },
         },
@@ -105,12 +126,40 @@ export function N3ListExplorer({
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search…"
-          className="w-64 rounded-md border bg-background px-3 py-1.5 text-sm"
-        />
+        {canSearch && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSearch(searchDraft.trim());
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              placeholder={searchPlaceholder ?? "Search…"}
+              className="w-72 rounded-md border bg-background px-3 py-1.5 text-sm"
+            />
+            <button
+              type="submit"
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Search
+            </button>
+            {(searchDraft || search) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchDraft("");
+                  setSearch("");
+                }}
+                className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              >
+                Clear
+              </button>
+            )}
+          </form>
+        )}
         <select
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
@@ -191,4 +240,16 @@ function formatCell(v: unknown): string {
   if (v === null || v === undefined) return "";
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
+}
+
+/**
+ * Build an OData v4 `$filter` that ORs case-insensitive `contains(...)`
+ * across the given fields. OData string literals escape single quotes by
+ * doubling them.
+ */
+function buildODataFilter(fields: string[], term: string): string {
+  const escaped = term.toLowerCase().replace(/'/g, "''");
+  return fields
+    .map((f) => `contains(tolower(${f}),'${escaped}')`)
+    .join(" or ");
 }

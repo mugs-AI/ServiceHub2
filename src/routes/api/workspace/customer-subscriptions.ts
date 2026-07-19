@@ -28,7 +28,12 @@ export const Route = createFileRoute("/api/workspace/customer-subscriptions")({
               "customer_code, customer_name, subscription_category, stock_code, stock_name, latest_document_no, latest_source_type, latest_document_date, renewal_cycle_value, renewal_cycle_unit, expiry_date, remaining_days, subscription_status, calculation_error, updated_at",
             )
             .eq("tenant_code", user.tenantCode)
-            .eq("customer_code", customerCode);
+            .eq("customer_code", customerCode)
+            // Phase 1.1.7a Fix A — Workspace is operational. Show only live
+            // entitlements. Inactive / superseded / voided rows remain in
+            // the database (Document Verifier still surfaces them) but must
+            // not appear on the Customer workspace.
+            .in("subscription_status", ["Active", "Due Soon", "Overdue"]);
           if (error) throw error;
 
           // Maintenance first, then alphabetical by category. Within a

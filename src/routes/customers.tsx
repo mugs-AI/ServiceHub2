@@ -10,6 +10,8 @@ export const Route = createFileRoute("/customers")({
         hint="Administrator explorer — live from the N3 Open API."
         defaultPath="/api/Customers/List"
         preferredColumns={["code", "companyName", "name", "email", "phone1", "isActive"]}
+        searchFields={["code", "companyName", "name", "email", "registrationNo", "id"]}
+        searchPlaceholder="Search by code, name, email, registration no or ID…"
       />
     </AdminOnly>
   ),
