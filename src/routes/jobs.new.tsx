@@ -533,8 +533,8 @@ function Field({
   className?: string;
 }) {
   return (
-    <label className={"flex flex-col gap-1 " + className}>
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    <label className={"flex flex-col gap-1.5 " + className}>
+      <span className="text-sm font-semibold text-foreground">{label}</span>
       {children}
     </label>
   );
