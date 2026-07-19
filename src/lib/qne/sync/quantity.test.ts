@@ -112,14 +112,17 @@ describe("computeExpiryForQuantity — fractional quantities", () => {
 
   it("qty=1.7 × 1y from 2025-06-01 → 621 days total (spec sample)", () => {
     // wholeEnd = 2026-06-01. next-year period 2026-06-01→2027-06-01 = 365 days.
-    // extra = round(365 * 0.7) = 256. Final exclusive = 2027-02-11.
-    // From start 2025-06-01 to 2027-02-11 = 620 days; inclusive = 2027-02-10
-    // spans 621 calendar days (start .. expiry inclusive).
+    // extra = round(365 * 0.7) = 256. Final exclusive-next-start = 2027-02-11.
+    // Total entitled days from start (exclusive next start − start) = 621 as
+    // per spec; inclusive expiry is one day earlier: 2027-02-10.
     const expiry = computeExpiryForQuantity(utc(2025, 5, 1), 1, "year", 1.7);
     expect(iso(expiry)).toBe("2027-02-10");
-    const spanDays =
-      Math.round((expiry.getTime() - utc(2025, 5, 1).getTime()) / 86_400_000) + 1;
-    expect(spanDays).toBe(621);
+    const exclusiveNext = new Date(expiry);
+    exclusiveNext.setUTCDate(exclusiveNext.getUTCDate() + 1);
+    const totalDays = Math.round(
+      (exclusiveNext.getTime() - utc(2025, 5, 1).getTime()) / 86_400_000,
+    );
+    expect(totalDays).toBe(621);
   });
 
   it("qty=1.5 × 1mo from 2026-01-01 uses actual next-month length (Feb 28) — inclusive 2026-02-14", () => {
