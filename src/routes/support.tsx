@@ -1,15 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
+
 
 export const Route = createFileRoute("/support")({
   component: SupportWorkspace,
