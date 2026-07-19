@@ -323,14 +323,14 @@ function NewJobPage() {
                         <li key={s.id}>
                           <label
                             className={
-                              "flex cursor-pointer items-start gap-2 rounded-lg border p-2 text-sm " +
+                              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm " +
                               (checked ? "border-primary bg-primary/5" : "bg-background")
                             }
                           >
                             <input
                               type="radio"
                               name="entitlement"
-                              className="mt-1"
+                              className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
                               checked={checked}
                               onChange={() => setSelectedSubId(s.id)}
                             />
