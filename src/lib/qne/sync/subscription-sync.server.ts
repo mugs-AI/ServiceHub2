@@ -404,7 +404,11 @@ export function computeExpiryForQuantity(
   }
   const nextEnd = addUnits(wholeEnd, 1, unit);
   const nextPeriodDays = Math.round((nextEnd.getTime() - wholeEnd.getTime()) / MS_PER_DAY);
-  const extraDays = Math.round(nextPeriodDays * frac); // Math.round: 0.5 → up
+  // Rational-arithmetic rounding — treats `quantity_used` at the same 6dp
+  // precision as the numeric(18,6) column so 365 × 0.7 = 255.5 (→ 256) is
+  // not lost to binary-float slop (255.49999997 rounding down to 255).
+  const fracScaled = Math.round(frac * 1_000_000);
+  const extraDays = Math.round((nextPeriodDays * fracScaled) / 1_000_000);
   const finalExclusive = new Date(wholeEnd);
   finalExclusive.setUTCDate(finalExclusive.getUTCDate() + extraDays - 1);
   return finalExclusive;
