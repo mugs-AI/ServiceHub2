@@ -525,7 +525,7 @@ function AdminSnapshots() {
 
       {/* Live sync progress — visible while any sync is running */}
       {busy && (
-        <section className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+        <section className="rounded-lg border border-red-300 bg-red-50 p-4">
           <h2 className="mb-2 text-sm font-semibold text-foreground">
             Sync in progress{running === "all" ? " (Run All)" : ""}
           </h2>
