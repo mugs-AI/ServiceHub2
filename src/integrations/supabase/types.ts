@@ -641,9 +641,72 @@ export type Database = {
         }
         Relationships: []
       }
+      service_job_assignment_history: {
+        Row: {
+          action: string
+          assigned_user_code_snapshot: string | null
+          assigned_user_email_snapshot: string | null
+          assigned_user_id: string | null
+          assigned_user_name_snapshot: string | null
+          id: string
+          performed_at: string
+          performed_by_name_snapshot: string | null
+          performed_by_user_id: string | null
+          previous_assigned_user_id: string | null
+          previous_assigned_user_name_snapshot: string | null
+          service_job_id: string
+          tenant_code: string
+        }
+        Insert: {
+          action: string
+          assigned_user_code_snapshot?: string | null
+          assigned_user_email_snapshot?: string | null
+          assigned_user_id?: string | null
+          assigned_user_name_snapshot?: string | null
+          id?: string
+          performed_at?: string
+          performed_by_name_snapshot?: string | null
+          performed_by_user_id?: string | null
+          previous_assigned_user_id?: string | null
+          previous_assigned_user_name_snapshot?: string | null
+          service_job_id: string
+          tenant_code: string
+        }
+        Update: {
+          action?: string
+          assigned_user_code_snapshot?: string | null
+          assigned_user_email_snapshot?: string | null
+          assigned_user_id?: string | null
+          assigned_user_name_snapshot?: string | null
+          id?: string
+          performed_at?: string
+          performed_by_name_snapshot?: string | null
+          performed_by_user_id?: string | null
+          previous_assigned_user_id?: string | null
+          previous_assigned_user_name_snapshot?: string | null
+          service_job_id?: string
+          tenant_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_assignment_history_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_jobs: {
         Row: {
           approval_reason: string | null
+          assigned_at: string | null
+          assigned_by_name_snapshot: string | null
+          assigned_by_user_id: string | null
+          assigned_user_code_snapshot: string | null
+          assigned_user_email_snapshot: string | null
+          assigned_user_id: string | null
+          assigned_user_name_snapshot: string | null
           contact_email: string | null
           contact_person: string | null
           contact_phone: string | null
@@ -674,6 +737,13 @@ export type Database = {
         }
         Insert: {
           approval_reason?: string | null
+          assigned_at?: string | null
+          assigned_by_name_snapshot?: string | null
+          assigned_by_user_id?: string | null
+          assigned_user_code_snapshot?: string | null
+          assigned_user_email_snapshot?: string | null
+          assigned_user_id?: string | null
+          assigned_user_name_snapshot?: string | null
           contact_email?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -704,6 +774,13 @@ export type Database = {
         }
         Update: {
           approval_reason?: string | null
+          assigned_at?: string | null
+          assigned_by_name_snapshot?: string | null
+          assigned_by_user_id?: string | null
+          assigned_user_code_snapshot?: string | null
+          assigned_user_email_snapshot?: string | null
+          assigned_user_id?: string | null
+          assigned_user_name_snapshot?: string | null
           contact_email?: string | null
           contact_person?: string | null
           contact_phone?: string | null
