@@ -1,6 +1,19 @@
-// GET /api/workspace/jobs/summary — customer Service Job counts for the
-// current tenant. Tenant is derived server-side; browser input for
-// tenant is ignored. Optional date range narrows results by created_at.
+// GET /api/workspace/jobs/summary — ALL-TIME customer Service Job counts
+// for the current tenant.
+//
+// Feature Pack B §10 definitions (do not change without updating tests):
+//   Service Jobs      = all non-deleted for customer
+//   Active            = non-deleted AND status IN
+//                       (Open, Assigned, In Progress,
+//                        Waiting Customer, Waiting Vendor)
+//   Pending Approval  = non-deleted AND status = 'Pending Approval'
+//   Assigned          = non-deleted AND assigned_user_id IS NOT NULL
+//                       AND status NOT IN (Completed, Cancelled)
+//   Completed         = non-deleted AND status = 'Completed'
+//   Draft & Cancelled included in total, NOT in Active.
+//
+// IMPORTANT: this endpoint MUST ignore any date filters. Date filters apply
+// only to the Job List endpoint. See Feature Pack A → B fix.
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -25,29 +38,32 @@ export const Route = createFileRoute("/api/workspace/jobs/summary")({
           const user = await requireAuthenticatedN3User(request);
           const sp = new URL(request.url).searchParams;
           const customerCode = trim(sp.get("customerCode"), 100);
-          const from = trim(sp.get("from"), 40);
-          const to = trim(sp.get("to"), 40);
 
           const base = () => {
             let q = supabaseAdmin
               .from("service_jobs")
               .select("id", { count: "exact", head: true })
-              .eq("tenant_code", user.tenantCode);
+              .eq("tenant_code", user.tenantCode)
+              .eq("is_deleted", false);
             if (customerCode) q = q.eq("customer_code_snapshot", customerCode);
-            if (from) q = q.gte("created_at", from);
-            if (to) q = q.lte("created_at", to);
             return q;
           };
 
-          const [totalR, activeR, pendingR, assignedR, completedR] =
-            await Promise.all([
-              base(),
-              base().in("status", ["Draft", "Pending Approval", "Assigned", "In Progress"]),
-              base().eq("status", "Pending Approval"),
-              base().not("assigned_user_id", "is", null),
-              base().eq("status", "Completed"),
-            ]);
-
+          const [totalR, activeR, pendingR, assignedR, completedR] = await Promise.all([
+            base(),
+            base().in("status", [
+              "Open",
+              "Assigned",
+              "In Progress",
+              "Waiting Customer",
+              "Waiting Vendor",
+            ]),
+            base().eq("status", "Pending Approval"),
+            base()
+              .not("assigned_user_id", "is", null)
+              .not("status", "in", "(Completed,Cancelled)"),
+            base().eq("status", "Completed"),
+          ]);
           for (const r of [totalR, activeR, pendingR, assignedR, completedR]) {
             if (r.error) throw r.error;
           }

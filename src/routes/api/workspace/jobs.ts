@@ -241,14 +241,17 @@ export const Route = createFileRoute("/api/workspace/jobs")({
           const technician = trim(sp.get("technician"), 100);
           const from = trim(sp.get("from"), 40);
           const to = trim(sp.get("to"), 40);
+          const includeDeleted =
+            sp.get("includeDeleted") === "1" && user.isAdministrator;
 
           let query = supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, assigned_user_id, assigned_user_name_snapshot, assigned_at, created_at",
+              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, assigned_user_id, assigned_user_name_snapshot, assigned_at, is_deleted, created_at",
               { count: "exact" },
             )
             .eq("tenant_code", user.tenantCode);
+          if (!includeDeleted) query = query.eq("is_deleted", false);
 
           if (customerCode) query = query.eq("customer_code_snapshot", customerCode);
           if (status) query = query.eq("status", status);

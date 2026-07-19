@@ -47,9 +47,16 @@ import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
 import { Route as ApiWorkspaceJobsSummaryRouteImport } from './routes/api/workspace/jobs.summary'
+import { Route as ApiWorkspaceJobsPendingRouteImport } from './routes/api/workspace/jobs.pending'
 import { Route as ApiWorkspaceJobsJobIdRouteImport } from './routes/api/workspace/jobs.$jobId'
+import { Route as ApiWorkspaceJobsJobIdTimelineRouteImport } from './routes/api/workspace/jobs.$jobId.timeline'
+import { Route as ApiWorkspaceJobsJobIdStatusRouteImport } from './routes/api/workspace/jobs.$jobId.status'
+import { Route as ApiWorkspaceJobsJobIdRestoreRouteImport } from './routes/api/workspace/jobs.$jobId.restore'
+import { Route as ApiWorkspaceJobsJobIdRejectRouteImport } from './routes/api/workspace/jobs.$jobId.reject'
 import { Route as ApiWorkspaceJobsJobIdHistoryRouteImport } from './routes/api/workspace/jobs.$jobId.history'
+import { Route as ApiWorkspaceJobsJobIdCommentsRouteImport } from './routes/api/workspace/jobs.$jobId.comments'
 import { Route as ApiWorkspaceJobsJobIdAssignRouteImport } from './routes/api/workspace/jobs.$jobId.assign'
+import { Route as ApiWorkspaceJobsJobIdApproveRouteImport } from './routes/api/workspace/jobs.$jobId.approve'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -249,21 +256,62 @@ const ApiWorkspaceJobsSummaryRoute = ApiWorkspaceJobsSummaryRouteImport.update({
   path: '/summary',
   getParentRoute: () => ApiWorkspaceJobsRoute,
 } as any)
+const ApiWorkspaceJobsPendingRoute = ApiWorkspaceJobsPendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => ApiWorkspaceJobsRoute,
+} as any)
 const ApiWorkspaceJobsJobIdRoute = ApiWorkspaceJobsJobIdRouteImport.update({
   id: '/$jobId',
   path: '/$jobId',
   getParentRoute: () => ApiWorkspaceJobsRoute,
 } as any)
+const ApiWorkspaceJobsJobIdTimelineRoute =
+  ApiWorkspaceJobsJobIdTimelineRouteImport.update({
+    id: '/timeline',
+    path: '/timeline',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
+const ApiWorkspaceJobsJobIdStatusRoute =
+  ApiWorkspaceJobsJobIdStatusRouteImport.update({
+    id: '/status',
+    path: '/status',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
+const ApiWorkspaceJobsJobIdRestoreRoute =
+  ApiWorkspaceJobsJobIdRestoreRouteImport.update({
+    id: '/restore',
+    path: '/restore',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
+const ApiWorkspaceJobsJobIdRejectRoute =
+  ApiWorkspaceJobsJobIdRejectRouteImport.update({
+    id: '/reject',
+    path: '/reject',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdHistoryRoute =
   ApiWorkspaceJobsJobIdHistoryRouteImport.update({
     id: '/history',
     path: '/history',
     getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
   } as any)
+const ApiWorkspaceJobsJobIdCommentsRoute =
+  ApiWorkspaceJobsJobIdCommentsRouteImport.update({
+    id: '/comments',
+    path: '/comments',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdAssignRoute =
   ApiWorkspaceJobsJobIdAssignRouteImport.update({
     id: '/assign',
     path: '/assign',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
+const ApiWorkspaceJobsJobIdApproveRoute =
+  ApiWorkspaceJobsJobIdApproveRouteImport.update({
+    id: '/approve',
+    path: '/approve',
     getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
   } as any)
 
@@ -306,9 +354,16 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/pending': typeof ApiWorkspaceJobsPendingRoute
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
+  '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
+  '/api/workspace/jobs/$jobId/reject': typeof ApiWorkspaceJobsJobIdRejectRoute
+  '/api/workspace/jobs/$jobId/restore': typeof ApiWorkspaceJobsJobIdRestoreRoute
+  '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
+  '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -349,9 +404,16 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/pending': typeof ApiWorkspaceJobsPendingRoute
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
+  '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
+  '/api/workspace/jobs/$jobId/reject': typeof ApiWorkspaceJobsJobIdRejectRoute
+  '/api/workspace/jobs/$jobId/restore': typeof ApiWorkspaceJobsJobIdRestoreRoute
+  '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
+  '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -393,9 +455,16 @@ export interface FileRoutesById {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/pending': typeof ApiWorkspaceJobsPendingRoute
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
+  '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
+  '/api/workspace/jobs/$jobId/reject': typeof ApiWorkspaceJobsJobIdRejectRoute
+  '/api/workspace/jobs/$jobId/restore': typeof ApiWorkspaceJobsJobIdRestoreRoute
+  '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
+  '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -438,9 +507,16 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/pending'
     | '/api/workspace/jobs/summary'
+    | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/history'
+    | '/api/workspace/jobs/$jobId/reject'
+    | '/api/workspace/jobs/$jobId/restore'
+    | '/api/workspace/jobs/$jobId/status'
+    | '/api/workspace/jobs/$jobId/timeline'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -481,9 +557,16 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/pending'
     | '/api/workspace/jobs/summary'
+    | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/history'
+    | '/api/workspace/jobs/$jobId/reject'
+    | '/api/workspace/jobs/$jobId/restore'
+    | '/api/workspace/jobs/$jobId/status'
+    | '/api/workspace/jobs/$jobId/timeline'
   id:
     | '__root__'
     | '/'
@@ -524,9 +607,16 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/pending'
     | '/api/workspace/jobs/summary'
+    | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/history'
+    | '/api/workspace/jobs/$jobId/reject'
+    | '/api/workspace/jobs/$jobId/restore'
+    | '/api/workspace/jobs/$jobId/status'
+    | '/api/workspace/jobs/$jobId/timeline'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -837,6 +927,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsSummaryRouteImport
       parentRoute: typeof ApiWorkspaceJobsRoute
     }
+    '/api/workspace/jobs/pending': {
+      id: '/api/workspace/jobs/pending'
+      path: '/pending'
+      fullPath: '/api/workspace/jobs/pending'
+      preLoaderRoute: typeof ApiWorkspaceJobsPendingRouteImport
+      parentRoute: typeof ApiWorkspaceJobsRoute
+    }
     '/api/workspace/jobs/$jobId': {
       id: '/api/workspace/jobs/$jobId'
       path: '/$jobId'
@@ -844,11 +941,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdRouteImport
       parentRoute: typeof ApiWorkspaceJobsRoute
     }
+    '/api/workspace/jobs/$jobId/timeline': {
+      id: '/api/workspace/jobs/$jobId/timeline'
+      path: '/timeline'
+      fullPath: '/api/workspace/jobs/$jobId/timeline'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdTimelineRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
+    '/api/workspace/jobs/$jobId/status': {
+      id: '/api/workspace/jobs/$jobId/status'
+      path: '/status'
+      fullPath: '/api/workspace/jobs/$jobId/status'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdStatusRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
+    '/api/workspace/jobs/$jobId/restore': {
+      id: '/api/workspace/jobs/$jobId/restore'
+      path: '/restore'
+      fullPath: '/api/workspace/jobs/$jobId/restore'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdRestoreRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
+    '/api/workspace/jobs/$jobId/reject': {
+      id: '/api/workspace/jobs/$jobId/reject'
+      path: '/reject'
+      fullPath: '/api/workspace/jobs/$jobId/reject'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdRejectRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
     '/api/workspace/jobs/$jobId/history': {
       id: '/api/workspace/jobs/$jobId/history'
       path: '/history'
       fullPath: '/api/workspace/jobs/$jobId/history'
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdHistoryRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
+    '/api/workspace/jobs/$jobId/comments': {
+      id: '/api/workspace/jobs/$jobId/comments'
+      path: '/comments'
+      fullPath: '/api/workspace/jobs/$jobId/comments'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdCommentsRouteImport
       parentRoute: typeof ApiWorkspaceJobsJobIdRoute
     }
     '/api/workspace/jobs/$jobId/assign': {
@@ -858,17 +990,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdAssignRouteImport
       parentRoute: typeof ApiWorkspaceJobsJobIdRoute
     }
+    '/api/workspace/jobs/$jobId/approve': {
+      id: '/api/workspace/jobs/$jobId/approve'
+      path: '/approve'
+      fullPath: '/api/workspace/jobs/$jobId/approve'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdApproveRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
   }
 }
 
 interface ApiWorkspaceJobsJobIdRouteChildren {
+  ApiWorkspaceJobsJobIdApproveRoute: typeof ApiWorkspaceJobsJobIdApproveRoute
   ApiWorkspaceJobsJobIdAssignRoute: typeof ApiWorkspaceJobsJobIdAssignRoute
+  ApiWorkspaceJobsJobIdCommentsRoute: typeof ApiWorkspaceJobsJobIdCommentsRoute
   ApiWorkspaceJobsJobIdHistoryRoute: typeof ApiWorkspaceJobsJobIdHistoryRoute
+  ApiWorkspaceJobsJobIdRejectRoute: typeof ApiWorkspaceJobsJobIdRejectRoute
+  ApiWorkspaceJobsJobIdRestoreRoute: typeof ApiWorkspaceJobsJobIdRestoreRoute
+  ApiWorkspaceJobsJobIdStatusRoute: typeof ApiWorkspaceJobsJobIdStatusRoute
+  ApiWorkspaceJobsJobIdTimelineRoute: typeof ApiWorkspaceJobsJobIdTimelineRoute
 }
 
 const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
+  ApiWorkspaceJobsJobIdApproveRoute: ApiWorkspaceJobsJobIdApproveRoute,
   ApiWorkspaceJobsJobIdAssignRoute: ApiWorkspaceJobsJobIdAssignRoute,
+  ApiWorkspaceJobsJobIdCommentsRoute: ApiWorkspaceJobsJobIdCommentsRoute,
   ApiWorkspaceJobsJobIdHistoryRoute: ApiWorkspaceJobsJobIdHistoryRoute,
+  ApiWorkspaceJobsJobIdRejectRoute: ApiWorkspaceJobsJobIdRejectRoute,
+  ApiWorkspaceJobsJobIdRestoreRoute: ApiWorkspaceJobsJobIdRestoreRoute,
+  ApiWorkspaceJobsJobIdStatusRoute: ApiWorkspaceJobsJobIdStatusRoute,
+  ApiWorkspaceJobsJobIdTimelineRoute: ApiWorkspaceJobsJobIdTimelineRoute,
 }
 
 const ApiWorkspaceJobsJobIdRouteWithChildren =
@@ -878,11 +1029,13 @@ const ApiWorkspaceJobsJobIdRouteWithChildren =
 
 interface ApiWorkspaceJobsRouteChildren {
   ApiWorkspaceJobsJobIdRoute: typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  ApiWorkspaceJobsPendingRoute: typeof ApiWorkspaceJobsPendingRoute
   ApiWorkspaceJobsSummaryRoute: typeof ApiWorkspaceJobsSummaryRoute
 }
 
 const ApiWorkspaceJobsRouteChildren: ApiWorkspaceJobsRouteChildren = {
   ApiWorkspaceJobsJobIdRoute: ApiWorkspaceJobsJobIdRouteWithChildren,
+  ApiWorkspaceJobsPendingRoute: ApiWorkspaceJobsPendingRoute,
   ApiWorkspaceJobsSummaryRoute: ApiWorkspaceJobsSummaryRoute,
 }
 
