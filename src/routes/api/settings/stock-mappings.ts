@@ -292,10 +292,11 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
           }
 
           // Confirm the stock code exists in this tenant's snapshots — prevents
-          // mapping arbitrary strings and preserves tenant isolation.
+          // mapping arbitrary strings and preserves tenant isolation. Phase
+          // 1.1.6c: also pull the immutable n3_stock_id used as the upsert key.
           const { data: stock, error: stErr } = await supabaseAdmin
             .from("stock_snapshots")
-            .select("stock_code")
+            .select("stock_code, n3_stock_id")
             .eq("tenant_code", user.tenantCode)
             .eq("stock_code", stockCode)
             .maybeSingle();
@@ -306,13 +307,28 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
               { status: 404 },
             );
           }
+          const n3StockId = stock.n3_stock_id ? String(stock.n3_stock_id).trim() : "";
+          if (!n3StockId) {
+            return Response.json(
+              {
+                error:
+                  "This stock has no N3 immutable ID yet. Run Sync Stock, then try mapping again.",
+                code: "MISSING_N3_STOCK_ID",
+              },
+              { status: 409 },
+            );
+          }
 
+          // Phase 1.1.6c — canonical identity is (tenant_code, n3_stock_id).
+          // The legacy (tenant_code, stock_code) unique constraint was dropped
+          // in the Pass 3 identity migration; upserting on it returned 42P10.
           const { data, error } = await supabaseAdmin
             .from("renewal_stock_mappings")
             .upsert(
               {
                 tenant_code: user.tenantCode,
                 stock_code: stockCode,
+                n3_stock_id: n3StockId,
                 service_type: SERVICE_TYPE_DB[typeUi],
                 contract_days: contractDays,
                 subscription_category: subscriptionCategory,
@@ -321,7 +337,7 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
                 is_active: true,
                 updated_at: new Date().toISOString(),
               },
-              { onConflict: "tenant_code,stock_code" },
+              { onConflict: "tenant_code,n3_stock_id" },
             )
             .select(
               "stock_code, service_type, contract_days, subscription_category, renewal_cycle_value, renewal_cycle_unit, is_active",
@@ -334,9 +350,17 @@ export const Route = createFileRoute("/api/settings/stock-mappings")({
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;
+          const dbErr = err as { message?: string; code?: string; details?: string; hint?: string } | null;
           console.error("[settings/stock-mappings POST] failed", err);
           return Response.json(
-            { error: "Mapping could not be saved. Please try again." },
+            {
+              error: dbErr?.message
+                ? `Mapping could not be saved: ${dbErr.message}`
+                : "Mapping could not be saved. Please try again.",
+              code: dbErr?.code ?? null,
+              details: dbErr?.details ?? null,
+              hint: dbErr?.hint ?? null,
+            },
             { status: 500 },
           );
         }

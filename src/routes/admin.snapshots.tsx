@@ -127,6 +127,14 @@ function fmtDate(iso: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
 
+// Phase 1.1.6c — Document Verifier renders date-only. Stored timestamps
+// remain unchanged; this is a display-only helper.
+function fmtDateOnly(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
+}
+
 function AdminSnapshots() {
   const { session } = useSession();
   const tenant = session?.tenantCode ?? "";
@@ -338,7 +346,7 @@ function AdminSnapshots() {
 
       {(staleLocks.length > 0 || liveLocks.length > 0) && (
         <section className="rounded-lg border p-4 space-y-3"
-          style={{ borderColor: staleLocks.length > 0 ? "rgb(252 165 165)" : "rgb(191 219 254)", background: staleLocks.length > 0 ? "rgb(254 242 242)" : "rgb(239 246 255)" }}
+          style={{ borderColor: "rgb(252 165 165)", background: "rgb(254 242 242)" }}
         >
           {staleLocks.map((l) => (
             <div key={`stale-${l.snapshotType}`} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -360,7 +368,7 @@ function AdminSnapshots() {
             </div>
           ))}
           {liveLocks.map((l) => (
-            <div key={`live-${l.snapshotType}`} className="text-sm text-blue-900">
+            <div key={`live-${l.snapshotType}`} className="text-sm text-red-900">
               Sync in progress · <code>{l.snapshotType}</code> · stage:{" "}
               <strong>{l.stage ?? "starting"}</strong>
               {l.ageSeconds != null ? ` · last heartbeat ${l.ageSeconds}s ago` : ""}
@@ -390,7 +398,11 @@ function AdminSnapshots() {
           <button
             disabled={busy}
             onClick={runFullSync}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className={
+              running === "full"
+                ? "rounded-md bg-red-100 border border-red-300 px-4 py-2 text-sm font-semibold text-red-900 disabled:opacity-90"
+                : "rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            }
           >
             {running === "full" ? "Running full sync…" : "Sync N3 Data & Recalculate"}
           </button>
@@ -513,7 +525,7 @@ function AdminSnapshots() {
 
       {/* Live sync progress — visible while any sync is running */}
       {busy && (
-        <section className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+        <section className="rounded-lg border border-red-300 bg-red-50 p-4">
           <h2 className="mb-2 text-sm font-semibold text-foreground">
             Sync in progress{running === "all" ? " (Run All)" : ""}
           </h2>
@@ -1461,7 +1473,7 @@ function DocumentVerifier() {
                         {c.document_status ?? "Active"}
                       </span>
                     </td>
-                    <td className="px-2 py-1">{fmtDate(c.document_date ?? "")}</td>
+                    <td className="px-2 py-1">{fmtDateOnly(c.document_date ?? "")}</td>
                     <td className="px-2 py-1">
                       {c.customer_code ?? "—"} {c.customer_name ?? ""}
                     </td>
@@ -1502,7 +1514,7 @@ function DocumentVerifier() {
                 </div>
                 <div className="mt-1 grid gap-1 text-muted-foreground md:grid-cols-3">
                   <div>Customer: {String(result.header?.customer_code ?? "—")} {String(result.header?.customer_name ?? "")}</div>
-                  <div>Date: {fmtDate(result.header?.document_date as string)}</div>
+                  <div>Date: {fmtDateOnly(result.header?.document_date as string)}</div>
                   <div>Status: {String(result.header?.document_status ?? "—")}</div>
                   <div>Detail op: {result.detailFetch.operation ?? "—"}</div>
                   <div>Lines stored: {result.detailFetch.linesStored}</div>

@@ -361,6 +361,34 @@ export function computeInclusiveExpiry(start: Date, value: number, unit: CycleUn
   return d;
 }
 
+/**
+ * Phase 1.1.6c — Resolve the effective renewal quantity from a raw N3 line
+ * `qty`. Returns an integer ≥ 1 when the line should produce entitlement,
+ * or a structured skip reason. Never rounds fractions.
+ *
+ *   null / undefined       → { effective: 1 }
+ *   integer ≥ 1            → { effective: qty }
+ *   0                      → skip "zero_quantity"
+ *   negative               → skip "negative_quantity" (package exchange
+ *                            is Phase 1.1.7 — existing entitlement stays)
+ *   fraction (e.g. 1.5)    → skip "fractional_quantity"
+ *   NaN / non-finite       → skip "invalid_quantity"
+ */
+export type QuantityResolution =
+  | { effective: number; skipReason?: undefined }
+  | { effective: null; skipReason: "zero_quantity" | "negative_quantity" | "fractional_quantity" | "invalid_quantity" };
+
+export function resolveEffectiveQuantity(qty: number | null | undefined): QuantityResolution {
+  if (qty === null || qty === undefined) return { effective: 1 };
+  if (typeof qty !== "number" || !Number.isFinite(qty)) {
+    return { effective: null, skipReason: "invalid_quantity" };
+  }
+  if (qty === 0) return { effective: null, skipReason: "zero_quantity" };
+  if (qty < 0) return { effective: null, skipReason: "negative_quantity" };
+  if (!Number.isInteger(qty)) return { effective: null, skipReason: "fractional_quantity" };
+  return { effective: qty };
+}
+
 function computeStatus(daysLeft: number, dueSoonDays: number): SubscriptionStatus {
   if (daysLeft < 0) return "Overdue";
   if (daysLeft <= dueSoonDays) return "Due Soon";
@@ -684,6 +712,11 @@ interface SourceMetrics {
   renewalEventsSkippedVoided: number;
   renewalEventsSkippedMissingCustomer: number;
   renewalEventsSkippedInvalidDate: number;
+  // Phase 1.1.6c — quantity-driven skip counters.
+  renewalEventsSkippedZeroQty: number;
+  renewalEventsSkippedNegativeQty: number;
+  renewalEventsSkippedFractionalQty: number;
+  renewalEventsSkippedInvalidQty: number;
   lineTypeCounts: {
     stock: number;
     description: number;
@@ -748,6 +781,10 @@ async function syncSourceDetails(args: {
     renewalEventsSkippedVoided: 0,
     renewalEventsSkippedMissingCustomer: 0,
     renewalEventsSkippedInvalidDate: 0,
+    renewalEventsSkippedZeroQty: 0,
+    renewalEventsSkippedNegativeQty: 0,
+    renewalEventsSkippedFractionalQty: 0,
+    renewalEventsSkippedInvalidQty: 0,
     lineTypeCounts: {
       stock: 0,
       description: 0,
@@ -963,9 +1000,34 @@ async function syncSourceDetails(args: {
           metrics.renewalEventsSkippedInvalidDate += 1;
           return;
         }
+        // Phase 1.1.6c — effective duration = configured cycle × qty.
+        const rawQty = typeof line.qty === "number" ? line.qty : null;
+        const qtyRes = resolveEffectiveQuantity(rawQty);
+        if (qtyRes.effective == null) {
+          metrics.renewalEventsSkipped += 1;
+          switch (qtyRes.skipReason) {
+            case "zero_quantity":
+              metrics.renewalEventsSkippedZeroQty += 1;
+              break;
+            case "negative_quantity":
+              metrics.renewalEventsSkippedNegativeQty += 1;
+              break;
+            case "fractional_quantity":
+              metrics.renewalEventsSkippedFractionalQty += 1;
+              break;
+            case "invalid_quantity":
+              metrics.renewalEventsSkippedInvalidQty += 1;
+              break;
+          }
+          console.warn(
+            `[subscription-sync] renewal event skipped source=${sourceType} docId=${docId} lineId=${lineId} reason=${qtyRes.skipReason} qty=${String(rawQty)}`,
+          );
+          return;
+        }
+        const effectiveQty = qtyRes.effective;
         const expiry = computeInclusiveExpiry(
           docDate,
-          renewal.renewal_cycle_value,
+          renewal.renewal_cycle_value * effectiveQty,
           renewal.renewal_cycle_unit,
         );
         renewalEvents.push({
@@ -993,6 +1055,7 @@ async function syncSourceDetails(args: {
           source_line_id: lineId,
           renewal_cycle_value: renewal.renewal_cycle_value,
           renewal_cycle_unit: renewal.renewal_cycle_unit,
+          quantity_used: effectiveQty,
           start_date: isoDate(docDate),
           expiry_date: isoDate(expiry),
           is_source_void: false,
