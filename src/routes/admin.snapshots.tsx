@@ -1469,7 +1469,7 @@ function DocumentVerifier() {
                         {c.document_status ?? "Active"}
                       </span>
                     </td>
-                    <td className="px-2 py-1">{fmtDate(c.document_date ?? "")}</td>
+                    <td className="px-2 py-1">{fmtDateOnly(c.document_date ?? "")}</td>
                     <td className="px-2 py-1">
                       {c.customer_code ?? "—"} {c.customer_name ?? ""}
                     </td>
