@@ -398,7 +398,11 @@ function AdminSnapshots() {
           <button
             disabled={busy}
             onClick={runFullSync}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className={
+              running === "full"
+                ? "rounded-md bg-red-100 border border-red-300 px-4 py-2 text-sm font-semibold text-red-900 disabled:opacity-90"
+                : "rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            }
           >
             {running === "full" ? "Running full sync…" : "Sync N3 Data & Recalculate"}
           </button>
