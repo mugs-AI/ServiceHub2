@@ -1510,7 +1510,7 @@ function DocumentVerifier() {
                 </div>
                 <div className="mt-1 grid gap-1 text-muted-foreground md:grid-cols-3">
                   <div>Customer: {String(result.header?.customer_code ?? "—")} {String(result.header?.customer_name ?? "")}</div>
-                  <div>Date: {fmtDate(result.header?.document_date as string)}</div>
+                  <div>Date: {fmtDateOnly(result.header?.document_date as string)}</div>
                   <div>Status: {String(result.header?.document_status ?? "—")}</div>
                   <div>Detail op: {result.detailFetch.operation ?? "—"}</div>
                   <div>Lines stored: {result.detailFetch.linesStored}</div>
