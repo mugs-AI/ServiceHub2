@@ -348,6 +348,7 @@ function isoDate(d: Date): string {
 /**
  * Inclusive expiry — day: start + value - 1 day; month/year: calendar
  * arithmetic, then minus 1 day. Never fixed-days per month/year.
+ * Whole-cycle helper — used by the fractional-aware `computeExpiryForQuantity`.
  */
 export function computeInclusiveExpiry(start: Date, value: number, unit: CycleUnit): Date {
   const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
@@ -361,32 +362,79 @@ export function computeInclusiveExpiry(start: Date, value: number, unit: CycleUn
   return d;
 }
 
+function addUnits(start: Date, count: number, unit: CycleUnit): Date {
+  const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  if (unit === "day") d.setUTCDate(d.getUTCDate() + count);
+  else if (unit === "month") d.setUTCMonth(d.getUTCMonth() + count);
+  else d.setUTCFullYear(d.getUTCFullYear() + count);
+  return d;
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Phase 1.1.6c correction — inclusive expiry that supports fractional
+ * quantities.
+ *
+ * effective cycles = cycleValue × quantity  (quantity may be fractional)
+ *
+ * 1. Apply the whole-number cycles using calendar arithmetic
+ *    (`wholeEnd` = the exclusive-next-start date after those cycles).
+ * 2. For any fractional remainder `frac`, look up the actual calendar length
+ *    of the NEXT one-unit period starting at `wholeEnd`, multiply by `frac`
+ *    and round to the nearest whole day (≥0.5 rounds up, `<0.5` rounds down).
+ * 3. Return `wholeEnd + extraDays − 1 day` to preserve inclusive-expiry
+ *    semantics. Never uses fixed 30-day months or 365-day years.
+ */
+export function computeExpiryForQuantity(
+  start: Date,
+  cycleValue: number,
+  unit: CycleUnit,
+  quantity: number,
+): Date {
+  const totalCycles = cycleValue * quantity;
+  const whole = Math.floor(totalCycles);
+  // Guard tiny binary-float artefacts (e.g. 1.5 × 1 = 1.5, floor 1, frac ≈ 0.5).
+  const frac = Math.max(0, totalCycles - whole);
+  const wholeEnd = addUnits(start, whole, unit);
+  if (frac === 0) {
+    const d = new Date(wholeEnd);
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d;
+  }
+  const nextEnd = addUnits(wholeEnd, 1, unit);
+  const nextPeriodDays = Math.round((nextEnd.getTime() - wholeEnd.getTime()) / MS_PER_DAY);
+  const extraDays = Math.round(nextPeriodDays * frac); // Math.round: 0.5 → up
+  const finalExclusive = new Date(wholeEnd);
+  finalExclusive.setUTCDate(finalExclusive.getUTCDate() + extraDays - 1);
+  return finalExclusive;
+}
+
 /**
  * Phase 1.1.6c — Resolve the effective renewal quantity from a raw N3 line
- * `qty`. Returns an integer ≥ 1 when the line should produce entitlement,
- * or a structured skip reason. Never rounds fractions.
+ * `qty`. Positive integers AND positive fractions produce entitlement;
+ * zero, negatives, and non-finite values are structured skip reasons.
  *
  *   null / undefined       → { effective: 1 }
- *   integer ≥ 1            → { effective: qty }
+ *   positive integer       → { effective: qty }
+ *   positive fraction      → { effective: qty, fractional: true }
  *   0                      → skip "zero_quantity"
  *   negative               → skip "negative_quantity" (package exchange
  *                            is Phase 1.1.7 — existing entitlement stays)
- *   fraction (e.g. 1.5)    → skip "fractional_quantity"
  *   NaN / non-finite       → skip "invalid_quantity"
  */
 export type QuantityResolution =
-  | { effective: number; skipReason?: undefined }
-  | { effective: null; skipReason: "zero_quantity" | "negative_quantity" | "fractional_quantity" | "invalid_quantity" };
+  | { effective: number; fractional: boolean; skipReason?: undefined }
+  | { effective: null; fractional?: undefined; skipReason: "zero_quantity" | "negative_quantity" | "invalid_quantity" };
 
 export function resolveEffectiveQuantity(qty: number | null | undefined): QuantityResolution {
-  if (qty === null || qty === undefined) return { effective: 1 };
+  if (qty === null || qty === undefined) return { effective: 1, fractional: false };
   if (typeof qty !== "number" || !Number.isFinite(qty)) {
     return { effective: null, skipReason: "invalid_quantity" };
   }
   if (qty === 0) return { effective: null, skipReason: "zero_quantity" };
   if (qty < 0) return { effective: null, skipReason: "negative_quantity" };
-  if (!Number.isInteger(qty)) return { effective: null, skipReason: "fractional_quantity" };
-  return { effective: qty };
+  return { effective: qty, fractional: !Number.isInteger(qty) };
 }
 
 function computeStatus(daysLeft: number, dueSoonDays: number): SubscriptionStatus {
