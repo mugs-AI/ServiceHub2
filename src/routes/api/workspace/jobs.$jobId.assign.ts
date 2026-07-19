@@ -45,7 +45,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/assign")({
           const { data: job, error: jobErr } = await supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, tenant_code, assigned_user_id, assigned_user_name_snapshot",
+              "id, tenant_code, status, is_deleted, assigned_user_id, assigned_user_name_snapshot",
             )
             .eq("tenant_code", user.tenantCode)
             .eq("id", params.jobId)
@@ -53,6 +53,18 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/assign")({
           if (jobErr) throw jobErr;
           if (!job) {
             return Response.json({ error: "Job not found." }, { status: 404 });
+          }
+          if (job.is_deleted) {
+            return Response.json(
+              { error: "Deleted job cannot be assigned." },
+              { status: 400 },
+            );
+          }
+          if (["Completed", "Cancelled"].includes(job.status)) {
+            return Response.json(
+              { error: `Cannot assign a ${job.status} job.` },
+              { status: 400 },
+            );
           }
 
           // Verify the technician against N3 Users for this tenant.
@@ -102,9 +114,14 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/assign")({
           const action: Action = previousUserId ? "reassigned" : "assigned";
           const now = new Date().toISOString();
 
+          // Coordinate status: Open → Assigned when a technician is set.
+          const oldStatus = job.status as string;
+          const nextStatus = oldStatus === "Open" ? "Assigned" : oldStatus;
+
           const { data: updated, error: upErr } = await supabaseAdmin
             .from("service_jobs")
             .update({
+              status: nextStatus,
               assigned_user_id: targetUserId,
               assigned_user_name_snapshot: nameSnap,
               assigned_user_code_snapshot: userNameSnap,
@@ -139,6 +156,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/assign")({
             });
           if (hErr) throw hErr;
 
+          if (nextStatus !== oldStatus) {
+            await supabaseAdmin.from("service_job_activity_log").insert({
+              tenant_code: user.tenantCode,
+              service_job_id: params.jobId,
+              event_type: "status_changed",
+              old_value: oldStatus,
+              new_value: nextStatus,
+              note: "Auto-advanced on technician assignment.",
+              performed_by_user_id:
+                user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
+              performed_by_name_snapshot: user.displayName || user.email || null,
+            });
+          }
+
           return Response.json({ ok: true, action, job: updated });
         } catch (err) {
           const resp = guardResponse(err);
@@ -163,7 +194,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/assign")({
           const { data: job, error: jobErr } = await supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, tenant_code, assigned_user_id, assigned_user_name_snapshot",
+              "id, tenant_code, status, is_deleted, assigned_user_id, assigned_user_name_snapshot",
             )
             .eq("tenant_code", user.tenantCode)
             .eq("id", params.jobId)
@@ -171,6 +202,12 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/assign")({
           if (jobErr) throw jobErr;
           if (!job) {
             return Response.json({ error: "Job not found." }, { status: 404 });
+          }
+          if (job.is_deleted) {
+            return Response.json(
+              { error: "Deleted job cannot be modified." },
+              { status: 400 },
+            );
           }
           if (!job.assigned_user_id) {
             return Response.json({
@@ -184,9 +221,14 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/assign")({
           const previousName = job.assigned_user_name_snapshot ?? null;
           const now = new Date().toISOString();
 
+          // Coordinate status: Assigned → Open when the technician is cleared.
+          const oldStatus = job.status as string;
+          const nextStatus = oldStatus === "Assigned" ? "Open" : oldStatus;
+
           const { data: updated, error: upErr } = await supabaseAdmin
             .from("service_jobs")
             .update({
+              status: nextStatus,
               assigned_user_id: null,
               assigned_user_name_snapshot: null,
               assigned_user_code_snapshot: null,
@@ -217,6 +259,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/assign")({
               performed_at: now,
             });
           if (hErr) throw hErr;
+
+          if (nextStatus !== oldStatus) {
+            await supabaseAdmin.from("service_job_activity_log").insert({
+              tenant_code: user.tenantCode,
+              service_job_id: params.jobId,
+              event_type: "status_changed",
+              old_value: oldStatus,
+              new_value: nextStatus,
+              note: "Auto-reverted on technician unassignment.",
+              performed_by_user_id:
+                user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
+              performed_by_name_snapshot: user.displayName || user.email || null,
+            });
+          }
 
           return Response.json({ ok: true, action: "unassigned", job: updated });
         } catch (err) {

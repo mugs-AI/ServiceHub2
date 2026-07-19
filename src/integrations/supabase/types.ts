@@ -641,6 +641,56 @@ export type Database = {
         }
         Relationships: []
       }
+      service_job_activity_log: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          metadata_json: Json | null
+          new_value: string | null
+          note: string | null
+          old_value: string | null
+          performed_by_name_snapshot: string | null
+          performed_by_user_id: string | null
+          service_job_id: string
+          tenant_code: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata_json?: Json | null
+          new_value?: string | null
+          note?: string | null
+          old_value?: string | null
+          performed_by_name_snapshot?: string | null
+          performed_by_user_id?: string | null
+          service_job_id: string
+          tenant_code: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata_json?: Json | null
+          new_value?: string | null
+          note?: string | null
+          old_value?: string | null
+          performed_by_name_snapshot?: string | null
+          performed_by_user_id?: string | null
+          service_job_id?: string
+          tenant_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_activity_log_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_job_assignment_history: {
         Row: {
           action: string
@@ -697,9 +747,54 @@ export type Database = {
           },
         ]
       }
+      service_job_comments: {
+        Row: {
+          author_name_snapshot: string | null
+          author_user_id: string | null
+          body: string
+          created_at: string
+          id: string
+          service_job_id: string
+          tenant_code: string
+          visibility: string
+        }
+        Insert: {
+          author_name_snapshot?: string | null
+          author_user_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          service_job_id: string
+          tenant_code: string
+          visibility?: string
+        }
+        Update: {
+          author_name_snapshot?: string | null
+          author_user_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          service_job_id?: string
+          tenant_code?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_comments_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_jobs: {
         Row: {
+          approval_note: string | null
           approval_reason: string | null
+          approved_at: string | null
+          approved_by_name_snapshot: string | null
+          approved_by_user_id: string | null
           assigned_at: string | null
           assigned_by_name_snapshot: string | null
           assigned_by_user_id: string | null
@@ -707,6 +802,11 @@ export type Database = {
           assigned_user_email_snapshot: string | null
           assigned_user_id: string | null
           assigned_user_name_snapshot: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by_name_snapshot: string | null
+          cancelled_by_user_id: string | null
+          completed_at: string | null
           contact_email: string | null
           contact_person: string | null
           contact_phone: string | null
@@ -715,18 +815,28 @@ export type Database = {
           created_by_user_id: string | null
           customer_code_snapshot: string
           customer_name_snapshot: string | null
+          deleted_at: string | null
+          deleted_by_name_snapshot: string | null
+          deleted_by_user_id: string | null
+          deletion_reason: string | null
           entitlement_expiry_snapshot: string | null
           entitlement_status_snapshot: string | null
           id: string
           internal_note: string | null
+          is_deleted: boolean
           job_number: string
           n3_customer_id: string | null
           n3_stock_id_snapshot: string | null
           priority: string
           problem_description: string
+          rejected_at: string | null
+          rejected_by_name_snapshot: string | null
+          rejected_by_user_id: string | null
+          rejection_reason: string | null
           requires_approval: boolean
           service_address: string | null
           source: string
+          started_at: string | null
           status: string
           stock_code_snapshot: string | null
           subject: string
@@ -736,7 +846,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approval_note?: string | null
           approval_reason?: string | null
+          approved_at?: string | null
+          approved_by_name_snapshot?: string | null
+          approved_by_user_id?: string | null
           assigned_at?: string | null
           assigned_by_name_snapshot?: string | null
           assigned_by_user_id?: string | null
@@ -744,6 +858,11 @@ export type Database = {
           assigned_user_email_snapshot?: string | null
           assigned_user_id?: string | null
           assigned_user_name_snapshot?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by_name_snapshot?: string | null
+          cancelled_by_user_id?: string | null
+          completed_at?: string | null
           contact_email?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -752,18 +871,28 @@ export type Database = {
           created_by_user_id?: string | null
           customer_code_snapshot: string
           customer_name_snapshot?: string | null
+          deleted_at?: string | null
+          deleted_by_name_snapshot?: string | null
+          deleted_by_user_id?: string | null
+          deletion_reason?: string | null
           entitlement_expiry_snapshot?: string | null
           entitlement_status_snapshot?: string | null
           id?: string
           internal_note?: string | null
+          is_deleted?: boolean
           job_number: string
           n3_customer_id?: string | null
           n3_stock_id_snapshot?: string | null
           priority?: string
           problem_description: string
+          rejected_at?: string | null
+          rejected_by_name_snapshot?: string | null
+          rejected_by_user_id?: string | null
+          rejection_reason?: string | null
           requires_approval?: boolean
           service_address?: string | null
           source?: string
+          started_at?: string | null
           status?: string
           stock_code_snapshot?: string | null
           subject: string
@@ -773,7 +902,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approval_note?: string | null
           approval_reason?: string | null
+          approved_at?: string | null
+          approved_by_name_snapshot?: string | null
+          approved_by_user_id?: string | null
           assigned_at?: string | null
           assigned_by_name_snapshot?: string | null
           assigned_by_user_id?: string | null
@@ -781,6 +914,11 @@ export type Database = {
           assigned_user_email_snapshot?: string | null
           assigned_user_id?: string | null
           assigned_user_name_snapshot?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by_name_snapshot?: string | null
+          cancelled_by_user_id?: string | null
+          completed_at?: string | null
           contact_email?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -789,18 +927,28 @@ export type Database = {
           created_by_user_id?: string | null
           customer_code_snapshot?: string
           customer_name_snapshot?: string | null
+          deleted_at?: string | null
+          deleted_by_name_snapshot?: string | null
+          deleted_by_user_id?: string | null
+          deletion_reason?: string | null
           entitlement_expiry_snapshot?: string | null
           entitlement_status_snapshot?: string | null
           id?: string
           internal_note?: string | null
+          is_deleted?: boolean
           job_number?: string
           n3_customer_id?: string | null
           n3_stock_id_snapshot?: string | null
           priority?: string
           problem_description?: string
+          rejected_at?: string | null
+          rejected_by_name_snapshot?: string | null
+          rejected_by_user_id?: string | null
+          rejection_reason?: string | null
           requires_approval?: boolean
           service_address?: string | null
           source?: string
+          started_at?: string | null
           status?: string
           stock_code_snapshot?: string | null
           subject?: string
