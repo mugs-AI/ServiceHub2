@@ -346,7 +346,7 @@ function AdminSnapshots() {
 
       {(staleLocks.length > 0 || liveLocks.length > 0) && (
         <section className="rounded-lg border p-4 space-y-3"
-          style={{ borderColor: staleLocks.length > 0 ? "rgb(252 165 165)" : "rgb(191 219 254)", background: staleLocks.length > 0 ? "rgb(254 242 242)" : "rgb(239 246 255)" }}
+          style={{ borderColor: "rgb(252 165 165)", background: "rgb(254 242 242)" }}
         >
           {staleLocks.map((l) => (
             <div key={`stale-${l.snapshotType}`} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
