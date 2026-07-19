@@ -46,6 +46,7 @@ import { Route as ApiDiagnosticsDocumentSearchRouteImport } from './routes/api/d
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
+import { Route as ApiWorkspaceJobsSummaryRouteImport } from './routes/api/workspace/jobs.summary'
 import { Route as ApiWorkspaceJobsJobIdRouteImport } from './routes/api/workspace/jobs.$jobId'
 import { Route as ApiWorkspaceJobsJobIdHistoryRouteImport } from './routes/api/workspace/jobs.$jobId.history'
 import { Route as ApiWorkspaceJobsJobIdAssignRouteImport } from './routes/api/workspace/jobs.$jobId.assign'
@@ -243,6 +244,11 @@ const ApiAdminAllowlistRoute = ApiAdminAllowlistRouteImport.update({
   path: '/api/admin/allowlist',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceJobsSummaryRoute = ApiWorkspaceJobsSummaryRouteImport.update({
+  id: '/summary',
+  path: '/summary',
+  getParentRoute: () => ApiWorkspaceJobsRoute,
+} as any)
 const ApiWorkspaceJobsJobIdRoute = ApiWorkspaceJobsJobIdRouteImport.update({
   id: '/$jobId',
   path: '/$jobId',
@@ -300,6 +306,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
 }
@@ -342,6 +349,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
 }
@@ -385,6 +393,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
 }
@@ -429,6 +438,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/assign'
     | '/api/workspace/jobs/$jobId/history'
   fileRoutesByTo: FileRoutesByTo
@@ -471,6 +481,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/assign'
     | '/api/workspace/jobs/$jobId/history'
   id:
@@ -513,6 +524,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/assign'
     | '/api/workspace/jobs/$jobId/history'
   fileRoutesById: FileRoutesById
@@ -818,6 +830,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminAllowlistRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace/jobs/summary': {
+      id: '/api/workspace/jobs/summary'
+      path: '/summary'
+      fullPath: '/api/workspace/jobs/summary'
+      preLoaderRoute: typeof ApiWorkspaceJobsSummaryRouteImport
+      parentRoute: typeof ApiWorkspaceJobsRoute
+    }
     '/api/workspace/jobs/$jobId': {
       id: '/api/workspace/jobs/$jobId'
       path: '/$jobId'
@@ -859,10 +878,12 @@ const ApiWorkspaceJobsJobIdRouteWithChildren =
 
 interface ApiWorkspaceJobsRouteChildren {
   ApiWorkspaceJobsJobIdRoute: typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  ApiWorkspaceJobsSummaryRoute: typeof ApiWorkspaceJobsSummaryRoute
 }
 
 const ApiWorkspaceJobsRouteChildren: ApiWorkspaceJobsRouteChildren = {
   ApiWorkspaceJobsJobIdRoute: ApiWorkspaceJobsJobIdRouteWithChildren,
+  ApiWorkspaceJobsSummaryRoute: ApiWorkspaceJobsSummaryRoute,
 }
 
 const ApiWorkspaceJobsRouteWithChildren =
