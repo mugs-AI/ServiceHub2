@@ -138,6 +138,33 @@ export const Route = createFileRoute("/api/diagnostics/subscription-run")({
             breakdown(supabaseAdmin, tenant, "delivery_order_line_snapshots", renewalKeys, adHocKeys),
           ]);
 
+          // Phase 1.1.7 — surface skip reasons + rebuild-by-source from the
+          // latest sync log's details JSON. Purely additive; the raw log
+          // stays available for deeper inspection.
+          const latest = (logRes.data ?? null) as
+            | { details?: Record<string, unknown> | null }
+            | null;
+          const details = (latest?.details ?? {}) as Record<string, unknown>;
+          const pickSkip = (src: unknown) => {
+            const s = (src ?? {}) as Record<string, unknown>;
+            const n = (k: string) => (typeof s[k] === "number" ? (s[k] as number) : 0);
+            return {
+              total: n("renewalEventsSkipped"),
+              voidedHeader: n("renewalEventsSkippedVoided"),
+              missingCustomer: n("renewalEventsSkippedMissingCustomer"),
+              invalidDate: n("renewalEventsSkippedInvalidDate"),
+              zeroQty: n("renewalEventsSkippedZeroQty"),
+              negativeQty: n("renewalEventsSkippedNegativeQty"),
+              invalidQty: n("renewalEventsSkippedInvalidQty"),
+              mappedRenewalLines: n("mappedRenewalLines"),
+              renewalEventsInserted: n("renewalEventsInserted"),
+              unmappedStockLines: n("unmappedStockLines"),
+            };
+          };
+          const rebuild = (details.rebuild ?? null) as
+            | { bySource?: unknown; inserted?: number; updated?: number; skipped?: number }
+            | null;
+
           return Response.json({
             tenantCode: tenant,
             latest: logRes.data ?? null,
@@ -150,6 +177,23 @@ export const Route = createFileRoute("/api/diagnostics/subscription-run")({
             perSource: {
               salesInvoice: si,
               deliveryOrder: dord,
+            },
+            // Phase 1.1.7 additions — Administrator-only diagnostics.
+            skipReasons: {
+              salesInvoice: pickSkip(details.salesInvoice),
+              deliveryOrder: pickSkip(details.deliveryOrder),
+            },
+            rebuild: rebuild
+              ? {
+                  inserted: rebuild.inserted ?? null,
+                  updated: rebuild.updated ?? null,
+                  skipped: rebuild.skipped ?? null,
+                  bySource: rebuild.bySource ?? null,
+                }
+              : null,
+            activeMappings: {
+              renewal: (details.activeRenewalMappings as number) ?? null,
+              adHoc: (details.activeAdHocMappings as number) ?? null,
             },
             reconciliationNote:
               "Stored detail-line totals are line-count, not document-count. The N3 Sales History Inquiry lists document headers; a single document may carry several detail lines (stock, description, serial and child-detail rows). The stock breakdown above reflects only rows that can produce entitlement.",
