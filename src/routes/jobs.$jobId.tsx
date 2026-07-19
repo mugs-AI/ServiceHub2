@@ -66,7 +66,7 @@ function authHeaders(): Record<string, string> {
 function JobDetailPage() {
   const { jobId } = Route.useParams();
   const session = useSession();
-  const canAssign = session.isAdministrator;
+  const canAssign = !!session.currentUser?.isAdministrator;
 
   const [job, setJob] = useState<JobDetail | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
