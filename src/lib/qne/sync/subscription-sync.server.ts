@@ -1060,9 +1060,6 @@ async function syncSourceDetails(args: {
             case "negative_quantity":
               metrics.renewalEventsSkippedNegativeQty += 1;
               break;
-            case "fractional_quantity":
-              metrics.renewalEventsSkippedFractionalQty += 1;
-              break;
             case "invalid_quantity":
               metrics.renewalEventsSkippedInvalidQty += 1;
               break;
@@ -1073,10 +1070,11 @@ async function syncSourceDetails(args: {
           return;
         }
         const effectiveQty = qtyRes.effective;
-        const expiry = computeInclusiveExpiry(
+        const expiry = computeExpiryForQuantity(
           docDate,
-          renewal.renewal_cycle_value * effectiveQty,
+          renewal.renewal_cycle_value,
           renewal.renewal_cycle_unit,
+          effectiveQty,
         );
         renewalEvents.push({
           tenant_code: tenantCode,
