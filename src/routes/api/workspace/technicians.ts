@@ -18,9 +18,9 @@ export const Route = createFileRoute("/api/workspace/technicians")({
           "@/lib/qne/session/current-user.server"
         );
         const { n3Get } = await import("@/lib/qne/sync/n3.server");
-        const { isUserActive, type N3UserDto } = await import(
-          "@/lib/qne/session/role-resolution"
-        );
+        const roleMod = await import("@/lib/qne/session/role-resolution");
+        const { isUserActive } = roleMod;
+        type N3UserDto = import("@/lib/qne/session/role-resolution").N3UserDto;
         try {
           const user = await requireAdministrator(request);
           const url = new URL(request.url);
