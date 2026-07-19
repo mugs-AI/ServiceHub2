@@ -466,15 +466,47 @@ function NewJobPage() {
       <style>{`
         .input {
           width: 100%;
-          min-height: 2.5rem;
+          min-height: 44px;
           border-radius: 0.5rem;
-          border: 1px solid hsl(var(--border));
-          background: hsl(var(--background));
-          padding: 0.5rem 0.75rem;
-          font-size: 0.875rem;
+          border: 1.5px solid #d1d5db;
+          background: #ffffff;
+          padding: 0.5rem 0.875rem;
+          font-size: 1rem;
+          color: #111827;
           outline: none;
+          transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+          box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
         }
-        .input:focus { box-shadow: 0 0 0 2px hsl(var(--primary) / 0.4); }
+        .input::placeholder {
+          color: #6b7280;
+        }
+        .input:focus {
+          border-color: #2563eb;
+          background: #eff6ff;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18), inset 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+        .input:disabled {
+          background: #f3f4f6;
+          border-color: #e5e7eb;
+          color: #9ca3af;
+        }
+        select.input {
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.75rem center;
+          padding-right: 2.25rem;
+        }
+        textarea.input {
+          min-height: 96px;
+          resize: vertical;
+        }
+        @media (max-width: 640px) {
+          .input {
+            font-size: 1rem;
+            padding: 0.625rem 0.875rem;
+          }
+        }
       `}</style>
     </div>
   );
