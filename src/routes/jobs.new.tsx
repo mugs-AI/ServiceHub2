@@ -262,7 +262,7 @@ function NewJobPage() {
                       <button
                         type="button"
                         onClick={() => setCustomer(c)}
-                        className="flex w-full flex-col items-start border-b px-3 py-2 text-left text-sm hover:bg-accent"
+                        className="flex w-full flex-col items-start border-b p-3 text-left text-sm hover:bg-accent active:bg-accent/80"
                       >
                         <span className="font-medium">
                           {c.customer_name ?? "(no name)"}
