@@ -43,6 +43,8 @@ function InvoicesPage() {
           title="Sales Invoices"
           defaultPath="/api/SalesInvoices/List"
           preferredColumns={["docNo", "docDate", "customerCode", "customerName", "netTotal"]}
+          searchFields={["docNo", "customerCode", "customerName", "id"]}
+          searchPlaceholder="Search by invoice no, customer code/name or N3 ID…"
         />
       ) : (
         <N3ListExplorer
@@ -50,6 +52,8 @@ function InvoicesPage() {
           title="Delivery Orders"
           defaultPath="/api/DeliveryOrders/List"
           preferredColumns={["docNo", "docDate", "customerCode", "customerName", "netTotal"]}
+          searchFields={["docNo", "customerCode", "customerName", "id"]}
+          searchPlaceholder="Search by DO no, customer code/name or N3 ID…"
         />
       )}
     </div>
