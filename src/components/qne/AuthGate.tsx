@@ -1,7 +1,9 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useSession, type CurrentUserInfo } from "@/lib/qne/session-context";
+import { TabsProvider, type AppTab } from "@/lib/tabs";
+import { AppTabs } from "./AppTabs";
 import { DevLoginScreen } from "./DevLoginScreen";
 import { RelaunchNotice } from "./RelaunchNotice";
 
