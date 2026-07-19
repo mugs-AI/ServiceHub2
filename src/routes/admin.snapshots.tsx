@@ -368,7 +368,7 @@ function AdminSnapshots() {
             </div>
           ))}
           {liveLocks.map((l) => (
-            <div key={`live-${l.snapshotType}`} className="text-sm text-blue-900">
+            <div key={`live-${l.snapshotType}`} className="text-sm text-red-900">
               Sync in progress · <code>{l.snapshotType}</code> · stage:{" "}
               <strong>{l.stage ?? "starting"}</strong>
               {l.ageSeconds != null ? ` · last heartbeat ${l.ageSeconds}s ago` : ""}
