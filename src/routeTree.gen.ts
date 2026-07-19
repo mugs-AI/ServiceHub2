@@ -17,9 +17,12 @@ import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as JobsNewRouteImport } from './routes/jobs.new'
+import { Route as JobsJobIdRouteImport } from './routes/jobs.$jobId'
 import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
+import { Route as ApiWorkspaceJobsRouteImport } from './routes/api/workspace/jobs'
 import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspace/customers'
 import { Route as ApiWorkspaceCustomerSubscriptionsRouteImport } from './routes/api/workspace/customer-subscriptions'
 import { Route as ApiSyncSubscriptionsRouteImport } from './routes/api/sync/subscriptions'
@@ -42,6 +45,7 @@ import { Route as ApiDiagnosticsDocumentSearchRouteImport } from './routes/api/d
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
+import { Route as ApiWorkspaceJobsJobIdRouteImport } from './routes/api/workspace/jobs.$jobId'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -83,6 +87,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JobsNewRoute = JobsNewRouteImport.update({
+  id: '/jobs/new',
+  path: '/jobs/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JobsJobIdRoute = JobsJobIdRouteImport.update({
+  id: '/jobs/$jobId',
+  path: '/jobs/$jobId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProxyRoute = ApiProxyRouteImport.update({
   id: '/api/proxy',
   path: '/api/proxy',
@@ -96,6 +110,11 @@ const AdminSnapshotsRoute = AdminSnapshotsRouteImport.update({
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/admin/dashboard',
   path: '/admin/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkspaceJobsRoute = ApiWorkspaceJobsRouteImport.update({
+  id: '/api/workspace/jobs',
+  path: '/api/workspace/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWorkspaceCustomersRoute = ApiWorkspaceCustomersRouteImport.update({
@@ -216,6 +235,11 @@ const ApiAdminAllowlistRoute = ApiAdminAllowlistRouteImport.update({
   path: '/api/admin/allowlist',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceJobsJobIdRoute = ApiWorkspaceJobsJobIdRouteImport.update({
+  id: '/$jobId',
+  path: '/$jobId',
+  getParentRoute: () => ApiWorkspaceJobsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -229,6 +253,8 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
+  '/jobs/$jobId': typeof JobsJobIdRoute
+  '/jobs/new': typeof JobsNewRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -251,6 +277,8 @@ export interface FileRoutesByFullPath {
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
+  '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
+  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -264,6 +292,8 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
+  '/jobs/$jobId': typeof JobsJobIdRoute
+  '/jobs/new': typeof JobsNewRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -286,6 +316,8 @@ export interface FileRoutesByTo {
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
+  '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
+  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -300,6 +332,8 @@ export interface FileRoutesById {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
+  '/jobs/$jobId': typeof JobsJobIdRoute
+  '/jobs/new': typeof JobsNewRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -322,6 +356,8 @@ export interface FileRoutesById {
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
+  '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
+  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -337,6 +373,8 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/snapshots'
     | '/api/proxy'
+    | '/jobs/$jobId'
+    | '/jobs/new'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
@@ -359,6 +397,8 @@ export interface FileRouteTypes {
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
+    | '/api/workspace/jobs'
+    | '/api/workspace/jobs/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -372,6 +412,8 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/snapshots'
     | '/api/proxy'
+    | '/jobs/$jobId'
+    | '/jobs/new'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
@@ -394,6 +436,8 @@ export interface FileRouteTypes {
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
+    | '/api/workspace/jobs'
+    | '/api/workspace/jobs/$jobId'
   id:
     | '__root__'
     | '/'
@@ -407,6 +451,8 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/snapshots'
     | '/api/proxy'
+    | '/jobs/$jobId'
+    | '/jobs/new'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
@@ -429,6 +475,8 @@ export interface FileRouteTypes {
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
+    | '/api/workspace/jobs'
+    | '/api/workspace/jobs/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -443,6 +491,8 @@ export interface RootRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminSnapshotsRoute: typeof AdminSnapshotsRoute
   ApiProxyRoute: typeof ApiProxyRoute
+  JobsJobIdRoute: typeof JobsJobIdRoute
+  JobsNewRoute: typeof JobsNewRoute
   ApiAdminAllowlistRoute: typeof ApiAdminAllowlistRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
@@ -465,6 +515,7 @@ export interface RootRouteChildren {
   ApiSyncSubscriptionsRoute: typeof ApiSyncSubscriptionsRoute
   ApiWorkspaceCustomerSubscriptionsRoute: typeof ApiWorkspaceCustomerSubscriptionsRoute
   ApiWorkspaceCustomersRoute: typeof ApiWorkspaceCustomersRoute
+  ApiWorkspaceJobsRoute: typeof ApiWorkspaceJobsRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -525,6 +576,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/jobs/new': {
+      id: '/jobs/new'
+      path: '/jobs/new'
+      fullPath: '/jobs/new'
+      preLoaderRoute: typeof JobsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/jobs/$jobId': {
+      id: '/jobs/$jobId'
+      path: '/jobs/$jobId'
+      fullPath: '/jobs/$jobId'
+      preLoaderRoute: typeof JobsJobIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/proxy': {
       id: '/api/proxy'
       path: '/api/proxy'
@@ -544,6 +609,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/dashboard'
       fullPath: '/admin/dashboard'
       preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/jobs': {
+      id: '/api/workspace/jobs'
+      path: '/api/workspace/jobs'
+      fullPath: '/api/workspace/jobs'
+      preLoaderRoute: typeof ApiWorkspaceJobsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workspace/customers': {
@@ -700,8 +772,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminAllowlistRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace/jobs/$jobId': {
+      id: '/api/workspace/jobs/$jobId'
+      path: '/$jobId'
+      fullPath: '/api/workspace/jobs/$jobId'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdRouteImport
+      parentRoute: typeof ApiWorkspaceJobsRoute
+    }
   }
 }
+
+interface ApiWorkspaceJobsRouteChildren {
+  ApiWorkspaceJobsJobIdRoute: typeof ApiWorkspaceJobsJobIdRoute
+}
+
+const ApiWorkspaceJobsRouteChildren: ApiWorkspaceJobsRouteChildren = {
+  ApiWorkspaceJobsJobIdRoute: ApiWorkspaceJobsJobIdRoute,
+}
+
+const ApiWorkspaceJobsRouteWithChildren =
+  ApiWorkspaceJobsRoute._addFileChildren(ApiWorkspaceJobsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -715,6 +805,8 @@ const rootRouteChildren: RootRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminSnapshotsRoute: AdminSnapshotsRoute,
   ApiProxyRoute: ApiProxyRoute,
+  JobsJobIdRoute: JobsJobIdRoute,
+  JobsNewRoute: JobsNewRoute,
   ApiAdminAllowlistRoute: ApiAdminAllowlistRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
@@ -740,17 +832,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceCustomerSubscriptionsRoute:
     ApiWorkspaceCustomerSubscriptionsRoute,
   ApiWorkspaceCustomersRoute: ApiWorkspaceCustomersRoute,
+  ApiWorkspaceJobsRoute: ApiWorkspaceJobsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

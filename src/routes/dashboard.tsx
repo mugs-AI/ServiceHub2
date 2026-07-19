@@ -33,7 +33,7 @@ function UserDashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           <QuickLink to="/support" label="Open Workspace" primary />
-          <QuickAction label="New Service Job" />
+          <QuickLink to="/jobs/new" label="New Service Job" />
           <QuickAction label="Quick Service" />
         </div>
       </header>

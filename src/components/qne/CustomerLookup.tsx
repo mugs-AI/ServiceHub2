@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 
 import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
@@ -264,14 +265,13 @@ export function CustomerLookup() {
                   )}
 
                   <div className="mt-3 border-t pt-3">
-                    <button
-                      type="button"
-                      disabled
-                      title="Coming next"
-                      className="w-full cursor-not-allowed rounded-md border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary/70"
+                    <Link
+                      to="/jobs/new"
+                      search={{ customerCode: selected.customer_code }}
+                      className="block w-full rounded-md bg-primary px-3 py-2 text-center text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
                     >
-                      + New Service Job (Coming Next)
-                    </button>
+                      + New Service Job
+                    </Link>
                   </div>
                 </div>
               )}

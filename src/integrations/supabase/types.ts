@@ -356,6 +356,27 @@ export type Database = {
         }
         Relationships: []
       }
+      job_number_sequences: {
+        Row: {
+          date_key: string
+          last_seq: number
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          date_key: string
+          last_seq?: number
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          date_key?: string
+          last_seq?: number
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -615,6 +636,99 @@ export type Database = {
           granted_by?: string | null
           id?: string
           is_bootstrap?: boolean
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      service_jobs: {
+        Row: {
+          approval_reason: string | null
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string
+          created_by_name: string | null
+          created_by_user_id: string | null
+          customer_code_snapshot: string
+          customer_name_snapshot: string | null
+          entitlement_expiry_snapshot: string | null
+          entitlement_status_snapshot: string | null
+          id: string
+          internal_note: string | null
+          job_number: string
+          n3_customer_id: string | null
+          n3_stock_id_snapshot: string | null
+          priority: string
+          problem_description: string
+          requires_approval: boolean
+          service_address: string | null
+          source: string
+          status: string
+          stock_code_snapshot: string | null
+          subject: string
+          subscription_category_snapshot: string | null
+          subscription_snapshot_id: string | null
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          approval_reason?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          created_by_user_id?: string | null
+          customer_code_snapshot: string
+          customer_name_snapshot?: string | null
+          entitlement_expiry_snapshot?: string | null
+          entitlement_status_snapshot?: string | null
+          id?: string
+          internal_note?: string | null
+          job_number: string
+          n3_customer_id?: string | null
+          n3_stock_id_snapshot?: string | null
+          priority?: string
+          problem_description: string
+          requires_approval?: boolean
+          service_address?: string | null
+          source?: string
+          status?: string
+          stock_code_snapshot?: string | null
+          subject: string
+          subscription_category_snapshot?: string | null
+          subscription_snapshot_id?: string | null
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          approval_reason?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          created_by_user_id?: string | null
+          customer_code_snapshot?: string
+          customer_name_snapshot?: string | null
+          entitlement_expiry_snapshot?: string | null
+          entitlement_status_snapshot?: string | null
+          id?: string
+          internal_note?: string | null
+          job_number?: string
+          n3_customer_id?: string | null
+          n3_stock_id_snapshot?: string | null
+          priority?: string
+          problem_description?: string
+          requires_approval?: boolean
+          service_address?: string | null
+          source?: string
+          status?: string
+          stock_code_snapshot?: string | null
+          subject?: string
+          subscription_category_snapshot?: string | null
+          subscription_snapshot_id?: string | null
           tenant_code?: string
           updated_at?: string
         }
@@ -1117,7 +1231,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      sh_next_job_number: {
+        Args: { p_date_key: string; p_tenant_code: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
