@@ -515,7 +515,7 @@ function NewJobPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="mb-4 text-base font-bold uppercase tracking-wide text-foreground">
         {title}
       </h2>
       {children}
