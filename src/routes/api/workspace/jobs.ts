@@ -228,20 +228,59 @@ export const Route = createFileRoute("/api/workspace/jobs")({
         try {
           const user = await requireAuthenticatedN3User(request);
           const url = new URL(request.url);
-          const limit = Math.min(
-            Math.max(Number(url.searchParams.get("limit") ?? 20) || 20, 1),
+          const sp = url.searchParams;
+          const page = Math.max(Number(sp.get("page") ?? 1) || 1, 1);
+          const pageSize = Math.min(
+            Math.max(Number(sp.get("pageSize") ?? sp.get("limit") ?? 20) || 20, 1),
             100,
           );
-          const { data, error } = await supabaseAdmin
+          const customerCode = trim(sp.get("customerCode"), 100);
+          const q = trim(sp.get("q"), 100);
+          const status = trim(sp.get("status"), 40);
+          const priority = trim(sp.get("priority"), 20);
+          const technician = trim(sp.get("technician"), 100);
+          const from = trim(sp.get("from"), 40);
+          const to = trim(sp.get("to"), 40);
+
+          let query = supabaseAdmin
             .from("service_jobs")
             .select(
               "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, assigned_user_id, assigned_user_name_snapshot, assigned_at, created_at",
+              { count: "exact" },
             )
-            .eq("tenant_code", user.tenantCode)
+            .eq("tenant_code", user.tenantCode);
+
+          if (customerCode) query = query.eq("customer_code_snapshot", customerCode);
+          if (status) query = query.eq("status", status);
+          if (priority) query = query.eq("priority", priority);
+          if (technician) {
+            if (technician === "__unassigned__") {
+              query = query.is("assigned_user_id", null);
+            } else {
+              query = query.eq("assigned_user_id", technician);
+            }
+          }
+          if (from) query = query.gte("created_at", from);
+          if (to) query = query.lte("created_at", to);
+          if (q) {
+            const like = `%${q.replace(/[%_,()]/g, "")}%`;
+            query = query.or(
+              `job_number.ilike.${like},subject.ilike.${like},customer_name_snapshot.ilike.${like}`,
+            );
+          }
+
+          const fromIdx = (page - 1) * pageSize;
+          const toIdx = fromIdx + pageSize - 1;
+          const { data, error, count } = await query
             .order("created_at", { ascending: false })
-            .limit(limit);
+            .range(fromIdx, toIdx);
           if (error) throw error;
-          return Response.json({ jobs: data ?? [] });
+          return Response.json({
+            jobs: data ?? [],
+            total: count ?? 0,
+            page,
+            pageSize,
+          });
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;

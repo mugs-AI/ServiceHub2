@@ -1,7 +1,9 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useSession, type CurrentUserInfo } from "@/lib/qne/session-context";
+import { TabsProvider, type AppTab } from "@/lib/tabs";
+import { AppTabs } from "./AppTabs";
 import { DevLoginScreen } from "./DevLoginScreen";
 import { RelaunchNotice } from "./RelaunchNotice";
 
@@ -50,21 +52,58 @@ export function AuthGate({ children }: { children?: ReactNode }) {
     );
   }
 
+  return <AuthenticatedShell error={error} session={session}>{children}</AuthenticatedShell>;
+}
+
+function AuthenticatedShell({
+  error,
+  session,
+  children,
+}: {
+  error: string | null;
+  session: unknown;
+  children?: ReactNode;
+}) {
+  const { currentUser } = useSession();
+  const isAdmin = !!currentUser?.isAdministrator;
+  const pinned = useMemo<AppTab[]>(
+    () => [
+      {
+        key: "pin:dashboard",
+        label: "Dashboard",
+        href: isAdmin ? "/admin/dashboard" : "/dashboard",
+        closable: false,
+        kind: "pinned",
+      },
+      {
+        key: "pin:workspace",
+        label: "Workspace",
+        href: "/support",
+        closable: false,
+        kind: "pinned",
+      },
+    ],
+    [isAdmin],
+  );
+
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader />
-      {error && (
-        <div className="border-b bg-destructive/10 px-4 py-2 text-xs text-destructive">
-          Session error: {error}
-        </div>
-      )}
-      {!session && !error && (
-        <div className="border-b bg-muted px-4 py-2 text-xs text-muted-foreground">
-          Loading company profile…
-        </div>
-      )}
-      <main className="mx-auto max-w-7xl px-4 py-6">{children ?? <Outlet />}</main>
-    </div>
+    <TabsProvider pinned={pinned}>
+      <div className="min-h-screen bg-background">
+        <AppHeader />
+        <AppTabs />
+        {error && (
+          <div className="border-b bg-destructive/10 px-4 py-2 text-xs text-destructive">
+            Session error: {error}
+          </div>
+        )}
+        {!session && !error && (
+          <div className="border-b bg-muted px-4 py-2 text-xs text-muted-foreground">
+            Loading company profile…
+          </div>
+        )}
+        <main className="mx-auto max-w-7xl px-4 py-6">{children ?? <Outlet />}</main>
+      </div>
+    </TabsProvider>
   );
 }
 
