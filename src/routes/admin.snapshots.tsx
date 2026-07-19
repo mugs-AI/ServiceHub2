@@ -127,6 +127,14 @@ function fmtDate(iso: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
 
+// Phase 1.1.6c — Document Verifier renders date-only. Stored timestamps
+// remain unchanged; this is a display-only helper.
+function fmtDateOnly(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
+}
+
 function AdminSnapshots() {
   const { session } = useSession();
   const tenant = session?.tenantCode ?? "";
