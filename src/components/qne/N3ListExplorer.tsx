@@ -35,8 +35,14 @@ export function N3ListExplorer({
   target = "main",
   extraQuery,
   preferredColumns,
+  searchFields,
+  searchPlaceholder,
 }: Props) {
   const [path, setPath] = useState(defaultPath);
+  // `searchDraft` is the input value; `search` is the committed term used
+  // by the query. Committing on Enter / Search / Clear prevents a request
+  // per keystroke and matches the acceptance criteria in Phase 1.1.7a.
+  const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
   const [pageNo, setPageNo] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -45,9 +51,16 @@ export function N3ListExplorer({
     setPageNo(1);
   }, [path, search, pageSize]);
 
+  const canSearch = !!searchFields?.length;
+
   const query = useQuery({
     queryKey: ["n3-list", target, path, search, pageNo, pageSize, extraQuery],
     queryFn: async () => {
+      const trimmed = search.trim();
+      const filter =
+        canSearch && trimmed
+          ? buildODataFilter(searchFields!, trimmed)
+          : undefined;
       const env = await qneProxy<PageQueryResult<Record<string, unknown>>>(
         target,
         "GET",
@@ -56,7 +69,7 @@ export function N3ListExplorer({
           query: {
             $top: pageSize,
             $skip: (pageNo - 1) * pageSize,
-            ...(search ? { search } : {}),
+            ...(filter ? { $filter: filter } : {}),
             ...extraQuery,
           },
         },
