@@ -739,7 +739,3 @@ function Pagination({
     </div>
   );
 }
-
-// Keep a memoized wrapper — unused presently, retained for parity with earlier
-// pattern (avoids "unused import" complaints if extended later).
-export const _memoNoop = useMemo;
