@@ -47,6 +47,7 @@ import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
 import { Route as ApiWorkspaceJobsJobIdRouteImport } from './routes/api/workspace/jobs.$jobId'
+import { Route as ApiWorkspaceJobsJobIdAssignRouteImport } from './routes/api/workspace/jobs.$jobId.assign'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -246,6 +247,12 @@ const ApiWorkspaceJobsJobIdRoute = ApiWorkspaceJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiWorkspaceJobsRoute,
 } as any)
+const ApiWorkspaceJobsJobIdAssignRoute =
+  ApiWorkspaceJobsJobIdAssignRouteImport.update({
+    id: '/assign',
+    path: '/assign',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -285,7 +292,8 @@ export interface FileRoutesByFullPath {
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
-  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRoute
+  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -325,7 +333,8 @@ export interface FileRoutesByTo {
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
-  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRoute
+  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -366,7 +375,8 @@ export interface FileRoutesById {
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
-  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRoute
+  '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
+  '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -409,6 +419,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/$jobId/assign'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -449,6 +460,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/$jobId/assign'
   id:
     | '__root__'
     | '/'
@@ -489,6 +501,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
+    | '/api/workspace/jobs/$jobId/assign'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -799,15 +812,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdRouteImport
       parentRoute: typeof ApiWorkspaceJobsRoute
     }
+    '/api/workspace/jobs/$jobId/assign': {
+      id: '/api/workspace/jobs/$jobId/assign'
+      path: '/assign'
+      fullPath: '/api/workspace/jobs/$jobId/assign'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdAssignRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
   }
 }
 
+interface ApiWorkspaceJobsJobIdRouteChildren {
+  ApiWorkspaceJobsJobIdAssignRoute: typeof ApiWorkspaceJobsJobIdAssignRoute
+}
+
+const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
+  ApiWorkspaceJobsJobIdAssignRoute: ApiWorkspaceJobsJobIdAssignRoute,
+}
+
+const ApiWorkspaceJobsJobIdRouteWithChildren =
+  ApiWorkspaceJobsJobIdRoute._addFileChildren(
+    ApiWorkspaceJobsJobIdRouteChildren,
+  )
+
 interface ApiWorkspaceJobsRouteChildren {
-  ApiWorkspaceJobsJobIdRoute: typeof ApiWorkspaceJobsJobIdRoute
+  ApiWorkspaceJobsJobIdRoute: typeof ApiWorkspaceJobsJobIdRouteWithChildren
 }
 
 const ApiWorkspaceJobsRouteChildren: ApiWorkspaceJobsRouteChildren = {
-  ApiWorkspaceJobsJobIdRoute: ApiWorkspaceJobsJobIdRoute,
+  ApiWorkspaceJobsJobIdRoute: ApiWorkspaceJobsJobIdRouteWithChildren,
 }
 
 const ApiWorkspaceJobsRouteWithChildren =
