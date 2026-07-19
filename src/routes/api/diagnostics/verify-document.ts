@@ -24,30 +24,60 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
           const tenant = user.tenantCode;
           const url = new URL(request.url);
           const docNo = (url.searchParams.get("docNo") ?? "").trim();
-          if (!docNo) {
+          const documentId = (url.searchParams.get("documentId") ?? "").trim();
+          const sourceParam = (url.searchParams.get("source") ?? "").trim();
+          const source: "invoice" | "delivery_order" | null =
+            sourceParam === "invoice" || sourceParam === "delivery_order"
+              ? sourceParam
+              : null;
+          if (!docNo && !documentId) {
             return Response.json(
-              { error: "Provide a document number (docNo)." },
+              { error: "Provide a document number (docNo) or immutable documentId." },
               { status: 400 },
             );
           }
 
-          // Look in both sales invoice and delivery order line snapshots.
-          const [siRes, doRes, mapRes, subsRes, evRes] = await Promise.all([
-            supabaseAdmin
-              .from("sales_invoice_line_snapshots")
-              .select(
-                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void, line_type, has_stock_code, parent_line_id",
-              )
-              .eq("tenant_code", tenant)
-              .eq("document_no", docNo),
-            supabaseAdmin
-              .from("delivery_order_line_snapshots")
-              .select(
-                "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void, line_type, has_stock_code, parent_line_id",
-              )
-              .eq("tenant_code", tenant)
-              .eq("document_no", docNo),
+          const LINE_SELECT =
+            "n3_document_id, n3_line_id, document_no, document_date, document_status, customer_code, customer_name, line_no, stock_code, stock_name, description, quantity, is_void, line_type, has_stock_code, parent_line_id";
 
+          // Build the line queries. When an immutable N3 document ID is
+          // provided it takes precedence — a mutable document_no may map to
+          // multiple immutable IDs and only the caller-selected record must
+          // be returned.
+          const siQuery = supabaseAdmin
+            .from("sales_invoice_line_snapshots")
+            .select(LINE_SELECT)
+            .eq("tenant_code", tenant);
+          const doQuery = supabaseAdmin
+            .from("delivery_order_line_snapshots")
+            .select(LINE_SELECT)
+            .eq("tenant_code", tenant);
+          if (documentId) {
+            siQuery.eq("n3_document_id", documentId);
+            doQuery.eq("n3_document_id", documentId);
+          } else {
+            siQuery.eq("document_no", docNo);
+            doQuery.eq("document_no", docNo);
+          }
+          const wantInvoice = !source || source === "invoice";
+          const wantDelivery = !source || source === "delivery_order";
+
+          const evQuery = supabaseAdmin
+            .from("subscription_renewal_events")
+            .select(
+              "customer_code, subscription_category_name, stock_code, source_type, source_document_no, source_document_id, source_line_id, source_document_date, expiry_date, is_source_void",
+            )
+            .eq("tenant_code", tenant);
+          if (documentId) evQuery.eq("source_document_id", documentId);
+          else evQuery.eq("source_document_no", docNo);
+
+          const [siRes, doRes, mapRes, subsRes, evRes] = await Promise.all([
+            wantInvoice
+              ? siQuery
+              : Promise.resolve({ data: [] as never[], error: null }),
+            wantDelivery
+              ? doQuery
+              : Promise.resolve({ data: [] as never[], error: null }),
             supabaseAdmin
               .from("renewal_stock_mappings")
               .select(
@@ -55,20 +85,16 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
               )
               .eq("tenant_code", tenant)
               .eq("is_active", true),
-            supabaseAdmin
-              .from("customer_subscription_snapshots")
-              .select(
-                "customer_code, subscription_category, stock_code, latest_document_no, latest_document_date, expiry_date, remaining_days, subscription_status",
-              )
-              .eq("tenant_code", tenant)
-              .eq("latest_document_no", docNo),
-            supabaseAdmin
-              .from("subscription_renewal_events")
-              .select(
-                "customer_code, subscription_category_name, stock_code, source_type, source_document_no, source_line_id, source_document_date, expiry_date, is_source_void",
-              )
-              .eq("tenant_code", tenant)
-              .eq("source_document_no", docNo),
+            docNo
+              ? supabaseAdmin
+                  .from("customer_subscription_snapshots")
+                  .select(
+                    "customer_code, subscription_category, stock_code, latest_document_no, latest_document_date, expiry_date, remaining_days, subscription_status",
+                  )
+                  .eq("tenant_code", tenant)
+                  .eq("latest_document_no", docNo)
+              : Promise.resolve({ data: [], error: null }),
+            evQuery,
           ]);
 
           const mappings = new Map<
