@@ -214,26 +214,27 @@ export const Route = createFileRoute("/api/diagnostics/verify-document")({
           const allLines = [...invoiceLines, ...doLines];
 
           const found = allLines.length > 0;
+          const firstSi = siRes.data?.[0];
+          const firstDo = doRes.data?.[0];
+          const primary = firstSi ?? firstDo ?? null;
+          const primarySource: "invoice" | "delivery_order" =
+            firstSi ? "invoice" : "delivery_order";
           const header = found
             ? {
-                document_no: docNo,
-                document_id: allLines[0].n3_document_id,
-                document_date:
-                  (siRes.data?.[0]?.document_date ?? doRes.data?.[0]?.document_date) ?? null,
-                document_status:
-                  (siRes.data?.[0]?.document_status ??
-                    doRes.data?.[0]?.document_status) ?? null,
-                customer_code:
-                  (siRes.data?.[0]?.customer_code ?? doRes.data?.[0]?.customer_code) ?? null,
-                customer_name:
-                  (siRes.data?.[0]?.customer_name ?? doRes.data?.[0]?.customer_name) ?? null,
-                source_type: siRes.data && siRes.data.length > 0 ? "invoice" : "delivery_order",
+                document_no: primary?.document_no ?? docNo,
+                document_id: primary?.n3_document_id ?? documentId ?? null,
+                document_date: primary?.document_date ?? null,
+                document_status: primary?.document_status ?? null,
+                customer_code: primary?.customer_code ?? null,
+                customer_name: primary?.customer_name ?? null,
+                source_type: primarySource,
               }
             : null;
 
           return Response.json({
             tenantCode: tenant,
-            documentNo: docNo,
+            documentNo: header?.document_no ?? docNo,
+            documentId: header?.document_id ?? documentId ?? null,
             found,
             header,
             detailFetch: {
