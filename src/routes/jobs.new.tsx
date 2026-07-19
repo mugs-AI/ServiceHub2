@@ -241,13 +241,13 @@ function NewJobPage() {
                     }
                   }}
                   placeholder="Search by code, name, contact, phone or email…"
-                  className="min-h-11 flex-1 min-w-64 rounded-lg border bg-background px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-primary/40"
+                  className="input"
                 />
                 <button
                   type="button"
                   onClick={() => runSearch(q)}
                   disabled={searching || q.trim().length < 2}
-                  className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                  className="min-h-11 shrink-0 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
                 >
                   {searching ? "Searching…" : "Search"}
                 </button>
