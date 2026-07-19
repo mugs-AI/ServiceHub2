@@ -712,6 +712,11 @@ interface SourceMetrics {
   renewalEventsSkippedVoided: number;
   renewalEventsSkippedMissingCustomer: number;
   renewalEventsSkippedInvalidDate: number;
+  // Phase 1.1.6c — quantity-driven skip counters.
+  renewalEventsSkippedZeroQty: number;
+  renewalEventsSkippedNegativeQty: number;
+  renewalEventsSkippedFractionalQty: number;
+  renewalEventsSkippedInvalidQty: number;
   lineTypeCounts: {
     stock: number;
     description: number;
