@@ -383,7 +383,7 @@ function CustomerSummaryPanel({
             {customer.customer_name ?? customer.customer_code}
           </h2>
           <p className="text-xs text-muted-foreground">
-            {customer.customer_code} · Counts within {range.from} → {range.to}
+            {customer.customer_code} · All-time counts (job list below honours the date range)
           </p>
         </div>
         <button
