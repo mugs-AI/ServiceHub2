@@ -346,8 +346,6 @@ function CustomerSummaryPanel({
     setErr(null);
     const sp = new URLSearchParams({
       customerCode: customer.customer_code,
-      from: `${range.from}T00:00:00Z`,
-      to: `${range.to}T23:59:59Z`,
     });
     fetch(`/api/workspace/jobs/summary?${sp.toString()}`, {
       headers: authHeaders(),
@@ -367,7 +365,7 @@ function CustomerSummaryPanel({
     return () => {
       cancelled = true;
     };
-  }, [customer.customer_code, range.from, range.to]);
+  }, [customer.customer_code]);
 
   const cards: { label: string; value: number | string; tone: string }[] = [
     { label: "Service Jobs", value: summary?.total ?? "—", tone: "text-foreground" },
