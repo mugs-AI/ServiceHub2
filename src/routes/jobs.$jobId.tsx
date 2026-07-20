@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
+import { allowedTransitionsClient } from "@/lib/qne/service-jobs/workflow";
 
 interface JobDetail {
   id: string;
@@ -35,6 +36,20 @@ interface JobDetail {
   assigned_at: string | null;
   assigned_by_user_id: string | null;
   assigned_by_name_snapshot: string | null;
+  is_deleted: boolean;
+  deleted_at: string | null;
+  deleted_by_name_snapshot: string | null;
+  deletion_reason: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  cancelled_by_name_snapshot: string | null;
+  completed_at: string | null;
+  approved_at: string | null;
+  approved_by_name_snapshot: string | null;
+  approval_note: string | null;
+  rejected_at: string | null;
+  rejected_by_name_snapshot: string | null;
+  rejection_reason: string | null;
 }
 
 interface TechnicianRow {
@@ -44,15 +59,23 @@ interface TechnicianRow {
   email: string | null;
 }
 
-interface HistoryRow {
+interface TimelineItem {
   id: string;
-  action: "assigned" | "reassigned" | "unassigned";
-  assigned_user_id: string | null;
-  assigned_user_name_snapshot: string | null;
-  previous_assigned_user_id: string | null;
-  previous_assigned_user_name_snapshot: string | null;
-  performed_by_name_snapshot: string | null;
+  kind: "activity" | "assignment" | "comment";
+  event: string;
+  old_value: string | null;
+  new_value: string | null;
+  note: string | null;
+  performed_by_name: string | null;
   performed_at: string;
+}
+
+interface CommentRow {
+  id: string;
+  visibility: "internal" | "customer";
+  body: string;
+  author_name_snapshot: string | null;
+  created_at: string;
 }
 
 export const Route = createFileRoute("/jobs/$jobId")({
@@ -67,10 +90,11 @@ function authHeaders(): Record<string, string> {
 function JobDetailPage() {
   const { jobId } = Route.useParams();
   const session = useSession();
-  const canAssign = !!session.currentUser?.isAdministrator;
+  const isAdmin = !!session.currentUser?.isAdministrator;
 
   const [job, setJob] = useState<JobDetail | null>(null);
-  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [comments, setComments] = useState<CommentRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
@@ -78,12 +102,14 @@ function JobDetailPage() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [jobRes, histRes] = await Promise.all([
+      const [jobRes, tlRes, cmRes] = await Promise.all([
         fetch(`/api/workspace/jobs/${jobId}`, { headers: authHeaders() }),
-        fetch(`/api/workspace/jobs/${jobId}/history`, { headers: authHeaders() }),
+        fetch(`/api/workspace/jobs/${jobId}/timeline`, { headers: authHeaders() }),
+        fetch(`/api/workspace/jobs/${jobId}/comments`, { headers: authHeaders() }),
       ]);
       const jobBody = await jobRes.json().catch(() => ({}));
-      const histBody = await histRes.json().catch(() => ({}));
+      const tlBody = await tlRes.json().catch(() => ({}));
+      const cmBody = await cmRes.json().catch(() => ({}));
       if (!jobRes.ok) {
         setError(jobBody?.error ?? "Unable to load job.");
         setJob(null);
@@ -91,7 +117,8 @@ function JobDetailPage() {
         setError(null);
         setJob(jobBody.job);
       }
-      if (histRes.ok) setHistory(histBody.history ?? []);
+      if (tlRes.ok) setTimeline(tlBody.timeline ?? []);
+      if (cmRes.ok) setComments(cmBody.comments ?? []);
     } finally {
       setLoading(false);
     }
@@ -106,7 +133,6 @@ function JobDetailPage() {
     if (job?.job_number) openJobTab(jobId, job.job_number);
   }, [jobId, job?.job_number, openJobTab]);
 
-
   if (loading && !job) {
     return <p className="text-sm text-muted-foreground">Loading job…</p>;
   }
@@ -117,11 +143,6 @@ function JobDetailPage() {
       </div>
     );
   }
-
-  const statusTone =
-    job.status === "Draft"
-      ? "bg-blue-100 text-blue-800 border-blue-200"
-      : "bg-amber-100 text-amber-900 border-amber-200";
 
   return (
     <div className="space-y-6">
@@ -139,17 +160,18 @@ function JobDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${statusTone}`}
-          >
-            {job.status}
-          </span>
+          <StatusBadge status={job.status} />
           <span className="rounded-full border px-2 py-0.5 text-xs font-semibold uppercase">
             {job.priority}
           </span>
           <span className="rounded-full border px-2 py-0.5 text-xs font-semibold uppercase">
             {job.source}
           </span>
+          {job.is_deleted && (
+            <span className="rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-xs font-semibold uppercase text-red-800">
+              Deleted
+            </span>
+          )}
           <Link
             to="/support"
             className="text-sm text-muted-foreground hover:text-foreground"
@@ -159,15 +181,25 @@ function JobDetailPage() {
         </div>
       </header>
 
-      {job.requires_approval && (
-        <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
-          Requires approval — {job.approval_reason}.
+      {job.is_deleted && (
+        <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
+          Deleted {job.deleted_at ? new Date(job.deleted_at).toLocaleString() : ""}
+          {job.deleted_by_name_snapshot ? ` by ${job.deleted_by_name_snapshot}` : ""}
+          {job.deletion_reason ? ` — ${job.deletion_reason}` : ""}
         </div>
+      )}
+
+      {job.requires_approval && job.status === "Pending Approval" && (
+        <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reload} />
+      )}
+
+      {!job.is_deleted && (
+        <WorkflowActions job={job} onDone={reload} />
       )}
 
       <AssignmentSection
         job={job}
-        canAssign={canAssign}
+        canAssign={isAdmin && !job.is_deleted}
         onOpenPicker={() => setShowPicker(true)}
         onReload={reload}
       />
@@ -217,7 +249,18 @@ function JobDetailPage() {
         </Section>
       )}
 
-      <AssignmentHistory rows={history} />
+      <CommentsSection
+        jobId={jobId}
+        comments={comments}
+        disabled={job.is_deleted}
+        onReload={reload}
+      />
+
+      <TimelineSection items={timeline} />
+
+      {isAdmin && (
+        <AdminDangerZone job={job} onReload={reload} />
+      )}
 
       {showPicker && (
         <TechnicianPicker
@@ -233,6 +276,240 @@ function JobDetailPage() {
     </div>
   );
 }
+
+/* ---------------- status ---------------- */
+
+function StatusBadge({ status }: { status: string }) {
+  const tone = statusTone(status);
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${tone}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function statusTone(status: string): string {
+  switch (status) {
+    case "Draft":
+      return "bg-blue-100 text-blue-800 border-blue-200";
+    case "Pending Approval":
+      return "bg-amber-100 text-amber-900 border-amber-200";
+    case "Open":
+      return "bg-sky-100 text-sky-900 border-sky-200";
+    case "Assigned":
+      return "bg-purple-100 text-purple-900 border-purple-200";
+    case "In Progress":
+      return "bg-indigo-100 text-indigo-900 border-indigo-200";
+    case "Waiting Customer":
+    case "Waiting Vendor":
+      return "bg-orange-100 text-orange-900 border-orange-200";
+    case "Completed":
+      return "bg-emerald-100 text-emerald-900 border-emerald-200";
+    case "Cancelled":
+      return "bg-gray-200 text-gray-800 border-gray-300";
+    default:
+      return "bg-gray-100 text-gray-800 border-gray-200";
+  }
+}
+
+/* ---------------- workflow ---------------- */
+
+function WorkflowActions({
+  job,
+  onDone,
+}: {
+  job: JobDetail;
+  onDone: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const transitions = useMemo(() => {
+    let t = allowedTransitionsClient(job.status);
+    // Draft → Open blocked when requires_approval is true.
+    if (job.status === "Draft" && job.requires_approval) {
+      t = t.filter((x) => x !== "Open");
+    }
+    // Pending Approval handled by ApprovalPanel.
+    if (job.status === "Pending Approval") t = t.filter((x) => x !== "Cancelled");
+    return t;
+  }, [job.status, job.requires_approval]);
+
+  if (transitions.length === 0) return null;
+
+  async function transition(to: string) {
+    let reason: string | null = null;
+    if (to === "Cancelled") {
+      const r = window.prompt("Cancellation reason (required):");
+      if (!r || !r.trim()) return;
+      reason = r.trim();
+    }
+    setBusy(to);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/status`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ to, reason }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Transition failed");
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Transition failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Workflow
+      </h2>
+      <div className="flex flex-wrap gap-2">
+        {transitions.map((to) => (
+          <button
+            key={to}
+            type="button"
+            onClick={() => transition(to)}
+            disabled={!!busy}
+            className={`min-h-11 rounded-lg px-4 text-sm font-semibold shadow-sm disabled:opacity-50 ${
+              to === "Cancelled"
+                ? "border border-destructive/40 bg-white text-destructive hover:bg-destructive/10"
+                : "bg-primary text-primary-foreground hover:bg-primary/90"
+            }`}
+          >
+            {busy === to ? "Working…" : actionLabel(job.status, to)}
+          </button>
+        ))}
+      </div>
+      {err && (
+        <div className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {err}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function actionLabel(from: string, to: string): string {
+  if (from === "Draft" && to === "Open") return "Submit → Open";
+  if (to === "In Progress") return "Start Work";
+  if (to === "Completed") return "Complete";
+  if (to === "Cancelled") return "Cancel";
+  if (to === "Waiting Customer") return "Waiting on Customer";
+  if (to === "Waiting Vendor") return "Waiting on Vendor";
+  return `→ ${to}`;
+}
+
+/* ---------------- approval ---------------- */
+
+function ApprovalPanel({
+  job,
+  isAdmin,
+  onDone,
+}: {
+  job: JobDetail;
+  isAdmin: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  async function approve() {
+    setBusy("approve");
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/approve`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ note: note.trim() || null }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed");
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function reject() {
+    const reason = window.prompt("Rejection reason (required):");
+    if (!reason || !reason.trim()) return;
+    setBusy("reject");
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/reject`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed");
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm sm:p-6">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-900">
+        Approval required
+      </h2>
+      <p className="mt-1 text-sm text-amber-900">
+        {job.approval_reason ?? "This job needs Administrator approval before work can start."}
+      </p>
+      {isAdmin ? (
+        <div className="mt-3 space-y-2">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional approval note"
+            rows={2}
+            className="w-full rounded-lg border-[1.5px] border-amber-300 bg-white px-3 py-2 text-sm outline-none focus:border-amber-600"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={approve}
+              disabled={!!busy}
+              className="min-h-11 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {busy === "approve" ? "Approving…" : "Approve"}
+            </button>
+            <button
+              type="button"
+              onClick={reject}
+              disabled={!!busy}
+              className="min-h-11 rounded-lg border border-red-400 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              {busy === "reject" ? "Rejecting…" : "Reject"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-amber-900">
+          An administrator must approve or reject this job.
+        </p>
+      )}
+      {err && (
+        <div className="mt-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">
+          {err}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ---------------- assignment ---------------- */
 
 function AssignmentSection({
   job,
@@ -291,9 +568,7 @@ function AssignmentSection({
           <div className="text-xs text-muted-foreground">
             Assigned{" "}
             {job.assigned_at ? new Date(job.assigned_at).toLocaleString() : ""}
-            {job.assigned_by_name_snapshot
-              ? ` by ${job.assigned_by_name_snapshot}`
-              : ""}
+            {job.assigned_by_name_snapshot ? ` by ${job.assigned_by_name_snapshot}` : ""}
           </div>
         </div>
       ) : (
@@ -393,8 +668,6 @@ function TechnicianPicker({
     }
   }
 
-  const filteredRows = useMemo(() => rows, [rows]);
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
@@ -430,13 +703,13 @@ function TechnicianPicker({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {loading ? (
             <p className="p-4 text-sm text-muted-foreground">Loading…</p>
-          ) : filteredRows.length === 0 ? (
+          ) : rows.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground">
               No active technicians match.
             </p>
           ) : (
             <ul className="divide-y">
-              {filteredRows.map((r) => {
+              {rows.map((r) => {
                 const label = r.display_name ?? r.user_name ?? r.email ?? r.user_id ?? "(user)";
                 const sub = [r.user_name, r.email].filter(Boolean).join(" · ");
                 const isCurrent = r.user_id && r.user_id === currentUserId;
@@ -461,9 +734,7 @@ function TechnicianPicker({
                       <button
                         type="button"
                         onClick={() => r.user_id && assign(r.user_id)}
-                        disabled={
-                          !r.user_id || assigningId === r.user_id || !!isCurrent
-                        }
+                        disabled={!r.user_id || assigningId === r.user_id || !!isCurrent}
                         className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
                       >
                         {isCurrent
@@ -489,40 +760,284 @@ function TechnicianPicker({
   );
 }
 
-function AssignmentHistory({ rows }: { rows: HistoryRow[] }) {
-  if (rows.length === 0) return null;
+/* ---------------- comments ---------------- */
+
+function CommentsSection({
+  jobId,
+  comments,
+  disabled,
+  onReload,
+}: {
+  jobId: string;
+  comments: CommentRow[];
+  disabled: boolean;
+  onReload: () => Promise<void>;
+}) {
+  const [body, setBody] = useState("");
+  const [visibility, setVisibility] = useState<"internal" | "customer">("internal");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit() {
+    if (!body.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${jobId}/comments`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ body: body.trim(), visibility }),
+      });
+      const bodyR = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(bodyR?.error ?? "Failed");
+      setBody("");
+      await onReload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Assignment history
+        Comments
+      </h2>
+
+      {!disabled && (
+        <div className="mb-4 space-y-2">
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={3}
+            placeholder="Add a comment…"
+            className="w-full rounded-lg border-[1.5px] border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="radio"
+                checked={visibility === "internal"}
+                onChange={() => setVisibility("internal")}
+              />
+              Internal
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="radio"
+                checked={visibility === "customer"}
+                onChange={() => setVisibility("customer")}
+              />
+              Visible to customer
+            </label>
+            <div className="ml-auto">
+              <button
+                type="button"
+                onClick={submit}
+                disabled={busy || !body.trim()}
+                className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              >
+                {busy ? "Posting…" : "Post comment"}
+              </button>
+            </div>
+          </div>
+          {err && (
+            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {err}
+            </div>
+          )}
+        </div>
+      )}
+
+      {comments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No comments yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {comments.map((c) => (
+            <li key={c.id} className="rounded-lg border bg-background/50 p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">
+                  {c.author_name_snapshot ?? "Unknown"}
+                </span>
+                <span>
+                  <span
+                    className={`mr-2 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                      c.visibility === "customer"
+                        ? "border-blue-300 bg-blue-50 text-blue-800"
+                        : "border-gray-300 bg-gray-50 text-gray-700"
+                    }`}
+                  >
+                    {c.visibility}
+                  </span>
+                  {new Date(c.created_at).toLocaleString()}
+                </span>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/* ---------------- timeline ---------------- */
+
+function TimelineSection({ items }: { items: TimelineItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Timeline
       </h2>
       <ol className="space-y-2">
-        {rows.map((r) => (
-          <li key={r.id} className="rounded-lg border bg-background/50 p-3 text-sm">
+        {items.map((it) => (
+          <li key={it.id} className="rounded-lg border bg-background/50 p-3 text-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-semibold capitalize text-foreground">
-                {r.action}
+              <span className="font-semibold text-foreground">
+                {formatEvent(it)}
               </span>
               <span className="text-xs text-muted-foreground">
-                {new Date(r.performed_at).toLocaleString()}
-                {r.performed_by_name_snapshot
-                  ? ` · ${r.performed_by_name_snapshot}`
-                  : ""}
+                {new Date(it.performed_at).toLocaleString()}
+                {it.performed_by_name ? ` · ${it.performed_by_name}` : ""}
               </span>
             </div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              {r.action === "unassigned"
-                ? `Removed ${r.previous_assigned_user_name_snapshot ?? "technician"}`
-                : r.action === "reassigned"
-                  ? `${r.previous_assigned_user_name_snapshot ?? "—"} → ${r.assigned_user_name_snapshot ?? "—"}`
-                  : `Assigned to ${r.assigned_user_name_snapshot ?? "—"}`}
-            </div>
+            <TimelineBody item={it} />
           </li>
         ))}
       </ol>
     </section>
   );
 }
+
+function formatEvent(it: TimelineItem): string {
+  switch (it.event) {
+    case "status_changed":
+      return `Status: ${it.old_value ?? "—"} → ${it.new_value ?? "—"}`;
+    case "job_cancelled":
+      return `Cancelled`;
+    case "job_deleted":
+      return `Deleted`;
+    case "job_restored":
+      return `Restored`;
+    case "approval_granted":
+      return `Approved`;
+    case "approval_rejected":
+      return `Rejected`;
+    case "technician_assigned":
+      return `Assigned to ${it.new_value ?? "—"}`;
+    case "technician_reassigned":
+      return `Reassigned: ${it.old_value ?? "—"} → ${it.new_value ?? "—"}`;
+    case "technician_unassigned":
+      return `Unassigned ${it.old_value ?? ""}`;
+    case "comment_added":
+      return `Comment (${it.new_value ?? "internal"})`;
+    default:
+      return it.event;
+  }
+}
+
+function TimelineBody({ item }: { item: TimelineItem }) {
+  if (!item.note) return null;
+  return (
+    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+      {item.note}
+    </p>
+  );
+}
+
+/* ---------------- danger zone ---------------- */
+
+function AdminDangerZone({
+  job,
+  onReload,
+}: {
+  job: JobDetail;
+  onReload: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function del() {
+    const reason = window.prompt("Deletion reason (required):");
+    if (!reason || !reason.trim()) return;
+    if (!confirm(`Soft-delete ${job.job_number}? Job number will NOT be reused.`)) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}`, {
+        method: "DELETE",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed");
+      await onReload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function restore() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/restore`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed");
+      await onReload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-red-200 bg-red-50/40 p-4 shadow-sm sm:p-6">
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-red-800">
+        Administrator actions
+      </h2>
+      <p className="mb-3 text-xs text-red-900/80">
+        Deleting a Service Job is reversible via Restore. Job numbers are never
+        reused.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {!job.is_deleted ? (
+          <button
+            type="button"
+            onClick={del}
+            disabled={busy}
+            className="min-h-11 rounded-lg border border-red-400 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+          >
+            {busy ? "Working…" : "Delete Job"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={restore}
+            disabled={busy}
+            className="min-h-11 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {busy ? "Restoring…" : "Restore Job"}
+          </button>
+        )}
+      </div>
+      {err && (
+        <div className="mt-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">
+          {err}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ---------------- primitives ---------------- */
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
