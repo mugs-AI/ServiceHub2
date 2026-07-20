@@ -17,6 +17,7 @@ import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as JobsPendingRouteImport } from './routes/jobs.pending'
 import { Route as JobsNewRouteImport } from './routes/jobs.new'
 import { Route as JobsJobIdRouteImport } from './routes/jobs.$jobId'
 import { Route as ApiProxyRouteImport } from './routes/api/proxy'
@@ -96,6 +97,11 @@ const CustomersRoute = CustomersRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JobsPendingRoute = JobsPendingRouteImport.update({
+  id: '/jobs/pending',
+  path: '/jobs/pending',
   getParentRoute: () => rootRouteImport,
 } as any)
 const JobsNewRoute = JobsNewRouteImport.update({
@@ -329,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/api/proxy': typeof ApiProxyRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
+  '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -379,6 +386,7 @@ export interface FileRoutesByTo {
   '/api/proxy': typeof ApiProxyRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
+  '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -430,6 +438,7 @@ export interface FileRoutesById {
   '/api/proxy': typeof ApiProxyRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
+  '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -482,6 +491,7 @@ export interface FileRouteTypes {
     | '/api/proxy'
     | '/jobs/$jobId'
     | '/jobs/new'
+    | '/jobs/pending'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
@@ -532,6 +542,7 @@ export interface FileRouteTypes {
     | '/api/proxy'
     | '/jobs/$jobId'
     | '/jobs/new'
+    | '/jobs/pending'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
@@ -582,6 +593,7 @@ export interface FileRouteTypes {
     | '/api/proxy'
     | '/jobs/$jobId'
     | '/jobs/new'
+    | '/jobs/pending'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
     | '/api/diagnostics/$type'
@@ -633,6 +645,7 @@ export interface RootRouteChildren {
   ApiProxyRoute: typeof ApiProxyRoute
   JobsJobIdRoute: typeof JobsJobIdRoute
   JobsNewRoute: typeof JobsNewRoute
+  JobsPendingRoute: typeof JobsPendingRoute
   ApiAdminAllowlistRoute: typeof ApiAdminAllowlistRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
@@ -715,6 +728,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/jobs/pending': {
+      id: '/jobs/pending'
+      path: '/jobs/pending'
+      fullPath: '/jobs/pending'
+      preLoaderRoute: typeof JobsPendingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/jobs/new': {
@@ -1056,6 +1076,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProxyRoute: ApiProxyRoute,
   JobsJobIdRoute: JobsJobIdRoute,
   JobsNewRoute: JobsNewRoute,
+  JobsPendingRoute: JobsPendingRoute,
   ApiAdminAllowlistRoute: ApiAdminAllowlistRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,

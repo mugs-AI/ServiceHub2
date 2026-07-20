@@ -82,6 +82,13 @@ function AuthenticatedShell({
         closable: false,
         kind: "pinned",
       },
+      {
+        key: "pin:pending",
+        label: "Pending Queue",
+        href: "/jobs/pending",
+        closable: false,
+        kind: "pinned",
+      },
     ],
     [isAdmin],
   );
