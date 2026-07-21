@@ -571,36 +571,22 @@ function AssignmentSection({
         Assigned technician
       </h2>
       {assigned ? (
-        <div className="space-y-2">
-          <div className="text-base font-semibold text-foreground">
-            {job.assigned_user_name_snapshot}
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {job.assigned_user_code_snapshot ?? ""}
-            {job.assigned_user_code_snapshot && job.assigned_user_email_snapshot
-              ? " · "
-              : ""}
-            {job.assigned_user_email_snapshot ?? ""}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Assigned{" "}
-            {job.assigned_at ? new Date(job.assigned_at).toLocaleString() : ""}
-            {job.assigned_by_name_snapshot ? ` by ${job.assigned_by_name_snapshot}` : ""}
-          </div>
+        <div className="text-base font-semibold text-foreground">
+          {job.assigned_user_name_snapshot}
         </div>
       ) : (
         <div className="text-sm font-medium text-muted-foreground">Unassigned</div>
       )}
 
       {canAssign && (
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onOpenPicker}
             disabled={busy}
             className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
           >
-            {assigned ? "Change technician" : "Assign technician"}
+            {assigned ? "Change" : "Assign Technician"}
           </button>
           {assigned && (
             <button
