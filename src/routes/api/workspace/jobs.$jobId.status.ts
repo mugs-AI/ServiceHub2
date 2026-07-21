@@ -58,13 +58,25 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
               { status: 400 },
             );
           }
-          if (!canTransition(job.status, to)) {
+          // Coordinate: a Draft with a technician must move to Assigned, not Open.
+          let effectiveTo = to;
+          if (job.status === "Draft" && to === "Open" && job.assigned_user_id) {
+            effectiveTo = "Assigned";
+          }
+          // A Draft without a technician cannot go directly to Assigned.
+          if (job.status === "Draft" && effectiveTo === "Assigned" && !job.assigned_user_id) {
             return Response.json(
-              { error: `Cannot transition from ${job.status} to ${to}.` },
+              { error: "Assign a technician before moving this draft to Assigned." },
               { status: 400 },
             );
           }
-          if (to === "Cancelled" && !reason) {
+          if (!canTransition(job.status, effectiveTo)) {
+            return Response.json(
+              { error: `Cannot transition from ${job.status} to ${effectiveTo}.` },
+              { status: 400 },
+            );
+          }
+          if (effectiveTo === "Cancelled" && !reason) {
             return Response.json(
               { error: "Cancellation reason is required." },
               { status: 400 },
