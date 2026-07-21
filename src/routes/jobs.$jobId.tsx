@@ -193,55 +193,58 @@ function JobDetailPage() {
         <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reload} />
       )}
 
-      {!job.is_deleted && (
-        <WorkflowActions job={job} onDone={reload} />
-      )}
-
-      <AssignmentSection
-        job={job}
-        canAssign={isAdmin && !job.is_deleted}
-        onOpenPicker={() => setShowPicker(true)}
-        onReload={reload}
-      />
-
-      <Section title="Customer">
-        <div className="text-sm">
-          <div className="font-semibold">
-            {job.customer_name_snapshot ?? "(no name)"}
-          </div>
-          <div className="text-muted-foreground">
-            {job.customer_code_snapshot}
-          </div>
+      {/* Workflow + Assigned technician — same row on md+, stacked on mobile */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <div className="md:col-span-3">
+          {!job.is_deleted ? (
+            <WorkflowActions job={job} onDone={reload} />
+          ) : (
+            <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Workflow
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                No actions available for a deleted job.
+              </p>
+            </section>
+          )}
         </div>
-      </Section>
+        <div className="md:col-span-2">
+          <AssignmentSection
+            job={job}
+            canAssign={isAdmin && !job.is_deleted}
+            onOpenPicker={() => setShowPicker(true)}
+            onReload={reload}
+          />
+        </div>
+      </div>
 
       <Section title="Job details">
+        <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
+        <Kv k="Customer code" v={job.customer_code_snapshot} />
         <Kv k="Subject" v={job.subject} />
         <Kv k="Problem" v={job.problem_description} multiline />
+        <Kv k="Priority" v={job.priority} />
+        <Kv k="Source" v={job.source} />
+        {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
+          <>
+            <Kv k="Entitlement" v={job.subscription_category_snapshot} />
+            <Kv k="Stock" v={job.stock_code_snapshot} />
+            <Kv
+              k="Expiry"
+              v={
+                job.entitlement_expiry_snapshot
+                  ? new Date(job.entitlement_expiry_snapshot).toLocaleDateString("en-GB")
+                  : null
+              }
+            />
+            <Kv k="Entitlement status" v={job.entitlement_status_snapshot} />
+          </>
+        )}
+        {job.requires_approval && (
+          <Kv k="Approval" v={job.status === "Pending Approval" ? "Pending" : (job.approved_at ? "Approved" : job.rejected_at ? "Rejected" : "Required")} />
+        )}
       </Section>
-
-      <Section title="Contact">
-        <Kv k="Contact person" v={job.contact_person} />
-        <Kv k="Phone" v={job.contact_phone} />
-        <Kv k="Email" v={job.contact_email} />
-        <Kv k="Service address" v={job.service_address} multiline />
-      </Section>
-
-      {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
-        <Section title="Entitlement snapshot">
-          <Kv k="Category" v={job.subscription_category_snapshot} />
-          <Kv k="Stock" v={job.stock_code_snapshot} />
-          <Kv
-            k="Expiry"
-            v={
-              job.entitlement_expiry_snapshot
-                ? new Date(job.entitlement_expiry_snapshot).toLocaleDateString("en-GB")
-                : null
-            }
-          />
-          <Kv k="Status" v={job.entitlement_status_snapshot} />
-        </Section>
-      )}
 
       {job.internal_note && (
         <Section title="Internal note">
@@ -257,6 +260,13 @@ function JobDetailPage() {
       />
 
       <TimelineSection items={timeline} />
+
+      <Section title="Contact">
+        <Kv k="Contact person" v={job.contact_person} />
+        <Kv k="Phone" v={job.contact_phone} />
+        <Kv k="Email" v={job.contact_email} />
+        <Kv k="Service address" v={job.service_address} multiline />
+      </Section>
 
       {isAdmin && (
         <AdminDangerZone job={job} onReload={reload} />
