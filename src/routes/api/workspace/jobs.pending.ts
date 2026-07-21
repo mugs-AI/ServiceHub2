@@ -8,6 +8,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 type QueueType =
+  | "draft"
   | "pending_approval"
   | "open_unassigned"
   | "assigned_not_started"
