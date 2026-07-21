@@ -165,8 +165,8 @@ function PendingQueuePage() {
       )}
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
       {!loading && rows.length === 0 && !err && (
-        <div className="rounded-lg border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
-          No pending jobs.
+        <div className="rounded-lg border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+          {QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg ?? "No jobs."}
         </div>
       )}
 
