@@ -58,13 +58,25 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
               { status: 400 },
             );
           }
-          if (!canTransition(job.status, to)) {
+          // Coordinate: a Draft with a technician must move to Assigned, not Open.
+          let effectiveTo = to;
+          if (job.status === "Draft" && to === "Open" && job.assigned_user_id) {
+            effectiveTo = "Assigned";
+          }
+          // A Draft without a technician cannot go directly to Assigned.
+          if (job.status === "Draft" && effectiveTo === "Assigned" && !job.assigned_user_id) {
             return Response.json(
-              { error: `Cannot transition from ${job.status} to ${to}.` },
+              { error: "Assign a technician before moving this draft to Assigned." },
               { status: 400 },
             );
           }
-          if (to === "Cancelled" && !reason) {
+          if (!canTransition(job.status, effectiveTo)) {
+            return Response.json(
+              { error: `Cannot transition from ${job.status} to ${effectiveTo}.` },
+              { status: 400 },
+            );
+          }
+          if (effectiveTo === "Cancelled" && !reason) {
             return Response.json(
               { error: "Cancellation reason is required." },
               { status: 400 },
@@ -86,10 +98,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
             cancellation_reason?: string;
             cancelled_by_user_id?: string | null;
             cancelled_by_name_snapshot?: string | null;
-          } = { status: to };
-          if (to === "In Progress") patch.started_at = now;
-          if (to === "Completed") patch.completed_at = now;
-          if (to === "Cancelled") {
+          } = { status: effectiveTo };
+          if (effectiveTo === "In Progress") patch.started_at = now;
+          if (effectiveTo === "Completed") patch.completed_at = now;
+          if (effectiveTo === "Cancelled") {
             patch.cancelled_at = now;
             patch.cancellation_reason = reason ?? undefined;
             patch.cancelled_by_user_id = performer.performed_by_user_id;
@@ -108,9 +120,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
           await supabaseAdmin.from("service_job_activity_log").insert({
             tenant_code: user.tenantCode,
             service_job_id: params.jobId,
-            event_type: to === "Cancelled" ? "job_cancelled" : "status_changed",
+            event_type: effectiveTo === "Cancelled" ? "job_cancelled" : "status_changed",
             old_value: job.status,
-            new_value: to,
+            new_value: effectiveTo,
             note: reason ?? note,
             ...performer,
           });

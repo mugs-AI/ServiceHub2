@@ -20,12 +20,13 @@ interface QueueRow {
 }
 
 const QUEUE_TABS = [
-  { key: "", label: "All Pending" },
-  { key: "pending_approval", label: "Pending Approval" },
-  { key: "open_unassigned", label: "Open · Unassigned" },
-  { key: "assigned_not_started", label: "Assigned" },
-  { key: "waiting_customer", label: "Waiting Customer" },
-  { key: "waiting_vendor", label: "Waiting Vendor" },
+  { key: "", label: "All Pending", emptyMsg: "No jobs currently require action." },
+  { key: "draft", label: "Draft", emptyMsg: "No Draft jobs." },
+  { key: "pending_approval", label: "Pending Approval", emptyMsg: "No Pending Approval jobs." },
+  { key: "open_unassigned", label: "Open · Unassigned", emptyMsg: "No Open unassigned jobs." },
+  { key: "assigned_not_started", label: "Assigned", emptyMsg: "No Assigned jobs." },
+  { key: "waiting_customer", label: "Waiting Customer", emptyMsg: "No jobs waiting on customer." },
+  { key: "waiting_vendor", label: "Waiting Vendor", emptyMsg: "No jobs waiting on vendor." },
 ] as const;
 
 export const Route = createFileRoute("/jobs/pending")({
@@ -164,8 +165,8 @@ function PendingQueuePage() {
       )}
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
       {!loading && rows.length === 0 && !err && (
-        <div className="rounded-lg border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
-          No pending jobs.
+        <div className="rounded-lg border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+          {QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg ?? "No jobs."}
         </div>
       )}
 

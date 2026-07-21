@@ -193,55 +193,58 @@ function JobDetailPage() {
         <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reload} />
       )}
 
-      {!job.is_deleted && (
-        <WorkflowActions job={job} onDone={reload} />
-      )}
-
-      <AssignmentSection
-        job={job}
-        canAssign={isAdmin && !job.is_deleted}
-        onOpenPicker={() => setShowPicker(true)}
-        onReload={reload}
-      />
-
-      <Section title="Customer">
-        <div className="text-sm">
-          <div className="font-semibold">
-            {job.customer_name_snapshot ?? "(no name)"}
-          </div>
-          <div className="text-muted-foreground">
-            {job.customer_code_snapshot}
-          </div>
+      {/* Workflow + Assigned technician — same row on md+, stacked on mobile */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <div className="md:col-span-3">
+          {!job.is_deleted ? (
+            <WorkflowActions job={job} onDone={reload} />
+          ) : (
+            <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Workflow
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                No actions available for a deleted job.
+              </p>
+            </section>
+          )}
         </div>
-      </Section>
+        <div className="md:col-span-2">
+          <AssignmentSection
+            job={job}
+            canAssign={isAdmin && !job.is_deleted}
+            onOpenPicker={() => setShowPicker(true)}
+            onReload={reload}
+          />
+        </div>
+      </div>
 
       <Section title="Job details">
+        <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
+        <Kv k="Customer code" v={job.customer_code_snapshot} />
         <Kv k="Subject" v={job.subject} />
         <Kv k="Problem" v={job.problem_description} multiline />
+        <Kv k="Priority" v={job.priority} />
+        <Kv k="Source" v={job.source} />
+        {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
+          <>
+            <Kv k="Entitlement" v={job.subscription_category_snapshot} />
+            <Kv k="Stock" v={job.stock_code_snapshot} />
+            <Kv
+              k="Expiry"
+              v={
+                job.entitlement_expiry_snapshot
+                  ? new Date(job.entitlement_expiry_snapshot).toLocaleDateString("en-GB")
+                  : null
+              }
+            />
+            <Kv k="Entitlement status" v={job.entitlement_status_snapshot} />
+          </>
+        )}
+        {job.requires_approval && (
+          <Kv k="Approval" v={job.status === "Pending Approval" ? "Pending" : (job.approved_at ? "Approved" : job.rejected_at ? "Rejected" : "Required")} />
+        )}
       </Section>
-
-      <Section title="Contact">
-        <Kv k="Contact person" v={job.contact_person} />
-        <Kv k="Phone" v={job.contact_phone} />
-        <Kv k="Email" v={job.contact_email} />
-        <Kv k="Service address" v={job.service_address} multiline />
-      </Section>
-
-      {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
-        <Section title="Entitlement snapshot">
-          <Kv k="Category" v={job.subscription_category_snapshot} />
-          <Kv k="Stock" v={job.stock_code_snapshot} />
-          <Kv
-            k="Expiry"
-            v={
-              job.entitlement_expiry_snapshot
-                ? new Date(job.entitlement_expiry_snapshot).toLocaleDateString("en-GB")
-                : null
-            }
-          />
-          <Kv k="Status" v={job.entitlement_status_snapshot} />
-        </Section>
-      )}
 
       {job.internal_note && (
         <Section title="Internal note">
@@ -257,6 +260,13 @@ function JobDetailPage() {
       />
 
       <TimelineSection items={timeline} />
+
+      <Section title="Contact">
+        <Kv k="Contact person" v={job.contact_person} />
+        <Kv k="Phone" v={job.contact_phone} />
+        <Kv k="Email" v={job.contact_email} />
+        <Kv k="Service address" v={job.service_address} multiline />
+      </Section>
 
       {isAdmin && (
         <AdminDangerZone job={job} onReload={reload} />
@@ -330,12 +340,17 @@ function WorkflowActions({
     let t = allowedTransitionsClient(job.status);
     // Draft → Open blocked when requires_approval is true.
     if (job.status === "Draft" && job.requires_approval) {
-      t = t.filter((x) => x !== "Open");
+      t = t.filter((x) => x !== "Open" && x !== "Assigned");
+    }
+    // Draft submit target depends on assignment: assigned → Assigned, else → Open.
+    if (job.status === "Draft") {
+      if (job.assigned_user_id) t = t.filter((x) => x !== "Open");
+      else t = t.filter((x) => x !== "Assigned");
     }
     // Pending Approval handled by ApprovalPanel.
     if (job.status === "Pending Approval") t = t.filter((x) => x !== "Cancelled");
     return t;
-  }, [job.status, job.requires_approval]);
+  }, [job.status, job.requires_approval, job.assigned_user_id]);
 
   if (transitions.length === 0) return null;
 
@@ -397,11 +412,13 @@ function WorkflowActions({
 
 function actionLabel(from: string, to: string): string {
   if (from === "Draft" && to === "Open") return "Submit → Open";
+  if (from === "Draft" && to === "Assigned") return "Submit → Assigned";
   if (to === "In Progress") return "Start Work";
   if (to === "Completed") return "Complete";
   if (to === "Cancelled") return "Cancel";
   if (to === "Waiting Customer") return "Waiting on Customer";
   if (to === "Waiting Vendor") return "Waiting on Vendor";
+  if (to === "Assigned") return "→ Assigned";
   return `→ ${to}`;
 }
 
@@ -554,36 +571,22 @@ function AssignmentSection({
         Assigned technician
       </h2>
       {assigned ? (
-        <div className="space-y-2">
-          <div className="text-base font-semibold text-foreground">
-            {job.assigned_user_name_snapshot}
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {job.assigned_user_code_snapshot ?? ""}
-            {job.assigned_user_code_snapshot && job.assigned_user_email_snapshot
-              ? " · "
-              : ""}
-            {job.assigned_user_email_snapshot ?? ""}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Assigned{" "}
-            {job.assigned_at ? new Date(job.assigned_at).toLocaleString() : ""}
-            {job.assigned_by_name_snapshot ? ` by ${job.assigned_by_name_snapshot}` : ""}
-          </div>
+        <div className="text-base font-semibold text-foreground">
+          {job.assigned_user_name_snapshot}
         </div>
       ) : (
         <div className="text-sm font-medium text-muted-foreground">Unassigned</div>
       )}
 
       {canAssign && (
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onOpenPicker}
             disabled={busy}
             className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
           >
-            {assigned ? "Change technician" : "Assign technician"}
+            {assigned ? "Change" : "Assign Technician"}
           </button>
           {assigned && (
             <button
@@ -810,9 +813,9 @@ function CommentsSection({
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            rows={3}
+            rows={6}
             placeholder="Add a comment…"
-            className="w-full rounded-lg border-[1.5px] border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+            className="w-full min-h-[160px] rounded-lg border-[1.5px] border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
           />
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-2 text-xs">

@@ -8,6 +8,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 type QueueType =
+  | "draft"
   | "pending_approval"
   | "open_unassigned"
   | "assigned_not_started"
@@ -58,7 +59,9 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             .eq("is_deleted", false);
 
           // Queue-type predicate.
-          if (queueType === "pending_approval") {
+          if (queueType === "draft") {
+            query = query.eq("status", "Draft");
+          } else if (queueType === "pending_approval") {
             query = query.eq("status", "Pending Approval");
           } else if (queueType === "open_unassigned") {
             query = query.eq("status", "Open").is("assigned_user_id", null);
@@ -69,8 +72,9 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           } else if (queueType === "waiting_vendor") {
             query = query.eq("status", "Waiting Vendor");
           } else {
-            // All pending statuses.
+            // All pending statuses (non-terminal, non-In-Progress, non-deleted).
             query = query.in("status", [
+              "Draft",
               "Pending Approval",
               "Open",
               "Assigned",
