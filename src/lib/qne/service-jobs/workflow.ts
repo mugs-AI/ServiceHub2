@@ -14,7 +14,7 @@ export type JobStatus =
   | "Cancelled";
 
 const USER_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
-  Draft: ["Open", "Cancelled"],
+  Draft: ["Open", "Assigned", "Cancelled"],
   "Pending Approval": ["Cancelled"],
   Open: ["In Progress", "Cancelled"],
   Assigned: ["In Progress", "Cancelled"],
