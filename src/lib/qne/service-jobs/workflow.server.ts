@@ -61,7 +61,7 @@ export const ACTIVE_STATUSES: readonly JobStatus[] = [
 
 // User-driven transitions via POST /status. Approve/Reject are separate.
 const USER_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
-  Draft: ["Open", "Cancelled"],
+  Draft: ["Open", "Assigned", "Cancelled"],
   "Pending Approval": ["Cancelled"], // approve handled separately
   Open: ["In Progress", "Cancelled"],
   Assigned: ["In Progress", "Cancelled"],
