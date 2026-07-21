@@ -412,11 +412,13 @@ function WorkflowActions({
 
 function actionLabel(from: string, to: string): string {
   if (from === "Draft" && to === "Open") return "Submit → Open";
+  if (from === "Draft" && to === "Assigned") return "Submit → Assigned";
   if (to === "In Progress") return "Start Work";
   if (to === "Completed") return "Complete";
   if (to === "Cancelled") return "Cancel";
   if (to === "Waiting Customer") return "Waiting on Customer";
   if (to === "Waiting Vendor") return "Waiting on Vendor";
+  if (to === "Assigned") return "→ Assigned";
   return `→ ${to}`;
 }
 
