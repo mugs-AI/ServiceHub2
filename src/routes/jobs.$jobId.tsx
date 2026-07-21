@@ -340,12 +340,17 @@ function WorkflowActions({
     let t = allowedTransitionsClient(job.status);
     // Draft → Open blocked when requires_approval is true.
     if (job.status === "Draft" && job.requires_approval) {
-      t = t.filter((x) => x !== "Open");
+      t = t.filter((x) => x !== "Open" && x !== "Assigned");
+    }
+    // Draft submit target depends on assignment: assigned → Assigned, else → Open.
+    if (job.status === "Draft") {
+      if (job.assigned_user_id) t = t.filter((x) => x !== "Open");
+      else t = t.filter((x) => x !== "Assigned");
     }
     // Pending Approval handled by ApprovalPanel.
     if (job.status === "Pending Approval") t = t.filter((x) => x !== "Cancelled");
     return t;
-  }, [job.status, job.requires_approval]);
+  }, [job.status, job.requires_approval, job.assigned_user_id]);
 
   if (transitions.length === 0) return null;
 
