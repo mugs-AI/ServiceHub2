@@ -98,10 +98,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
             cancellation_reason?: string;
             cancelled_by_user_id?: string | null;
             cancelled_by_name_snapshot?: string | null;
-          } = { status: to };
-          if (to === "In Progress") patch.started_at = now;
-          if (to === "Completed") patch.completed_at = now;
-          if (to === "Cancelled") {
+          } = { status: effectiveTo };
+          if (effectiveTo === "In Progress") patch.started_at = now;
+          if (effectiveTo === "Completed") patch.completed_at = now;
+          if (effectiveTo === "Cancelled") {
             patch.cancelled_at = now;
             patch.cancellation_reason = reason ?? undefined;
             patch.cancelled_by_user_id = performer.performed_by_user_id;
@@ -120,9 +120,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
           await supabaseAdmin.from("service_job_activity_log").insert({
             tenant_code: user.tenantCode,
             service_job_id: params.jobId,
-            event_type: to === "Cancelled" ? "job_cancelled" : "status_changed",
+            event_type: effectiveTo === "Cancelled" ? "job_cancelled" : "status_changed",
             old_value: job.status,
-            new_value: to,
+            new_value: effectiveTo,
             note: reason ?? note,
             ...performer,
           });
