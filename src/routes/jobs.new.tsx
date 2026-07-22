@@ -424,8 +424,51 @@ function NewJobPage() {
                 className="input"
               />
             </Field>
+            <Field label="Assign to (optional)" className="sm:col-span-2">
+              {assignee ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background p-3 text-sm">
+                  <div>
+                    <div className="font-semibold text-foreground">
+                      {assignee.display_name ?? assignee.user_name ?? assignee.email ?? "(user)"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {[assignee.user_name, assignee.email].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPickTech(true)}
+                      className="min-h-[44px] rounded-lg border bg-white px-3 text-xs font-semibold text-foreground hover:bg-accent"
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAssignee(null)}
+                      className="min-h-[44px] rounded-lg border border-destructive/40 bg-white px-3 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPickTech(true)}
+                  className="min-h-[44px] w-full rounded-lg border-[1.5px] border-dashed border-gray-300 bg-white px-3 text-left text-sm text-muted-foreground hover:border-blue-600 hover:bg-blue-50"
+                >
+                  + Assign a technician
+                </button>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Optional. If assigned, submitting the Draft will move it to
+                Assigned. Otherwise it moves to Open.
+              </p>
+            </Field>
           </div>
         </Section>
+
 
         {/* 4. Contact details */}
         <Section title="Contact details">
