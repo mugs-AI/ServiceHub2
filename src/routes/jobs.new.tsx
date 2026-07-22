@@ -202,6 +202,7 @@ function NewJobPage() {
           source,
           internal_note: internalNote || null,
           subscription_snapshot_id: selectedSubId || null,
+          assigned_user_id: assignee?.user_id || null,
         }),
       });
       const body = await res.json().catch(() => ({}));
