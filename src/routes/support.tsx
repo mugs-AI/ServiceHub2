@@ -630,7 +630,7 @@ function JobList({
                       {j.job_number}
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {new Date(j.created_at).toLocaleDateString("en-GB")}
+                      {formatMY(j.created_at)}
                     </td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{j.customer_name_snapshot ?? "—"}</div>
@@ -663,7 +663,7 @@ function JobList({
                       {j.job_number}
                     </span>
                     <span className="text-[10px] uppercase text-muted-foreground">
-                      {new Date(j.created_at).toLocaleDateString("en-GB")}
+                      {formatMY(j.created_at)}
                     </span>
                   </div>
                   <div className="mt-1 truncate text-sm font-semibold">{j.subject}</div>
