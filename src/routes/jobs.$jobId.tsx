@@ -663,7 +663,7 @@ function AssignmentSection({
   }
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+    <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         Assigned technician
       </h2>
