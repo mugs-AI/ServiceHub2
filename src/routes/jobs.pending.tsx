@@ -184,7 +184,7 @@ function PendingQueuePage() {
                     {r.job_number}
                   </span>
                   <span className="text-[10px] uppercase text-muted-foreground">
-                    {new Date(r.created_at).toLocaleString()}
+                    {formatMYDateTime(r.created_at)}
                   </span>
                 </div>
                 <div className="mt-1 truncate text-sm font-semibold">{r.subject}</div>
