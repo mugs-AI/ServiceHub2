@@ -78,6 +78,10 @@ function NewJobPage() {
   const [source, setSource] = useState<SourceType>("Phone");
   const [internalNote, setInternalNote] = useState("");
 
+  // Optional technician assignment at creation time.
+  const [assignee, setAssignee] = useState<TechnicianRow | null>(null);
+  const [pickTech, setPickTech] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const inflightRef = useRef(false);
