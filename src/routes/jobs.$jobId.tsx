@@ -970,7 +970,7 @@ function CommentsSection({
                   >
                     {c.visibility}
                   </span>
-                  {new Date(c.created_at).toLocaleString()}
+                  {formatMYDateTime(c.created_at)}
                 </span>
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p>
