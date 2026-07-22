@@ -359,7 +359,7 @@ function NewJobPage() {
                               <div className="text-xs text-muted-foreground">
                                 Stock: {s.stock_code ?? "—"}
                                 {s.expiry_date
-                                  ? ` · Expiry: ${new Date(s.expiry_date).toLocaleDateString("en-GB")}`
+                                  ? ` · Expiry: ${formatMY(s.expiry_date)}`
                                   : ""}
                               </div>
                             </div>
