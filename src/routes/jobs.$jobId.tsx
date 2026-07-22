@@ -471,10 +471,15 @@ function WorkflowActions({
   }
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+    <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         Workflow
       </h2>
+      {job.status === "Draft" && (
+        <p className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-900 ring-1 ring-blue-200">
+          Draft jobs auto-route: submitting with a technician assigned goes to <strong>Assigned</strong>; without one, it goes to <strong>Open</strong>.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {transitions.map((to) => (
           <button
@@ -500,6 +505,7 @@ function WorkflowActions({
     </section>
   );
 }
+
 
 function actionLabel(from: string, to: string): string {
   if (from === "Draft" && to === "Open") return "Submit → Open";
