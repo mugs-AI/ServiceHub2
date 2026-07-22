@@ -607,3 +607,125 @@ function Field({
     </label>
   );
 }
+
+function NewJobTechnicianPicker({
+  onClose,
+  onPick,
+}: {
+  onClose: () => void;
+  onPick: (t: TechnicianRow) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [rows, setRows] = useState<TechnicianRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const url = new URL("/api/workspace/technicians", window.location.origin);
+        if (q.trim()) url.searchParams.set("q", q.trim());
+        const res = await fetch(url.toString(), { headers: authHeaders() });
+        const body = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setErr(body?.error ?? "Unable to load technicians.");
+          setRows([]);
+        } else {
+          setRows(body.rows ?? []);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [q]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b p-4">
+          <h3 className="text-base font-semibold text-foreground">
+            Select technician
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[44px] min-w-[44px] rounded-md px-2 text-sm text-muted-foreground hover:bg-muted"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="border-b p-4">
+          <input
+            type="search"
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name, user code or email"
+            className="input"
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {loading ? (
+            <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+          ) : rows.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              No active technicians match.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {rows.map((r) => {
+                const label = r.display_name ?? r.user_name ?? r.email ?? r.user_id ?? "(user)";
+                const sub = [r.user_name, r.email].filter(Boolean).join(" · ");
+                return (
+                  <li key={r.user_id ?? label} className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-foreground">
+                          {label}
+                        </div>
+                        {sub && (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {sub}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => r.user_id && onPick(r)}
+                        disabled={!r.user_id}
+                        className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        Select
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+        {err && (
+          <div className="border-t bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            {err}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
