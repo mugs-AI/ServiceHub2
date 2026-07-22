@@ -2,8 +2,10 @@
 //
 // Source: N3 /api/Users (validated bearer, so N3 itself scopes to the caller's
 // tenant). No local Technician master. We filter to isActive users and rank
-// exact code/email matches first. Admin-only, matching the assignment
-// permission model.
+// exact code/email matches first. Available to any authenticated tenant user
+// so the New Service Job form can offer Assign To at creation time; the write
+// endpoints (POST /assign, POST /jobs with assigned_user_id) enforce their own
+// admin gates where applicable.
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -14,7 +16,7 @@ export const Route = createFileRoute("/api/workspace/technicians")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAdministrator, guardResponse } = await import(
+        const { requireAuthenticatedN3User, guardResponse } = await import(
           "@/lib/qne/session/current-user.server"
         );
         const { n3Get } = await import("@/lib/qne/sync/n3.server");
@@ -22,7 +24,7 @@ export const Route = createFileRoute("/api/workspace/technicians")({
         const { isUserActive } = roleMod;
         type N3UserDto = import("@/lib/qne/session/role-resolution").N3UserDto;
         try {
-          const user = await requireAdministrator(request);
+          const user = await requireAuthenticatedN3User(request);
           const url = new URL(request.url);
           const qRaw = (url.searchParams.get("q") ?? "").trim();
 
