@@ -999,7 +999,7 @@ function TimelineSection({ items }: { items: TimelineItem[] }) {
                 {formatEvent(it)}
               </span>
               <span className="text-xs text-muted-foreground">
-                {new Date(it.performed_at).toLocaleString()}
+                {formatMYDateTime(it.performed_at)}
                 {it.performed_by_name ? ` · ${it.performed_by_name}` : ""}
               </span>
             </div>
