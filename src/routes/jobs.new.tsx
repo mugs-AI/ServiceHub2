@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-r
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getStoredToken } from "@/lib/qne/tokens";
+import { formatMY } from "@/lib/format-date";
 
 type Priority = "High" | "Medium" | "Low";
 type SourceType =
@@ -27,6 +28,13 @@ interface SubscriptionRow {
   stock_name: string | null;
   expiry_date: string | null;
   subscription_status: string | null;
+}
+
+interface TechnicianRow {
+  user_id: string | null;
+  user_name: string | null;
+  display_name: string | null;
+  email: string | null;
 }
 
 interface JobsNewSearch {
@@ -69,6 +77,10 @@ function NewJobPage() {
   const [priority, setPriority] = useState<Priority>("Medium");
   const [source, setSource] = useState<SourceType>("Phone");
   const [internalNote, setInternalNote] = useState("");
+
+  // Optional technician assignment at creation time.
+  const [assignee, setAssignee] = useState<TechnicianRow | null>(null);
+  const [pickTech, setPickTech] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -190,6 +202,7 @@ function NewJobPage() {
           source,
           internal_note: internalNote || null,
           subscription_snapshot_id: selectedSubId || null,
+          assigned_user_id: assignee?.user_id || null,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -346,7 +359,7 @@ function NewJobPage() {
                               <div className="text-xs text-muted-foreground">
                                 Stock: {s.stock_code ?? "—"}
                                 {s.expiry_date
-                                  ? ` · Expiry: ${new Date(s.expiry_date).toLocaleDateString("en-GB")}`
+                                  ? ` · Expiry: ${formatMY(s.expiry_date)}`
                                   : ""}
                               </div>
                             </div>
@@ -411,8 +424,51 @@ function NewJobPage() {
                 className="input"
               />
             </Field>
+            <Field label="Assign to (optional)" className="sm:col-span-2">
+              {assignee ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background p-3 text-sm">
+                  <div>
+                    <div className="font-semibold text-foreground">
+                      {assignee.display_name ?? assignee.user_name ?? assignee.email ?? "(user)"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {[assignee.user_name, assignee.email].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPickTech(true)}
+                      className="min-h-[44px] rounded-lg border bg-white px-3 text-xs font-semibold text-foreground hover:bg-accent"
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAssignee(null)}
+                      className="min-h-[44px] rounded-lg border border-destructive/40 bg-white px-3 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPickTech(true)}
+                  className="min-h-[44px] w-full rounded-lg border-[1.5px] border-dashed border-gray-300 bg-white px-3 text-left text-sm text-muted-foreground hover:border-blue-600 hover:bg-blue-50"
+                >
+                  + Assign a technician
+                </button>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Optional. If assigned, submitting the Draft will move it to
+                Assigned. Otherwise it moves to Open.
+              </p>
+            </Field>
           </div>
         </Section>
+
 
         {/* 4. Contact details */}
         <Section title="Contact details">
@@ -462,6 +518,18 @@ function NewJobPage() {
           </button>
         </div>
       </form>
+
+      {pickTech && (
+        <NewJobTechnicianPicker
+          onClose={() => setPickTech(false)}
+          onPick={(t) => {
+            setAssignee(t);
+            setPickTech(false);
+          }}
+        />
+      )}
+
+
 
       <style>{`
         .input {
@@ -539,3 +607,125 @@ function Field({
     </label>
   );
 }
+
+function NewJobTechnicianPicker({
+  onClose,
+  onPick,
+}: {
+  onClose: () => void;
+  onPick: (t: TechnicianRow) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [rows, setRows] = useState<TechnicianRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const url = new URL("/api/workspace/technicians", window.location.origin);
+        if (q.trim()) url.searchParams.set("q", q.trim());
+        const res = await fetch(url.toString(), { headers: authHeaders() });
+        const body = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setErr(body?.error ?? "Unable to load technicians.");
+          setRows([]);
+        } else {
+          setRows(body.rows ?? []);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [q]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b p-4">
+          <h3 className="text-base font-semibold text-foreground">
+            Select technician
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[44px] min-w-[44px] rounded-md px-2 text-sm text-muted-foreground hover:bg-muted"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="border-b p-4">
+          <input
+            type="search"
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name, user code or email"
+            className="input"
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {loading ? (
+            <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+          ) : rows.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              No active technicians match.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {rows.map((r) => {
+                const label = r.display_name ?? r.user_name ?? r.email ?? r.user_id ?? "(user)";
+                const sub = [r.user_name, r.email].filter(Boolean).join(" · ");
+                return (
+                  <li key={r.user_id ?? label} className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-foreground">
+                          {label}
+                        </div>
+                        {sub && (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {sub}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => r.user_id && onPick(r)}
+                        disabled={!r.user_id}
+                        className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        Select
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+        {err && (
+          <div className="border-t bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            {err}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

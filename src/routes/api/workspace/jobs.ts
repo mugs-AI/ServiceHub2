@@ -158,6 +158,55 @@ export const Route = createFileRoute("/api/workspace/jobs")({
             }
           }
 
+          // 3b) Optional technician assignment at creation time.
+          //     Verified against live N3 Users (bearer scopes to caller's tenant).
+          const assignedUserIdRaw = trim(body.assigned_user_id, 100);
+          let assignedSnap: {
+            user_id: string;
+            name: string;
+            code: string | null;
+            email: string | null;
+          } | null = null;
+          if (assignedUserIdRaw) {
+            const { n3Get } = await import("@/lib/qne/sync/n3.server");
+            const { isUserActive } = await import(
+              "@/lib/qne/session/role-resolution"
+            );
+            const raw = await n3Get<unknown>(user.token, "main", "/api/Users");
+            const list = Array.isArray(raw)
+              ? (raw as Array<Record<string, unknown>>)
+              : Array.isArray((raw as { value?: unknown[] })?.value)
+                ? (raw as { value: Array<Record<string, unknown>> }).value
+                : Array.isArray((raw as { data?: unknown[] })?.data)
+                  ? (raw as { data: Array<Record<string, unknown>> }).data
+                  : [];
+            const tech = list.find(
+              (u) => String(u.userId ?? "").trim() === assignedUserIdRaw,
+            );
+            if (!tech) {
+              return Response.json(
+                { error: "Selected technician not found in this tenant." },
+                { status: 404 },
+              );
+            }
+            if (!isUserActive(tech)) {
+              return Response.json(
+                { error: "Selected technician is inactive." },
+                { status: 400 },
+              );
+            }
+            assignedSnap = {
+              user_id: assignedUserIdRaw,
+              name:
+                String(tech.displayName ?? "").trim() ||
+                String(tech.userName ?? "").trim() ||
+                String(tech.email ?? "").trim() ||
+                assignedUserIdRaw,
+              code: String(tech.userName ?? "").trim() || null,
+              email: String(tech.email ?? "").trim() || null,
+            };
+          }
+
           // 4) Mint job number atomically.
           const { key: dk, yy, mm, dd } = dateKey(new Date());
           const { data: seqData, error: seqErr } = await supabaseAdmin.rpc(
@@ -172,6 +221,10 @@ export const Route = createFileRoute("/api/workspace/jobs")({
           const jobNumber = `JB${yy}${mm}${dd}${String(seq).padStart(2, "0")}`;
 
           // 5) Insert the job.
+          const nowIso = new Date().toISOString();
+          const actorId =
+            user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
+          const actorName = user.displayName || user.email || null;
           const insert = {
             tenant_code: user.tenantCode,
             job_number: jobNumber,
@@ -196,8 +249,16 @@ export const Route = createFileRoute("/api/workspace/jobs")({
             entitlement_expiry_snapshot: entitlementSnap?.expiry_date ?? null,
             entitlement_status_snapshot: entitlementSnap?.status ?? null,
             internal_note: trim(body.internal_note, 5000),
-            created_by_user_id: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
-            created_by_name: user.displayName || user.email || null,
+            created_by_user_id: actorId,
+            created_by_name: actorName,
+            // Assignment (optional).
+            assigned_user_id: assignedSnap?.user_id ?? null,
+            assigned_user_name_snapshot: assignedSnap?.name ?? null,
+            assigned_user_code_snapshot: assignedSnap?.code ?? null,
+            assigned_user_email_snapshot: assignedSnap?.email ?? null,
+            assigned_at: assignedSnap ? nowIso : null,
+            assigned_by_user_id: assignedSnap ? actorId : null,
+            assigned_by_name_snapshot: assignedSnap ? actorName : null,
           };
           const { data: inserted, error: insErr } = await supabaseAdmin
             .from("service_jobs")
@@ -205,6 +266,26 @@ export const Route = createFileRoute("/api/workspace/jobs")({
             .select("*")
             .single();
           if (insErr) throw insErr;
+
+          // 5b) Record assignment history when assigned at creation.
+          if (assignedSnap) {
+            await supabaseAdmin
+              .from("service_job_assignment_history")
+              .insert({
+                tenant_code: user.tenantCode,
+                service_job_id: inserted.id,
+                action: "assigned",
+                assigned_user_id: assignedSnap.user_id,
+                assigned_user_name_snapshot: assignedSnap.name,
+                assigned_user_code_snapshot: assignedSnap.code,
+                assigned_user_email_snapshot: assignedSnap.email,
+                previous_assigned_user_id: null,
+                previous_assigned_user_name_snapshot: null,
+                performed_by_user_id: actorId,
+                performed_by_name_snapshot: actorName,
+                performed_at: nowIso,
+              });
+          }
 
           return Response.json({ job: inserted }, { status: 201 });
         } catch (err) {
