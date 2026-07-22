@@ -155,14 +155,10 @@ function JobDetailPage() {
           <h1 className="mt-1 text-2xl font-semibold text-foreground">
             {job.job_number}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Created {new Date(job.created_at).toLocaleString()}
-            {job.created_by_name ? ` by ${job.created_by_name}` : ""}
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={job.status} />
-          <span className="rounded-full border px-2 py-0.5 text-xs font-semibold uppercase">
+          <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${priorityTone(job.priority)}`}>
             {job.priority}
           </span>
           <span className="rounded-full border px-2 py-0.5 text-xs font-semibold uppercase">
@@ -184,7 +180,7 @@ function JobDetailPage() {
 
       {job.is_deleted && (
         <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
-          Deleted {job.deleted_at ? new Date(job.deleted_at).toLocaleString() : ""}
+          Deleted {formatMYDateTime(job.deleted_at)}
           {job.deleted_by_name_snapshot ? ` by ${job.deleted_by_name_snapshot}` : ""}
           {job.deletion_reason ? ` — ${job.deletion_reason}` : ""}
         </div>
@@ -194,38 +190,35 @@ function JobDetailPage() {
         <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reload} />
       )}
 
-      {/* Workflow + Assigned technician — same row on md+, stacked on mobile */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-        <div className="md:col-span-3">
-          {!job.is_deleted ? (
-            <WorkflowActions job={job} onDone={reload} />
-          ) : (
-            <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Workflow
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                No actions available for a deleted job.
-              </p>
-            </section>
-          )}
-        </div>
-        <div className="md:col-span-2">
-          <AssignmentSection
-            job={job}
-            canAssign={isAdmin && !job.is_deleted}
-            onOpenPicker={() => setShowPicker(true)}
-            onReload={reload}
-          />
-        </div>
+      {/* Top summary row — Job Info | Workflow | Assigned Technician.
+          Equal-height via grid; stacks on mobile. */}
+      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
+        <JobInfoCard job={job} />
+        {!job.is_deleted ? (
+          <WorkflowActions job={job} onDone={reload} />
+        ) : (
+          <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Workflow
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              No actions available for a deleted job.
+            </p>
+          </section>
+        )}
+        <AssignmentSection
+          job={job}
+          canAssign={isAdmin && !job.is_deleted}
+          onOpenPicker={() => setShowPicker(true)}
+          onReload={reload}
+        />
       </div>
 
       <Section title="Job details">
         <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
-        <Kv k="Customer code" v={job.customer_code_snapshot} />
         <Kv k="Subject" v={job.subject} />
         <Kv k="Problem" v={job.problem_description} multiline />
-        <Kv k="Priority" v={job.priority} />
+        <PriorityEditor job={job} onDone={reload} />
         <Kv k="Source" v={job.source} />
         {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
           <>
@@ -233,11 +226,7 @@ function JobDetailPage() {
             <Kv k="Stock" v={job.stock_code_snapshot} />
             <Kv
               k="Expiry"
-              v={
-                job.entitlement_expiry_snapshot
-                  ? new Date(job.entitlement_expiry_snapshot).toLocaleDateString("en-GB")
-                  : null
-              }
+              v={formatMY(job.entitlement_expiry_snapshot) || null}
             />
             <Kv k="Entitlement status" v={job.entitlement_status_snapshot} />
           </>
@@ -263,6 +252,7 @@ function JobDetailPage() {
       <TimelineSection items={timeline} />
 
       <Section title="Contact">
+        <Kv k="Customer code" v={job.customer_code_snapshot} />
         <Kv k="Contact person" v={job.contact_person} />
         <Kv k="Phone" v={job.contact_phone} />
         <Kv k="Email" v={job.contact_email} />
@@ -287,6 +277,106 @@ function JobDetailPage() {
     </div>
   );
 }
+
+function priorityTone(p: string): string {
+  if (p === "High") return "border-red-300 bg-red-50 text-red-800";
+  if (p === "Medium") return "border-amber-300 bg-amber-50 text-amber-800";
+  return "border-gray-200 bg-gray-50 text-gray-700";
+}
+
+/* ---------------- top summary cards ---------------- */
+
+function JobInfoCard({ job }: { job: JobDetail }) {
+  return (
+    <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Job information
+      </h2>
+      <dl className="space-y-2 text-sm">
+        <div className="flex justify-between gap-3">
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Job number</dt>
+          <dd className="font-mono font-semibold text-primary">{job.job_number}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Created</dt>
+          <dd className="text-right text-foreground">{formatMYDateTime(job.created_at)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Created by</dt>
+          <dd className="text-right text-foreground">{job.created_by_name ?? "—"}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+function PriorityEditor({
+  job,
+  onDone,
+}: {
+  job: JobDetail;
+  onDone: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const locked =
+    job.is_deleted || job.status === "Completed" || job.status === "Cancelled";
+
+  async function change(next: string) {
+    if (next === job.priority || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/priority`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ priority: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed to update priority.");
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+      <div className="min-w-32 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Priority
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {(["High", "Medium", "Low"] as const).map((p) => {
+          const active = job.priority === p;
+          return (
+            <button
+              key={p}
+              type="button"
+              onClick={() => change(p)}
+              disabled={locked || busy}
+              className={`min-h-9 rounded-full border px-3 py-1 text-xs font-semibold uppercase transition-colors disabled:opacity-50 ${
+                active ? priorityTone(p) + " ring-2 ring-offset-1 ring-blue-500" : "bg-white text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {p}
+            </button>
+          );
+        })}
+        {locked && (
+          <span className="text-[10px] uppercase text-muted-foreground">
+            Locked ({job.is_deleted ? "deleted" : job.status})
+          </span>
+        )}
+      </div>
+      {err && (
+        <span className="text-xs text-destructive sm:ml-2">{err}</span>
+      )}
+    </div>
+  );
+}
+
 
 /* ---------------- status ---------------- */
 
