@@ -519,6 +519,18 @@ function NewJobPage() {
         </div>
       </form>
 
+      {pickTech && (
+        <NewJobTechnicianPicker
+          onClose={() => setPickTech(false)}
+          onPick={(t) => {
+            setAssignee(t);
+            setPickTech(false);
+          }}
+        />
+      )}
+
+
+
       <style>{`
         .input {
           width: 100%;
