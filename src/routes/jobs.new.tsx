@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-r
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getStoredToken } from "@/lib/qne/tokens";
+import { formatMY } from "@/lib/format-date";
 
 type Priority = "High" | "Medium" | "Low";
 type SourceType =
@@ -27,6 +28,13 @@ interface SubscriptionRow {
   stock_name: string | null;
   expiry_date: string | null;
   subscription_status: string | null;
+}
+
+interface TechnicianRow {
+  user_id: string | null;
+  user_name: string | null;
+  display_name: string | null;
+  email: string | null;
 }
 
 interface JobsNewSearch {
