@@ -1015,6 +1015,8 @@ function formatEvent(it: TimelineItem): string {
   switch (it.event) {
     case "status_changed":
       return `Status: ${it.old_value ?? "—"} → ${it.new_value ?? "—"}`;
+    case "priority_changed":
+      return `Priority: ${it.old_value ?? "—"} → ${it.new_value ?? "—"}`;
     case "job_cancelled":
       return `Cancelled`;
     case "job_deleted":
