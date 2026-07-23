@@ -306,8 +306,8 @@ function JobInfoCard({ job }: { job: JobDetail }) {
       </h2>
       <dl className="space-y-2 text-sm">
         <div className="flex justify-between gap-3">
-          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Job number</dt>
-          <dd className="font-mono font-semibold text-primary">{job.job_number}</dd>
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Source</dt>
+          <dd className="text-right text-foreground">{job.source}</dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Created</dt>
@@ -318,6 +318,111 @@ function JobInfoCard({ job }: { job: JobDetail }) {
           <dd className="text-right text-foreground">{job.created_by_name ?? "—"}</dd>
         </div>
       </dl>
+    </section>
+  );
+}
+
+/* ---------------- internal note (creator-only edit) ---------------- */
+
+function InternalNoteSection({
+  job,
+  canEdit,
+  onReload,
+}: {
+  job: JobDetail;
+  canEdit: boolean;
+  onReload: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(job.internal_note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setValue(job.internal_note ?? "");
+  }, [job.internal_note]);
+
+  const empty = !job.internal_note;
+  if (empty && !canEdit) return null;
+
+  async function save() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/internal-note`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ internal_note: value }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed");
+      setEditing(false);
+      await onReload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Internal note
+        </h2>
+        {canEdit && !editing && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="min-h-9 rounded-md border bg-background px-3 text-xs font-semibold text-foreground hover:bg-accent"
+          >
+            {empty ? "Add note" : "Edit"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            rows={5}
+            placeholder="Internal note visible only inside your team…"
+            className="w-full min-h-[140px] rounded-lg border-[1.5px] border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy}
+              className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setValue(job.internal_note ?? "");
+                setEditing(false);
+                setErr(null);
+              }}
+              disabled={busy}
+              className="min-h-11 rounded-lg border bg-background px-4 text-sm font-semibold hover:bg-accent"
+            >
+              Cancel
+            </button>
+          </div>
+          {err && (
+            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {err}
+            </div>
+          )}
+        </div>
+      ) : empty ? (
+        <p className="text-sm text-muted-foreground">No internal note.</p>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm">{job.internal_note}</p>
+      )}
     </section>
   );
 }
