@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getStoredToken } from "@/lib/qne/tokens";
@@ -28,6 +28,7 @@ interface JobDetail {
   entitlement_expiry_snapshot: string | null;
   entitlement_status_snapshot: string | null;
   internal_note: string | null;
+  created_by_user_id: string | null;
   created_by_name: string | null;
   created_at: string;
   assigned_user_id: string | null;
@@ -145,16 +146,29 @@ function JobDetailPage() {
     );
   }
 
+  const currentUserId =
+    session.currentUser?.diagnostics?.matchedN3UserId ??
+    session.currentUser?.userCode ??
+    null;
+  const isCreator =
+    !!job.created_by_user_id &&
+    !!currentUserId &&
+    job.created_by_user_id === currentUserId;
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Service job
+            Service Job
           </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            {job.job_number}
+          <h1 className="mt-1 flex flex-wrap items-baseline gap-2 text-2xl font-semibold text-foreground">
+            <span>Service Job</span>
+            <span className="font-mono text-primary">{job.job_number}</span>
           </h1>
+          <p className="mt-1 text-base font-medium text-foreground sm:text-lg">
+            {job.subject}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={job.status} />
@@ -216,10 +230,8 @@ function JobDetailPage() {
 
       <Section title="Job details">
         <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
-        <Kv k="Subject" v={job.subject} />
         <Kv k="Problem" v={job.problem_description} multiline />
         <PriorityEditor job={job} onDone={reload} />
-        <Kv k="Source" v={job.source} />
         {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
           <>
             <Kv k="Entitlement" v={job.subscription_category_snapshot} />
@@ -236,11 +248,11 @@ function JobDetailPage() {
         )}
       </Section>
 
-      {job.internal_note && (
-        <Section title="Internal note">
-          <p className="whitespace-pre-wrap text-sm">{job.internal_note}</p>
-        </Section>
-      )}
+      <InternalNoteSection
+        job={job}
+        canEdit={isCreator && !job.is_deleted}
+        onReload={reload}
+      />
 
       <CommentsSection
         jobId={jobId}
@@ -294,8 +306,8 @@ function JobInfoCard({ job }: { job: JobDetail }) {
       </h2>
       <dl className="space-y-2 text-sm">
         <div className="flex justify-between gap-3">
-          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Job number</dt>
-          <dd className="font-mono font-semibold text-primary">{job.job_number}</dd>
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Source</dt>
+          <dd className="text-right text-foreground">{job.source}</dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Created</dt>
@@ -306,6 +318,111 @@ function JobInfoCard({ job }: { job: JobDetail }) {
           <dd className="text-right text-foreground">{job.created_by_name ?? "—"}</dd>
         </div>
       </dl>
+    </section>
+  );
+}
+
+/* ---------------- internal note (creator-only edit) ---------------- */
+
+function InternalNoteSection({
+  job,
+  canEdit,
+  onReload,
+}: {
+  job: JobDetail;
+  canEdit: boolean;
+  onReload: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(job.internal_note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setValue(job.internal_note ?? "");
+  }, [job.internal_note]);
+
+  const empty = !job.internal_note;
+  if (empty && !canEdit) return null;
+
+  async function save() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/internal-note`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ internal_note: value }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed");
+      setEditing(false);
+      await onReload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Internal note
+        </h2>
+        {canEdit && !editing && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="min-h-9 rounded-md border bg-background px-3 text-xs font-semibold text-foreground hover:bg-accent"
+          >
+            {empty ? "Add note" : "Edit"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            rows={5}
+            placeholder="Internal note visible only inside your team…"
+            className="w-full min-h-[140px] rounded-lg border-[1.5px] border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy}
+              className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setValue(job.internal_note ?? "");
+                setEditing(false);
+                setErr(null);
+              }}
+              disabled={busy}
+              className="min-h-11 rounded-lg border bg-background px-4 text-sm font-semibold hover:bg-accent"
+            >
+              Cancel
+            </button>
+          </div>
+          {err && (
+            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {err}
+            </div>
+          )}
+        </div>
+      ) : empty ? (
+        <p className="text-sm text-muted-foreground">No internal note.</p>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm">{job.internal_note}</p>
+      )}
     </section>
   );
 }
@@ -1035,6 +1152,8 @@ function formatEvent(it: TimelineItem): string {
       return `Unassigned ${it.old_value ?? ""}`;
     case "comment_added":
       return `Comment (${it.new_value ?? "internal"})`;
+    case "internal_note_updated":
+      return `Internal note updated`;
     default:
       return it.event;
   }
@@ -1058,8 +1177,12 @@ function AdminDangerZone({
   job: JobDetail;
   onReload: () => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [purgeOpen, setPurgeOpen] = useState(false);
+  const [purgeConfirmed1, setPurgeConfirmed1] = useState(false);
+  const [purgeText, setPurgeText] = useState("");
 
   async function del() {
     const reason = window.prompt("Deletion reason (required):");
@@ -1099,14 +1222,35 @@ function AdminDangerZone({
       setBusy(false);
     }
   }
+  async function purge() {
+    if (purgeText !== job.job_number) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/purge`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: purgeText }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed");
+      setPurgeOpen(false);
+      navigate({ to: "/support" });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <section className="rounded-xl border border-red-200 bg-red-50/40 p-4 shadow-sm sm:p-6">
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-red-800">
-        Administrator actions
+        Danger zone
       </h2>
       <p className="mb-3 text-xs text-red-900/80">
-        Deleting a Service Job is reversible via Restore. Job numbers are never
+        Soft-deleting is reversible via Restore. Permanent deletion removes the
+        job and all its history and cannot be undone. Job numbers are never
         reused.
       </p>
       <div className="flex flex-wrap gap-2">
@@ -1129,10 +1273,97 @@ function AdminDangerZone({
             {busy ? "Restoring…" : "Restore Job"}
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => {
+            setPurgeOpen(true);
+            setPurgeConfirmed1(false);
+            setPurgeText("");
+            setErr(null);
+          }}
+          disabled={busy}
+          className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-red-800 disabled:opacity-50"
+        >
+          Permanently delete…
+        </button>
       </div>
       {err && (
         <div className="mt-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">
           {err}
+        </div>
+      )}
+
+      {purgeOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !busy && setPurgeOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-red-800">
+              Permanently delete {job.job_number}?
+            </h3>
+            {!purgeConfirmed1 ? (
+              <>
+                <p className="mt-2 text-sm text-foreground">
+                  This removes the job and its full history (comments,
+                  assignments, activity log). This action <strong>cannot be
+                  undone</strong>.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPurgeOpen(false)}
+                    className="min-h-11 rounded-lg border bg-background px-4 text-sm font-semibold hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPurgeConfirmed1(true)}
+                    className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800"
+                  >
+                    I understand, continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-foreground">
+                  Type the job number{" "}
+                  <span className="font-mono font-semibold">{job.job_number}</span>{" "}
+                  below to confirm.
+                </p>
+                <input
+                  autoFocus
+                  value={purgeText}
+                  onChange={(e) => setPurgeText(e.target.value)}
+                  placeholder={job.job_number}
+                  className="mt-3 w-full min-h-11 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 font-mono text-sm outline-none focus:border-red-600"
+                />
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPurgeOpen(false)}
+                    disabled={busy}
+                    className="min-h-11 rounded-lg border bg-background px-4 text-sm font-semibold hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={purge}
+                    disabled={busy || purgeText !== job.job_number}
+                    className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                  >
+                    {busy ? "Deleting…" : "Permanently delete"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </section>

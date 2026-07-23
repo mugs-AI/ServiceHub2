@@ -30,6 +30,7 @@ function defaultRange(): { from: string; to: string } {
 }
 
 const RANGE_KEY = "sh2:workspaceRange:v1";
+const FILTERS_KEY = "sh2:workspaceFilters:v2";
 
 function loadRange(): { from: string; to: string } {
   if (typeof window === "undefined") return defaultRange();
@@ -50,6 +51,89 @@ function saveRange(r: { from: string; to: string }) {
   try {
     window.sessionStorage.setItem(RANGE_KEY, JSON.stringify(r));
   } catch { /* ignore */ }
+}
+
+interface Filters {
+  q: string;
+  statuses: string[];
+  priorities: string[];
+  technician: string;
+}
+const DEFAULT_FILTERS: Filters = { q: "", statuses: [], priorities: [], technician: "" };
+
+function loadFilters(): Filters {
+  if (typeof window === "undefined") return DEFAULT_FILTERS;
+  try {
+    const raw = window.sessionStorage.getItem(FILTERS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && typeof p === "object") {
+        return {
+          q: typeof p.q === "string" ? p.q : "",
+          statuses: Array.isArray(p.statuses) ? p.statuses.filter((x: unknown) => typeof x === "string") : [],
+          priorities: Array.isArray(p.priorities) ? p.priorities.filter((x: unknown) => typeof x === "string") : [],
+          technician: typeof p.technician === "string" ? p.technician : "",
+        };
+      }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_FILTERS;
+}
+function saveFilters(f: Filters) {
+  if (typeof window === "undefined") return;
+  try { window.sessionStorage.setItem(FILTERS_KEY, JSON.stringify(f)); } catch { /* ignore */ }
+}
+
+/* ---------------- Malaysia date input (dd/mm/yyyy) ---------------- */
+
+function isoToMY(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+function myToIso(s: string): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s.trim());
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const iso = `${yyyy}-${mm}-${dd}`;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return iso;
+}
+
+function MYDateInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (iso: string) => void;
+}) {
+  const [text, setText] = useState(isoToMY(value));
+  useEffect(() => setText(isoToMY(value)), [value]);
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="dd/mm/yyyy"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          const iso = myToIso(text);
+          if (iso) onChange(iso);
+          else setText(isoToMY(value));
+        }}
+        className="min-h-11 w-32 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+      />
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => e.target.value && onChange(e.target.value)}
+        className="min-h-11 w-11 cursor-pointer rounded-lg border-[1.5px] border-gray-300 bg-white px-1 text-sm outline-none focus:border-blue-600"
+        aria-label="Pick date"
+      />
+    </div>
+  );
 }
 
 /* ---------------- types ---------------- */
@@ -95,12 +179,7 @@ function SupportWorkspace() {
 
   const [customer, setCustomer] = useState<CustomerRow | null>(null);
 
-  const [filters, setFilters] = useState({
-    q: "",
-    status: "",
-    priority: "",
-    technician: "",
-  });
+  const [filters, setFilters] = useState<Filters>(loadFilters);
 
   const [page, setPage] = useState(1);
   const pageSize = 20;
@@ -133,9 +212,20 @@ function SupportWorkspace() {
       </header>
 
       <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Customer search
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Customer search
+          </h2>
+          <Link
+            to="/jobs/new"
+            search={
+              customer ? { customerCode: customer.customer_code } : undefined
+            }
+            className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+          >
+            + New Service Job
+          </Link>
+        </div>
         <CustomerSearchBox
           selected={customer}
           onSelect={(c) => {
@@ -154,7 +244,6 @@ function SupportWorkspace() {
           customer={customer}
           range={range}
           onViewJobs={() => {
-            // Scroll to list — filter is already applied via `customer`.
             const el = document.getElementById("workspace-jobs");
             if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
@@ -162,20 +251,9 @@ function SupportWorkspace() {
       )}
 
       <section id="workspace-jobs" className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Service jobs
-          </h2>
-          <Link
-            to="/jobs/new"
-            search={
-              customer ? { customerCode: customer.customer_code } : undefined
-            }
-            className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-          >
-            + New Service Job
-          </Link>
-        </div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Service jobs
+        </h2>
 
         <DateRangeBar
           value={pendingRange}
@@ -188,6 +266,7 @@ function SupportWorkspace() {
           filters={filters}
           onChange={(f) => {
             setFilters(f);
+            saveFilters(f);
             setPage(1);
           }}
         />
@@ -330,7 +409,6 @@ function CustomerSearchBox({
 
 function CustomerSummaryPanel({
   customer,
-  range,
   onViewJobs,
 }: {
   customer: CustomerRow;
@@ -430,26 +508,20 @@ function DateRangeBar({
   onApply: () => void;
   onReset: () => void;
 }) {
-  const inputCls =
-    "min-h-11 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50";
   return (
     <div className="mb-3 flex flex-wrap items-end gap-2">
       <label className="flex flex-col gap-1 text-xs font-medium text-foreground">
-        From
-        <input
-          type="date"
+        From (dd/mm/yyyy)
+        <MYDateInput
           value={value.from}
-          onChange={(e) => onChange({ ...value, from: e.target.value })}
-          className={inputCls}
+          onChange={(iso) => onChange({ ...value, from: iso })}
         />
       </label>
       <label className="flex flex-col gap-1 text-xs font-medium text-foreground">
-        To
-        <input
-          type="date"
+        To (dd/mm/yyyy)
+        <MYDateInput
           value={value.to}
-          onChange={(e) => onChange({ ...value, to: e.target.value })}
-          className={inputCls}
+          onChange={(iso) => onChange({ ...value, to: iso })}
         />
       </label>
       <button
@@ -472,53 +544,107 @@ function DateRangeBar({
 
 /* ---------------- filter bar ---------------- */
 
-const STATUS_OPTS = ["", "Draft", "Pending Approval", "Assigned", "In Progress", "Completed"];
-const PRIORITY_OPTS = ["", "High", "Medium", "Low"];
+const STATUS_OPTS = [
+  "Draft",
+  "Pending Approval",
+  "Open",
+  "Assigned",
+  "In Progress",
+  "Waiting Customer",
+  "Waiting Vendor",
+  "Completed",
+  "Cancelled",
+];
+const PRIORITY_OPTS = ["High", "Medium", "Low"];
+
+function MultiPills({
+  options,
+  selected,
+  onChange,
+  label,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  label: string;
+}) {
+  const toggle = (o: string) =>
+    onChange(selected.includes(o) ? selected.filter((x) => x !== o) : [...selected, o]);
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold uppercase text-muted-foreground">
+          {label}
+        </span>
+        {selected.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {options.map((o) => {
+          const active = selected.includes(o);
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => toggle(o)}
+              className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                active
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-gray-300 bg-white text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {o}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function FilterBar({
   filters,
   onChange,
 }: {
-  filters: { q: string; status: string; priority: string; technician: string };
-  onChange: (f: typeof filters) => void;
+  filters: Filters;
+  onChange: (f: Filters) => void;
 }) {
   const inputCls =
     "min-h-11 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50";
   return (
-    <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-      <input
-        value={filters.q}
-        onChange={(e) => onChange({ ...filters, q: e.target.value })}
-        placeholder="Job number, subject or customer"
-        className={inputCls}
+    <div className="mb-3 space-y-3">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <input
+          value={filters.q}
+          onChange={(e) => onChange({ ...filters, q: e.target.value })}
+          placeholder="Job number, subject or customer"
+          className={inputCls}
+        />
+        <input
+          value={filters.technician}
+          onChange={(e) => onChange({ ...filters, technician: e.target.value })}
+          placeholder="Technician user id (or __unassigned__)"
+          className={inputCls}
+        />
+      </div>
+      <MultiPills
+        label="Status"
+        options={STATUS_OPTS}
+        selected={filters.statuses}
+        onChange={(statuses) => onChange({ ...filters, statuses })}
       />
-      <select
-        value={filters.status}
-        onChange={(e) => onChange({ ...filters, status: e.target.value })}
-        className={inputCls}
-      >
-        {STATUS_OPTS.map((s) => (
-          <option key={s} value={s}>
-            {s || "All statuses"}
-          </option>
-        ))}
-      </select>
-      <select
-        value={filters.priority}
-        onChange={(e) => onChange({ ...filters, priority: e.target.value })}
-        className={inputCls}
-      >
-        {PRIORITY_OPTS.map((p) => (
-          <option key={p} value={p}>
-            {p || "All priorities"}
-          </option>
-        ))}
-      </select>
-      <input
-        value={filters.technician}
-        onChange={(e) => onChange({ ...filters, technician: e.target.value })}
-        placeholder="Technician user id (or __unassigned__)"
-        className={inputCls}
+      <MultiPills
+        label="Priority"
+        options={PRIORITY_OPTS}
+        selected={filters.priorities}
+        onChange={(priorities) => onChange({ ...filters, priorities })}
       />
     </div>
   );
@@ -535,7 +661,7 @@ function JobList({
   onPageChange,
 }: {
   customerCode: string | null;
-  filters: { q: string; status: string; priority: string; technician: string };
+  filters: Filters;
   range: { from: string; to: string };
   page: number;
   pageSize: number;
@@ -560,8 +686,8 @@ function JobList({
     sp.set("to", `${range.to}T23:59:59Z`);
     if (customerCode) sp.set("customerCode", customerCode);
     if (filters.q.trim()) sp.set("q", filters.q.trim());
-    if (filters.status) sp.set("status", filters.status);
-    if (filters.priority) sp.set("priority", filters.priority);
+    if (filters.statuses.length) sp.set("statuses", filters.statuses.join(","));
+    if (filters.priorities.length) sp.set("priorities", filters.priorities.join(","));
     if (filters.technician.trim()) sp.set("technician", filters.technician.trim());
 
     fetch(`/api/workspace/jobs?${sp.toString()}`, { headers: authHeaders() })
@@ -581,7 +707,17 @@ function JobList({
     return () => {
       cancelled = true;
     };
-  }, [customerCode, filters.q, filters.status, filters.priority, filters.technician, range.from, range.to, page, pageSize]);
+  }, [
+    customerCode,
+    filters.q,
+    filters.statuses,
+    filters.priorities,
+    filters.technician,
+    range.from,
+    range.to,
+    page,
+    pageSize,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
