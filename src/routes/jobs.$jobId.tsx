@@ -28,6 +28,7 @@ interface JobDetail {
   entitlement_expiry_snapshot: string | null;
   entitlement_status_snapshot: string | null;
   internal_note: string | null;
+  created_by_user_id: string | null;
   created_by_name: string | null;
   created_at: string;
   assigned_user_id: string | null;
@@ -145,16 +146,29 @@ function JobDetailPage() {
     );
   }
 
+  const currentUserId =
+    session.currentUser?.diagnostics?.matchedN3UserId ??
+    session.currentUser?.userCode ??
+    null;
+  const isCreator =
+    !!job.created_by_user_id &&
+    !!currentUserId &&
+    job.created_by_user_id === currentUserId;
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Service job
+            Service Job
           </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            {job.job_number}
+          <h1 className="mt-1 flex flex-wrap items-baseline gap-2 text-2xl font-semibold text-foreground">
+            <span>Service Job</span>
+            <span className="font-mono text-primary">{job.job_number}</span>
           </h1>
+          <p className="mt-1 text-base font-medium text-foreground sm:text-lg">
+            {job.subject}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={job.status} />
@@ -216,10 +230,8 @@ function JobDetailPage() {
 
       <Section title="Job details">
         <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
-        <Kv k="Subject" v={job.subject} />
         <Kv k="Problem" v={job.problem_description} multiline />
         <PriorityEditor job={job} onDone={reload} />
-        <Kv k="Source" v={job.source} />
         {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
           <>
             <Kv k="Entitlement" v={job.subscription_category_snapshot} />
@@ -236,11 +248,11 @@ function JobDetailPage() {
         )}
       </Section>
 
-      {job.internal_note && (
-        <Section title="Internal note">
-          <p className="whitespace-pre-wrap text-sm">{job.internal_note}</p>
-        </Section>
-      )}
+      <InternalNoteSection
+        job={job}
+        canEdit={isCreator && !job.is_deleted}
+        onReload={reload}
+      />
 
       <CommentsSection
         jobId={jobId}
