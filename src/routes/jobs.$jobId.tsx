@@ -1152,6 +1152,8 @@ function formatEvent(it: TimelineItem): string {
       return `Unassigned ${it.old_value ?? ""}`;
     case "comment_added":
       return `Comment (${it.new_value ?? "internal"})`;
+    case "internal_note_updated":
+      return `Internal note updated`;
     default:
       return it.event;
   }
@@ -1175,8 +1177,12 @@ function AdminDangerZone({
   job: JobDetail;
   onReload: () => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [purgeOpen, setPurgeOpen] = useState(false);
+  const [purgeConfirmed1, setPurgeConfirmed1] = useState(false);
+  const [purgeText, setPurgeText] = useState("");
 
   async function del() {
     const reason = window.prompt("Deletion reason (required):");
@@ -1216,14 +1222,35 @@ function AdminDangerZone({
       setBusy(false);
     }
   }
+  async function purge() {
+    if (purgeText !== job.job_number) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/purge`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: purgeText }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed");
+      setPurgeOpen(false);
+      navigate({ to: "/support" });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <section className="rounded-xl border border-red-200 bg-red-50/40 p-4 shadow-sm sm:p-6">
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-red-800">
-        Administrator actions
+        Danger zone
       </h2>
       <p className="mb-3 text-xs text-red-900/80">
-        Deleting a Service Job is reversible via Restore. Job numbers are never
+        Soft-deleting is reversible via Restore. Permanent deletion removes the
+        job and all its history and cannot be undone. Job numbers are never
         reused.
       </p>
       <div className="flex flex-wrap gap-2">
@@ -1246,10 +1273,97 @@ function AdminDangerZone({
             {busy ? "Restoring…" : "Restore Job"}
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => {
+            setPurgeOpen(true);
+            setPurgeConfirmed1(false);
+            setPurgeText("");
+            setErr(null);
+          }}
+          disabled={busy}
+          className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-red-800 disabled:opacity-50"
+        >
+          Permanently delete…
+        </button>
       </div>
       {err && (
         <div className="mt-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">
           {err}
+        </div>
+      )}
+
+      {purgeOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !busy && setPurgeOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-red-800">
+              Permanently delete {job.job_number}?
+            </h3>
+            {!purgeConfirmed1 ? (
+              <>
+                <p className="mt-2 text-sm text-foreground">
+                  This removes the job and its full history (comments,
+                  assignments, activity log). This action <strong>cannot be
+                  undone</strong>.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPurgeOpen(false)}
+                    className="min-h-11 rounded-lg border bg-background px-4 text-sm font-semibold hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPurgeConfirmed1(true)}
+                    className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800"
+                  >
+                    I understand, continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-foreground">
+                  Type the job number{" "}
+                  <span className="font-mono font-semibold">{job.job_number}</span>{" "}
+                  below to confirm.
+                </p>
+                <input
+                  autoFocus
+                  value={purgeText}
+                  onChange={(e) => setPurgeText(e.target.value)}
+                  placeholder={job.job_number}
+                  className="mt-3 w-full min-h-11 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 font-mono text-sm outline-none focus:border-red-600"
+                />
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPurgeOpen(false)}
+                    disabled={busy}
+                    className="min-h-11 rounded-lg border bg-background px-4 text-sm font-semibold hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={purge}
+                    disabled={busy || purgeText !== job.job_number}
+                    className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                  >
+                    {busy ? "Deleting…" : "Permanently delete"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </section>
