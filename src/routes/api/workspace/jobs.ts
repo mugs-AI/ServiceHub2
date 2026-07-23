@@ -325,6 +325,15 @@ export const Route = createFileRoute("/api/workspace/jobs")({
           const includeDeleted =
             sp.get("includeDeleted") === "1" && user.isAdministrator;
 
+          const csv = (raw: string | null): string[] =>
+            (raw ?? "")
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .slice(0, 20);
+          const statuses = csv(sp.get("statuses"));
+          const priorities = csv(sp.get("priorities"));
+
           let query = supabaseAdmin
             .from("service_jobs")
             .select(
@@ -335,8 +344,10 @@ export const Route = createFileRoute("/api/workspace/jobs")({
           if (!includeDeleted) query = query.eq("is_deleted", false);
 
           if (customerCode) query = query.eq("customer_code_snapshot", customerCode);
-          if (status) query = query.eq("status", status);
-          if (priority) query = query.eq("priority", priority);
+          if (statuses.length) query = query.in("status", statuses);
+          else if (status) query = query.eq("status", status);
+          if (priorities.length) query = query.in("priority", priorities);
+          else if (priority) query = query.eq("priority", priority);
           if (technician) {
             if (technician === "__unassigned__") {
               query = query.is("assigned_user_id", null);
