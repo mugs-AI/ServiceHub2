@@ -45,6 +45,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/timeline")({
               .select("*")
               .eq("tenant_code", user.tenantCode)
               .eq("service_job_id", params.jobId)
+              // Exclude comment_added: comments are rendered from
+              // service_job_comments to keep one canonical source.
+              .neq("event_type", "comment_added")
               .limit(500),
             supabaseAdmin
               .from("service_job_assignment_history")
@@ -60,6 +63,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/timeline")({
               .limit(500),
           ]);
           for (const r of [actR, asnR, comR]) if (r.error) throw r.error;
+
 
           const items: TimelineItem[] = [];
 
@@ -106,11 +110,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/timeline")({
             });
           }
 
-          items.sort((a, b) =>
-            order === "asc"
-              ? a.performed_at.localeCompare(b.performed_at)
-              : b.performed_at.localeCompare(a.performed_at),
-          );
+          // Deterministic ordering: performed_at, then kind rank, then id.
+          const kindRank: Record<TimelineItem["kind"], number> = {
+            activity: 0,
+            assignment: 1,
+            comment: 2,
+          };
+          items.sort((a, b) => {
+            const t = a.performed_at.localeCompare(b.performed_at);
+            if (t !== 0) return order === "asc" ? t : -t;
+            const k = kindRank[a.kind] - kindRank[b.kind];
+            if (k !== 0) return k;
+            return order === "asc" ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id);
+          });
+
 
           return Response.json({ timeline: items });
         } catch (err) {
