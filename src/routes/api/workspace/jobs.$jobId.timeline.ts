@@ -45,6 +45,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/timeline")({
               .select("*")
               .eq("tenant_code", user.tenantCode)
               .eq("service_job_id", params.jobId)
+              // Exclude comment_added: comments are rendered from
+              // service_job_comments to keep one canonical source.
+              .neq("event_type", "comment_added")
               .limit(500),
             supabaseAdmin
               .from("service_job_assignment_history")
@@ -60,6 +63,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/timeline")({
               .limit(500),
           ]);
           for (const r of [actR, asnR, comR]) if (r.error) throw r.error;
+
 
           const items: TimelineItem[] = [];
 
