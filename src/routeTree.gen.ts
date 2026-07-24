@@ -45,6 +45,7 @@ import { Route as ApiDiagnosticsIdentityRouteImport } from './routes/api/diagnos
 import { Route as ApiDiagnosticsHealthRouteImport } from './routes/api/diagnostics/health'
 import { Route as ApiDiagnosticsDocumentSearchRouteImport } from './routes/api/diagnostics/document-search'
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
+import { Route as ApiDashboardMyWorkRouteImport } from './routes/api/dashboard/my-work'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
 import { Route as ApiWorkspaceJobsSummaryRouteImport } from './routes/api/workspace/jobs.summary'
@@ -59,6 +60,7 @@ import { Route as ApiWorkspaceJobsJobIdPriorityRouteImport } from './routes/api/
 import { Route as ApiWorkspaceJobsJobIdInternalNoteRouteImport } from './routes/api/workspace/jobs.$jobId.internal-note'
 import { Route as ApiWorkspaceJobsJobIdHistoryRouteImport } from './routes/api/workspace/jobs.$jobId.history'
 import { Route as ApiWorkspaceJobsJobIdCommentsRouteImport } from './routes/api/workspace/jobs.$jobId.comments'
+import { Route as ApiWorkspaceJobsJobIdClaimRouteImport } from './routes/api/workspace/jobs.$jobId.claim'
 import { Route as ApiWorkspaceJobsJobIdAssignRouteImport } from './routes/api/workspace/jobs.$jobId.assign'
 import { Route as ApiWorkspaceJobsJobIdApproveRouteImport } from './routes/api/workspace/jobs.$jobId.approve'
 
@@ -250,6 +252,11 @@ const ApiDiagnosticsTypeRoute = ApiDiagnosticsTypeRouteImport.update({
   path: '/api/diagnostics/$type',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDashboardMyWorkRoute = ApiDashboardMyWorkRouteImport.update({
+  id: '/api/dashboard/my-work',
+  path: '/api/dashboard/my-work',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthConnectRoute = ApiAuthConnectRouteImport.update({
   id: '/api/auth/connect',
   path: '/api/auth/connect',
@@ -329,6 +336,12 @@ const ApiWorkspaceJobsJobIdCommentsRoute =
     path: '/comments',
     getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
   } as any)
+const ApiWorkspaceJobsJobIdClaimRoute =
+  ApiWorkspaceJobsJobIdClaimRouteImport.update({
+    id: '/claim',
+    path: '/claim',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdAssignRoute =
   ApiWorkspaceJobsJobIdAssignRouteImport.update({
     id: '/assign',
@@ -359,6 +372,7 @@ export interface FileRoutesByFullPath {
   '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
@@ -386,6 +400,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
@@ -413,6 +428,7 @@ export interface FileRoutesByTo {
   '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
@@ -440,6 +456,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
@@ -468,6 +485,7 @@ export interface FileRoutesById {
   '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
+  '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
   '/api/diagnostics/document-search': typeof ApiDiagnosticsDocumentSearchRoute
   '/api/diagnostics/health': typeof ApiDiagnosticsHealthRoute
@@ -495,6 +513,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
@@ -524,6 +543,7 @@ export interface FileRouteTypes {
     | '/jobs/pending'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
+    | '/api/dashboard/my-work'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
@@ -551,6 +571,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
@@ -578,6 +599,7 @@ export interface FileRouteTypes {
     | '/jobs/pending'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
+    | '/api/dashboard/my-work'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
@@ -605,6 +627,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
@@ -632,6 +655,7 @@ export interface FileRouteTypes {
     | '/jobs/pending'
     | '/api/admin/allowlist'
     | '/api/auth/connect'
+    | '/api/dashboard/my-work'
     | '/api/diagnostics/$type'
     | '/api/diagnostics/document-search'
     | '/api/diagnostics/health'
@@ -659,6 +683,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
@@ -687,6 +712,7 @@ export interface RootRouteChildren {
   JobsPendingRoute: typeof JobsPendingRoute
   ApiAdminAllowlistRoute: typeof ApiAdminAllowlistRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
+  ApiDashboardMyWorkRoute: typeof ApiDashboardMyWorkRoute
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
   ApiDiagnosticsDocumentSearchRoute: typeof ApiDiagnosticsDocumentSearchRoute
   ApiDiagnosticsHealthRoute: typeof ApiDiagnosticsHealthRoute
@@ -965,6 +991,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDiagnosticsTypeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dashboard/my-work': {
+      id: '/api/dashboard/my-work'
+      path: '/api/dashboard/my-work'
+      fullPath: '/api/dashboard/my-work'
+      preLoaderRoute: typeof ApiDashboardMyWorkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/connect': {
       id: '/api/auth/connect'
       path: '/api/auth/connect'
@@ -1063,6 +1096,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdCommentsRouteImport
       parentRoute: typeof ApiWorkspaceJobsJobIdRoute
     }
+    '/api/workspace/jobs/$jobId/claim': {
+      id: '/api/workspace/jobs/$jobId/claim'
+      path: '/claim'
+      fullPath: '/api/workspace/jobs/$jobId/claim'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdClaimRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
     '/api/workspace/jobs/$jobId/assign': {
       id: '/api/workspace/jobs/$jobId/assign'
       path: '/assign'
@@ -1083,6 +1123,7 @@ declare module '@tanstack/react-router' {
 interface ApiWorkspaceJobsJobIdRouteChildren {
   ApiWorkspaceJobsJobIdApproveRoute: typeof ApiWorkspaceJobsJobIdApproveRoute
   ApiWorkspaceJobsJobIdAssignRoute: typeof ApiWorkspaceJobsJobIdAssignRoute
+  ApiWorkspaceJobsJobIdClaimRoute: typeof ApiWorkspaceJobsJobIdClaimRoute
   ApiWorkspaceJobsJobIdCommentsRoute: typeof ApiWorkspaceJobsJobIdCommentsRoute
   ApiWorkspaceJobsJobIdHistoryRoute: typeof ApiWorkspaceJobsJobIdHistoryRoute
   ApiWorkspaceJobsJobIdInternalNoteRoute: typeof ApiWorkspaceJobsJobIdInternalNoteRoute
@@ -1097,6 +1138,7 @@ interface ApiWorkspaceJobsJobIdRouteChildren {
 const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
   ApiWorkspaceJobsJobIdApproveRoute: ApiWorkspaceJobsJobIdApproveRoute,
   ApiWorkspaceJobsJobIdAssignRoute: ApiWorkspaceJobsJobIdAssignRoute,
+  ApiWorkspaceJobsJobIdClaimRoute: ApiWorkspaceJobsJobIdClaimRoute,
   ApiWorkspaceJobsJobIdCommentsRoute: ApiWorkspaceJobsJobIdCommentsRoute,
   ApiWorkspaceJobsJobIdHistoryRoute: ApiWorkspaceJobsJobIdHistoryRoute,
   ApiWorkspaceJobsJobIdInternalNoteRoute:
@@ -1146,6 +1188,7 @@ const rootRouteChildren: RootRouteChildren = {
   JobsPendingRoute: JobsPendingRoute,
   ApiAdminAllowlistRoute: ApiAdminAllowlistRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
+  ApiDashboardMyWorkRoute: ApiDashboardMyWorkRoute,
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
   ApiDiagnosticsDocumentSearchRoute: ApiDiagnosticsDocumentSearchRoute,
   ApiDiagnosticsHealthRoute: ApiDiagnosticsHealthRoute,
