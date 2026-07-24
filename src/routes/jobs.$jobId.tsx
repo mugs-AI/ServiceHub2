@@ -158,18 +158,20 @@ function JobDetailPage() {
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Service Job
-          </p>
-          <h1 className="mt-1 flex flex-wrap items-baseline gap-2 text-2xl font-semibold text-foreground">
-            <span>Service Job</span>
-            <span className="font-mono text-primary">{job.job_number}</span>
+        <div className="min-w-0 flex-1">
+          <h1 className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+              Service Job
+            </span>
+            <span className="font-mono text-2xl font-bold text-foreground sm:text-3xl">
+              {job.job_number}
+            </span>
           </h1>
-          <p className="mt-1 text-base font-medium text-foreground sm:text-lg">
+          <p className="mt-1 break-words text-base font-medium text-muted-foreground sm:text-lg">
             {job.subject}
           </p>
         </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={job.status} />
           <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${priorityTone(job.priority)}`}>
