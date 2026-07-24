@@ -225,9 +225,12 @@ function JobDetailPage() {
         <AssignmentSection
           job={job}
           canAssign={isAdmin && !job.is_deleted}
+          currentUserId={currentUserId}
+          currentDisplayName={session.currentUser?.displayName || session.currentUser?.email || ""}
           onOpenPicker={() => setShowPicker(true)}
           onReload={reload}
         />
+
       </div>
 
       <Section title="Job details">
@@ -747,11 +750,15 @@ function ApprovalPanel({
 function AssignmentSection({
   job,
   canAssign,
+  currentUserId,
+  currentDisplayName,
   onOpenPicker,
   onReload,
 }: {
   job: JobDetail;
   canAssign: boolean;
+  currentUserId: string | null;
+  currentDisplayName: string;
   onOpenPicker: () => void;
   onReload: () => Promise<void>;
 }) {
@@ -759,6 +766,12 @@ function AssignmentSection({
   const [err, setErr] = useState<string | null>(null);
 
   const assigned = !!job.assigned_user_id;
+  const CLAIMABLE = new Set(["Open", "Assigned", "Waiting Customer", "Waiting Vendor"]);
+  const canClaim =
+    !!currentUserId &&
+    !job.is_deleted &&
+    CLAIMABLE.has(job.status) &&
+    job.assigned_user_id !== currentUserId;
 
   async function handleUnassign() {
     if (!confirm(`Unassign ${job.assigned_user_name_snapshot ?? "technician"} from ${job.job_number}?`)) {
@@ -781,6 +794,30 @@ function AssignmentSection({
     }
   }
 
+  async function handleClaim() {
+    const currentName = job.assigned_user_name_snapshot ?? "(Unassigned)";
+    const meName = currentDisplayName || "you";
+    const msg = job.assigned_user_id
+      ? `Reassign ${job.job_number} from ${currentName} to ${meName}?\n\nThe previous technician stays in the assignment history.`
+      : `Assign ${job.job_number} to ${meName}?`;
+    if (!confirm(msg)) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/claim`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Unable to claim job.");
+      await onReload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Unable to claim job.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -789,33 +826,50 @@ function AssignmentSection({
       {assigned ? (
         <div className="text-base font-semibold text-foreground">
           {job.assigned_user_name_snapshot}
+          {job.assigned_user_id === currentUserId && (
+            <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+              You
+            </span>
+          )}
         </div>
       ) : (
         <div className="text-sm font-medium text-muted-foreground">Unassigned</div>
       )}
 
-      {canAssign && (
-        <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
+        {canClaim && (
           <button
             type="button"
-            onClick={onOpenPicker}
+            onClick={handleClaim}
             disabled={busy}
-            className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            className="min-h-[44px] rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
           >
-            {assigned ? "Change" : "Assign Technician"}
+            {assigned ? "Reassign to Me" : "Assign to Me"}
           </button>
-          {assigned && (
+        )}
+        {canAssign && (
+          <>
             <button
               type="button"
-              onClick={handleUnassign}
+              onClick={onOpenPicker}
               disabled={busy}
-              className="min-h-[44px] rounded-lg border border-destructive/40 bg-white px-4 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
             >
-              Unassign
+              {assigned ? "Change" : "Assign Technician"}
             </button>
-          )}
-        </div>
-      )}
+            {assigned && (
+              <button
+                type="button"
+                onClick={handleUnassign}
+                disabled={busy}
+                className="min-h-[44px] rounded-lg border border-destructive/40 bg-white px-4 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              >
+                Unassign
+              </button>
+            )}
+          </>
+        )}
+      </div>
       {err && (
         <div className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {err}
@@ -824,6 +878,7 @@ function AssignmentSection({
     </section>
   );
 }
+
 
 function TechnicianPicker({
   jobId,
