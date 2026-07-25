@@ -102,7 +102,11 @@ export const Route = createFileRoute("/api/workspace/jobs")({
             );
           }
 
-          // 2) Server-side entitlement classification (never trust client).
+          // 2) Load candidate entitlements (server-side, tenant-scoped).
+          //    Selection is authoritative — if the user selects an Overdue
+          //    entitlement we route to Pending Approval; Active/Due Soon
+          //    routes to Draft. When no entitlement is selected, we fall
+          //    back to inventory-based classification.
           const { data: subs, error: subsErr } = await supabaseAdmin
             .from("customer_subscription_snapshots")
             .select(
@@ -112,26 +116,6 @@ export const Route = createFileRoute("/api/workspace/jobs")({
             .eq("customer_code", customerCode)
             .in("subscription_status", ACTIVE_STATUSES);
           if (subsErr) throw subsErr;
-
-          const hasActiveish = (subs ?? []).some((s) =>
-            ["Active", "Due Soon"].includes(s.subscription_status ?? ""),
-          );
-          const hasOverdue = (subs ?? []).some(
-            (s) => (s.subscription_status ?? "") === "Overdue",
-          );
-
-          let status: "Draft" | "Pending Approval" = "Draft";
-          let requiresApproval = false;
-          let approvalReason: string | null = null;
-          if (!hasActiveish && hasOverdue) {
-            status = "Pending Approval";
-            requiresApproval = true;
-            approvalReason = "Overdue Entitlement";
-          } else if (!hasActiveish && !hasOverdue) {
-            status = "Pending Approval";
-            requiresApproval = true;
-            approvalReason = "No Active Entitlement";
-          }
 
           // 3) Optional selected entitlement — verify it belongs to this
           //    tenant/customer before we snapshot it onto the job.
@@ -157,6 +141,40 @@ export const Route = createFileRoute("/api/workspace/jobs")({
               };
             }
           }
+
+          // Status decision:
+          //   selected Active/Due Soon  -> Draft
+          //   selected Overdue          -> Pending Approval (Overdue Entitlement)
+          //   nothing selected + no active -> Pending Approval (No Active Entitlement)
+          //   nothing selected + has active -> Draft
+          let status: "Draft" | "Pending Approval" = "Draft";
+          let requiresApproval = false;
+          let approvalReason: string | null = null;
+          if (entitlementSnap) {
+            const s = (entitlementSnap.status ?? "").toLowerCase();
+            if (s === "overdue" || s === "expired") {
+              status = "Pending Approval";
+              requiresApproval = true;
+              approvalReason = "Overdue Entitlement";
+            }
+          } else {
+            const hasActiveish = (subs ?? []).some((s) =>
+              ["Active", "Due Soon"].includes(s.subscription_status ?? ""),
+            );
+            const hasOverdue = (subs ?? []).some(
+              (s) => (s.subscription_status ?? "") === "Overdue",
+            );
+            if (!hasActiveish && hasOverdue) {
+              status = "Pending Approval";
+              requiresApproval = true;
+              approvalReason = "Overdue Entitlement";
+            } else if (!hasActiveish && !hasOverdue) {
+              status = "Pending Approval";
+              requiresApproval = true;
+              approvalReason = "No Active Entitlement";
+            }
+          }
+
 
           // 3b) Optional technician assignment at creation time.
           //     Verified against live N3 Users (bearer scopes to caller's tenant).
