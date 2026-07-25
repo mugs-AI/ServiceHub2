@@ -142,6 +142,7 @@ function UserDashboard() {
   const [data, setData] = useState<MyWorkResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => saveFilters(filters), [filters]);
 
@@ -164,6 +165,7 @@ function UserDashboard() {
       const body = (await res.json().catch(() => ({}))) as MyWorkResponse & { error?: string };
       if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
       setData(body);
+      setLastRefreshed(new Date());
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to load My Work");
     } finally {
@@ -175,12 +177,31 @@ function UserDashboard() {
     void load();
   }, [load]);
 
+  // Auto-refresh every 30s and when the tab regains focus.
+  useEffect(() => {
+    const onFocus = () => void load();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    const iv = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, AUTO_REFRESH_MS);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(iv);
+    };
+  }, [load]);
+
   const summary = data?.summary ?? {
     assignedToMe: 0,
+    myPendingTasks: 0,
     myInProgress: 0,
     myWaitingCustomer: 0,
     myWaitingVendor: 0,
-    myPendingTasks: 0,
+    myWaitingApproval: 0,
     completedByMeToday: 0,
   };
 
