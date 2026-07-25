@@ -152,24 +152,42 @@ function NewJobPage() {
     };
   }, [customer]);
 
+  const selectedSub = useMemo(
+    () => subs.find((s) => s.id === selectedSubId) ?? null,
+    [subs, selectedSubId],
+  );
+
   const gate = useMemo(() => {
     if (!customer) return null;
+    // Selection is authoritative when present.
+    if (selectedSub) {
+      const s = (selectedSub.subscription_status ?? "").toLowerCase();
+      if (s === "overdue" || s === "expired") {
+        return {
+          tone: "warn" as const,
+          label: "Overdue entitlement selected — Pending Approval",
+        };
+      }
+      return { tone: "ok" as const, label: "Active entitlement — Draft" };
+    }
     const hasActive = subs.some((s) =>
       ["Active", "Due Soon"].includes(s.subscription_status ?? ""),
     );
-    const hasOverdue = subs.some((s) => s.subscription_status === "Overdue");
+    const hasOverdue = subs.some(
+      (s) => (s.subscription_status ?? "").toLowerCase() === "overdue",
+    );
     if (hasActive)
-      return { tone: "ok" as const, label: "Active entitlement — Draft" };
+      return { tone: "ok" as const, label: "Active entitlement available — Draft" };
     if (hasOverdue)
       return {
         tone: "warn" as const,
-        label: "Overdue entitlement — Pending Approval",
+        label: "Only overdue entitlements — Pending Approval",
       };
     return {
       tone: "warn" as const,
       label: "No active entitlement — Pending Approval",
     };
-  }, [customer, subs]);
+  }, [customer, subs, selectedSub]);
 
   const canSubmit =
     !!customer &&
