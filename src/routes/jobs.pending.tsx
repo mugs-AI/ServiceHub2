@@ -103,10 +103,12 @@ function PendingQueuePage() {
             Workspace
           </p>
           <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            Pending Queue
+            {excludeMe ? "Pending from My Team" : "Pending Queue"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sorted by priority (High → Low), then oldest waiting first.
+            {excludeMe
+              ? "Office-wide pending jobs, excluding jobs assigned to you."
+              : "Sorted by priority (High → Low), then oldest waiting first."}
           </p>
         </div>
         <Link
