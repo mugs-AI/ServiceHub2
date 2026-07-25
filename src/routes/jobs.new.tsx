@@ -347,45 +347,69 @@ function NewJobPage() {
                   {gate?.label ?? "—"}
                 </div>
                 {subs.length > 0 && (
-                  <ul className="mt-3 space-y-2">
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                     {subs.map((s) => {
                       const checked = selectedSubId === s.id;
+                      const statusRaw = (s.subscription_status ?? "").toLowerCase();
+                      const tone =
+                        statusRaw === "active"
+                          ? "border-emerald-300 bg-emerald-50"
+                          : statusRaw === "due soon"
+                            ? "border-amber-300 bg-amber-50"
+                            : statusRaw === "overdue" || statusRaw === "expired"
+                              ? "border-rose-300 bg-rose-50"
+                              : "border-border bg-background";
+                      const badgeTone =
+                        statusRaw === "active"
+                          ? "bg-emerald-600 text-white"
+                          : statusRaw === "due soon"
+                            ? "bg-amber-500 text-white"
+                            : statusRaw === "overdue" || statusRaw === "expired"
+                              ? "bg-rose-600 text-white"
+                              : "bg-muted text-foreground";
                       return (
-                        <li key={s.id}>
-                          <label
-                            className={
-                              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm " +
-                              (checked ? "border-primary bg-primary/5" : "bg-background")
-                            }
-                          >
-                            <input
-                              type="radio"
-                              name="entitlement"
-                              className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
-                              checked={checked}
-                              onChange={() => setSelectedSubId(s.id)}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-semibold">
-                                  {s.subscription_category ?? "Uncategorised"}
+                        <button
+                          type="button"
+                          key={s.id}
+                          onClick={() => setSelectedSubId(checked ? "" : s.id)}
+                          className={
+                            "flex w-full items-start gap-3 rounded-lg border-2 p-3 text-left text-sm transition " +
+                            tone +
+                            (checked ? " ring-2 ring-primary border-primary" : "")
+                          }
+                          aria-pressed={checked}
+                        >
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-semibold text-foreground">
+                                {s.subscription_category ?? "Uncategorised"}
+                              </span>
+                              <span
+                                className={
+                                  "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide " +
+                                  badgeTone
+                                }
+                              >
+                                {s.subscription_status ?? "unknown"}
+                              </span>
+                              {checked && (
+                                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
+                                  Selected
                                 </span>
-                                <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
-                                  {s.subscription_status ?? "unknown"}
-                                </span>
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Stock: {s.stock_code ?? "—"}
-                                {s.expiry_date
-                                  ? ` · Expiry: ${formatMY(s.expiry_date)}`
-                                  : ""}
-                              </div>
+                              )}
                             </div>
-                          </label>
-                        </li>
+                            <div className="text-xs text-muted-foreground">
+                              Stock: {s.stock_code ?? "—"}
+                              {s.stock_description ? ` · ${s.stock_description}` : ""}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Expiry: {s.expiry_date ? formatMY(s.expiry_date) : "—"}
+                            </div>
+                          </div>
+                        </button>
                       );
                     })}
-                  </ul>
+                  </div>
                 )}
                 {subs.length === 0 && !subsLoading && (
                   <p className="mt-2 text-xs text-muted-foreground">
