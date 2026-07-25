@@ -14,10 +14,11 @@ export const Route = createFileRoute("/dashboard")({
 
 interface MyWorkSummary {
   assignedToMe: number;
+  myPendingTasks: number;
   myInProgress: number;
   myWaitingCustomer: number;
   myWaitingVendor: number;
-  myPendingTasks: number;
+  myWaitingApproval: number;
   completedByMeToday: number;
 }
 
@@ -30,6 +31,8 @@ interface MyWorkItem {
   status: string;
   priority: string;
   source: string;
+  requires_approval?: boolean;
+  approval_reason?: string | null;
   assigned_at: string | null;
   created_at: string;
   updated_at: string | null;
@@ -53,8 +56,16 @@ function authHeaders(): Record<string, string> {
 }
 
 const FILTERS_KEY = "sh2:myWorkFilters:v1";
-const STATUS_OPTS = ["Assigned", "In Progress", "Waiting Customer", "Waiting Vendor"] as const;
+const STATUS_OPTS = [
+  "Draft",
+  "Pending Approval",
+  "Assigned",
+  "In Progress",
+  "Waiting Customer",
+  "Waiting Vendor",
+] as const;
 const PRIORITY_OPTS = ["High", "Medium", "Low"] as const;
+const AUTO_REFRESH_MS = 30_000;
 
 interface MyFilters {
   q: string;
@@ -131,6 +142,7 @@ function UserDashboard() {
   const [data, setData] = useState<MyWorkResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => saveFilters(filters), [filters]);
 
@@ -153,6 +165,7 @@ function UserDashboard() {
       const body = (await res.json().catch(() => ({}))) as MyWorkResponse & { error?: string };
       if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
       setData(body);
+      setLastRefreshed(new Date());
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to load My Work");
     } finally {
@@ -164,12 +177,31 @@ function UserDashboard() {
     void load();
   }, [load]);
 
+  // Auto-refresh every 30s and when the tab regains focus.
+  useEffect(() => {
+    const onFocus = () => void load();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    const iv = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, AUTO_REFRESH_MS);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(iv);
+    };
+  }, [load]);
+
   const summary = data?.summary ?? {
     assignedToMe: 0,
+    myPendingTasks: 0,
     myInProgress: 0,
     myWaitingCustomer: 0,
     myWaitingVendor: 0,
-    myPendingTasks: 0,
+    myWaitingApproval: 0,
     completedByMeToday: 0,
   };
 
@@ -199,7 +231,18 @@ function UserDashboard() {
             {session?.companyName || "—"} · What needs your attention today
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="mr-2 text-[11px] text-muted-foreground">
+            {lastRefreshed ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "—"}
+          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="min-h-9 rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </button>
           <QuickLink to="/support" label="Workspace" />
           <QuickLink to="/jobs/pending" label="Pending Queue" />
           <QuickLink to="/jobs/new" label="New Service Job" primary />
@@ -215,17 +258,25 @@ function UserDashboard() {
 
       <section>
         <SectionTitle>My work</SectionTitle>
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
           <MiniStat label="My Pending Tasks" value={summary.myPendingTasks} tone="blue" emphasise />
           <MiniStat label="Assigned to Me" value={summary.assignedToMe} tone="blue" />
+          <MiniStat label="Waiting Approval" value={summary.myWaitingApproval} tone="amber" />
           <MiniStat label="My In Progress" value={summary.myInProgress} tone="amber" />
           <MiniStat label="My Waiting Customer" value={summary.myWaitingCustomer} tone="amber" />
           <MiniStat label="My Waiting Vendor" value={summary.myWaitingVendor} tone="purple" />
           <MiniStat label="Completed by Me Today" value={summary.completedByMeToday} tone="green" />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <Link to="/jobs/pending" className="font-medium text-primary hover:underline">
             View Office-Wide Assigned Queue →
+          </Link>
+          <Link
+            to="/jobs/pending"
+            search={{ scope: "team" as const }}
+            className="font-medium text-primary hover:underline"
+          >
+            Pending from My Team →
           </Link>
         </p>
       </section>

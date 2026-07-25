@@ -43,6 +43,9 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           const from = trim(sp.get("from"), 40);
           const to = trim(sp.get("to"), 40);
           const q = trim(sp.get("q"), 100);
+          // Run 2 — "Pending from My Team": exclude jobs assigned to caller.
+          const excludeMe =
+            sp.get("excludeMe") === "1" || sp.get("excludeMe") === "true";
           const page = Math.max(Number(sp.get("page") ?? 1) || 1, 1);
           const pageSize = Math.min(
             Math.max(Number(sp.get("pageSize") ?? 50) || 50, 1),
@@ -89,6 +92,15 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           if (technician) {
             if (technician === "__unassigned__") query = query.is("assigned_user_id", null);
             else query = query.eq("assigned_user_id", technician);
+          }
+          if (excludeMe) {
+            const me = user.diagnostics.matchedN3UserId;
+            if (me) {
+              // Exclude jobs whose assignee is me. Unassigned rows remain.
+              query = query.or(
+                `assigned_user_id.is.null,assigned_user_id.neq.${me}`,
+              );
+            }
           }
           if (from) query = query.gte("created_at", from);
           if (to) query = query.lte("created_at", to);
