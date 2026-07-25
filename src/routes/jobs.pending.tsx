@@ -31,6 +31,9 @@ const QUEUE_TABS = [
 ] as const;
 
 export const Route = createFileRoute("/jobs/pending")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    scope: s.scope === "team" ? ("team" as const) : undefined,
+  }),
   component: PendingQueuePage,
 });
 
@@ -40,6 +43,8 @@ function authHeaders(): Record<string, string> {
 }
 
 function PendingQueuePage() {
+  const { scope } = Route.useSearch();
+  const excludeMe = scope === "team";
   const [queueType, setQueueType] = useState<string>("");
   const [q, setQ] = useState("");
   const [priority, setPriority] = useState("");
@@ -64,6 +69,7 @@ function PendingQueuePage() {
       if (queueType) sp.set("queueType", queueType);
       if (q.trim()) sp.set("q", q.trim());
       if (priority) sp.set("priority", priority);
+      if (excludeMe) sp.set("excludeMe", "1");
       const res = await fetch(`/api/workspace/jobs/pending?${sp.toString()}`, {
         headers: authHeaders(),
       });
