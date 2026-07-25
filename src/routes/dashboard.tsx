@@ -280,7 +280,6 @@ function UserDashboard() {
           </Link>
         </p>
       </section>
-      </section>
 
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
