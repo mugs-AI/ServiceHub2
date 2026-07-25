@@ -6,26 +6,36 @@
 // - Assignee identity is resolved server-side; browser cannot forge user.
 // - Excludes soft-deleted jobs from summary and items.
 // - "Completed by Me Today" uses the Malaysia calendar day (Asia/Kuala_Lumpur).
+//
+// Definitions (Run 2 correction):
+//   assignedToMe       = Draft, Pending Approval, Open, Assigned,
+//                        In Progress, Waiting Customer, Waiting Vendor
+//   myPendingTasks     = Draft, Assigned, In Progress, Waiting Customer,
+//                        Waiting Vendor   (excludes Pending Approval)
+//   myInProgress       = status = In Progress
+//   myWaitingApproval  = status = Pending Approval  (labelled "Waiting Approval")
+//   Default items      = all assignedToMe statuses (visible immediately,
+//                        without needing a status-filter click)
 
 import { createFileRoute } from "@tanstack/react-router";
 
-type Status =
-  | "Draft"
-  | "Pending Approval"
-  | "Open"
-  | "Assigned"
-  | "In Progress"
-  | "Waiting Customer"
-  | "Waiting Vendor"
-  | "Completed"
-  | "Cancelled";
-
-const PENDING_STATUSES: readonly Status[] = [
+const ASSIGNED_TO_ME_STATUSES = [
+  "Draft",
+  "Pending Approval",
+  "Open",
   "Assigned",
   "In Progress",
   "Waiting Customer",
   "Waiting Vendor",
-];
+] as const;
+
+const MY_PENDING_STATUSES = [
+  "Draft",
+  "Assigned",
+  "In Progress",
+  "Waiting Customer",
+  "Waiting Vendor",
+] as const;
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
@@ -72,10 +82,11 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
             return Response.json({
               summary: {
                 assignedToMe: 0,
+                myPendingTasks: 0,
                 myInProgress: 0,
                 myWaitingCustomer: 0,
                 myWaitingVendor: 0,
-                myPendingTasks: 0,
+                myWaitingApproval: 0,
                 completedByMeToday: 0,
               },
               items: [],
@@ -117,37 +128,46 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           const { fromIso: mytFrom, toIso: mytTo } = malaysiaTodayUtcRange();
 
           const [
-            rAssigned,
+            rAssignedToMe,
+            rMyPending,
             rInProgress,
             rWaitCust,
             rWaitVend,
+            rWaitApproval,
             rCompletedToday,
           ] = await Promise.all([
-            base().eq("status", "Assigned"),
+            base().in("status", ASSIGNED_TO_ME_STATUSES as unknown as string[]),
+            base().in("status", MY_PENDING_STATUSES as unknown as string[]),
             base().eq("status", "In Progress"),
             base().eq("status", "Waiting Customer"),
             base().eq("status", "Waiting Vendor"),
+            base().eq("status", "Pending Approval"),
             base()
               .eq("status", "Completed")
               .gte("completed_at", mytFrom)
               .lt("completed_at", mytTo),
           ]);
 
-          const errs = [rAssigned, rInProgress, rWaitCust, rWaitVend, rCompletedToday]
+          const errs = [
+            rAssignedToMe,
+            rMyPending,
+            rInProgress,
+            rWaitCust,
+            rWaitVend,
+            rWaitApproval,
+            rCompletedToday,
+          ]
             .map((r) => r.error)
             .filter(Boolean);
           if (errs.length) throw errs[0];
 
           const summary = {
-            assignedToMe: rAssigned.count ?? 0,
+            assignedToMe: rAssignedToMe.count ?? 0,
+            myPendingTasks: rMyPending.count ?? 0,
             myInProgress: rInProgress.count ?? 0,
             myWaitingCustomer: rWaitCust.count ?? 0,
             myWaitingVendor: rWaitVend.count ?? 0,
-            myPendingTasks:
-              (rAssigned.count ?? 0) +
-              (rInProgress.count ?? 0) +
-              (rWaitCust.count ?? 0) +
-              (rWaitVend.count ?? 0),
+            myWaitingApproval: rWaitApproval.count ?? 0,
             completedByMeToday: rCompletedToday.count ?? 0,
           };
 
@@ -155,7 +175,7 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           let query = supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, assigned_user_id, assigned_user_name_snapshot, assigned_at, started_at, completed_at, created_at, updated_at",
+              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, assigned_user_id, assigned_user_name_snapshot, assigned_at, started_at, completed_at, created_at, updated_at",
               { count: "exact" },
             )
             .eq("tenant_code", user.tenantCode)
@@ -166,8 +186,8 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
             statuses.length > 0
               ? statuses
               : includeCompleted
-                ? [...PENDING_STATUSES, "Completed"]
-                : PENDING_STATUSES;
+                ? [...ASSIGNED_TO_ME_STATUSES, "Completed"]
+                : [...ASSIGNED_TO_ME_STATUSES];
           query = query.in("status", effectiveStatuses as string[]);
 
           if (priorities.length > 0) query = query.in("priority", priorities);
