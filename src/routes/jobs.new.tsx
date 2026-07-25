@@ -300,7 +300,7 @@ function NewJobPage() {
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {c.customer_code}
-                          {c.contact_person ? ` · ${c.contact_person}` }
+                          {c.contact_person ? ` · ${c.contact_person}` : ""}
                         </span>
                       </button>
                     </li>
