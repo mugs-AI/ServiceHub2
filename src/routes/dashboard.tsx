@@ -14,10 +14,11 @@ export const Route = createFileRoute("/dashboard")({
 
 interface MyWorkSummary {
   assignedToMe: number;
+  myPendingTasks: number;
   myInProgress: number;
   myWaitingCustomer: number;
   myWaitingVendor: number;
-  myPendingTasks: number;
+  myWaitingApproval: number;
   completedByMeToday: number;
 }
 
@@ -30,6 +31,8 @@ interface MyWorkItem {
   status: string;
   priority: string;
   source: string;
+  requires_approval?: boolean;
+  approval_reason?: string | null;
   assigned_at: string | null;
   created_at: string;
   updated_at: string | null;
@@ -53,8 +56,16 @@ function authHeaders(): Record<string, string> {
 }
 
 const FILTERS_KEY = "sh2:myWorkFilters:v1";
-const STATUS_OPTS = ["Assigned", "In Progress", "Waiting Customer", "Waiting Vendor"] as const;
+const STATUS_OPTS = [
+  "Draft",
+  "Pending Approval",
+  "Assigned",
+  "In Progress",
+  "Waiting Customer",
+  "Waiting Vendor",
+] as const;
 const PRIORITY_OPTS = ["High", "Medium", "Low"] as const;
+const AUTO_REFRESH_MS = 30_000;
 
 interface MyFilters {
   q: string;
