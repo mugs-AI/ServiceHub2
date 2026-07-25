@@ -231,7 +231,18 @@ function UserDashboard() {
             {session?.companyName || "—"} · What needs your attention today
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="mr-2 text-[11px] text-muted-foreground">
+            {lastRefreshed ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "—"}
+          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="min-h-9 rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </button>
           <QuickLink to="/support" label="Workspace" />
           <QuickLink to="/jobs/pending" label="Pending Queue" />
           <QuickLink to="/jobs/new" label="New Service Job" primary />
@@ -247,19 +258,28 @@ function UserDashboard() {
 
       <section>
         <SectionTitle>My work</SectionTitle>
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
           <MiniStat label="My Pending Tasks" value={summary.myPendingTasks} tone="blue" emphasise />
           <MiniStat label="Assigned to Me" value={summary.assignedToMe} tone="blue" />
+          <MiniStat label="Waiting Approval" value={summary.myWaitingApproval} tone="amber" />
           <MiniStat label="My In Progress" value={summary.myInProgress} tone="amber" />
           <MiniStat label="My Waiting Customer" value={summary.myWaitingCustomer} tone="amber" />
           <MiniStat label="My Waiting Vendor" value={summary.myWaitingVendor} tone="purple" />
           <MiniStat label="Completed by Me Today" value={summary.completedByMeToday} tone="green" />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <Link to="/jobs/pending" className="font-medium text-primary hover:underline">
             View Office-Wide Assigned Queue →
           </Link>
+          <Link
+            to="/jobs/pending"
+            search={{ scope: "team" as const }}
+            className="font-medium text-primary hover:underline"
+          >
+            Pending from My Team →
+          </Link>
         </p>
+      </section>
       </section>
 
       <section>
