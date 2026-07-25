@@ -375,7 +375,7 @@ function NewJobPage() {
                           className={
                             "flex w-full items-start gap-3 rounded-lg border-2 p-3 text-left text-sm transition " +
                             tone +
-                            (checked ? " ring-2 ring-primary border-primary" )
+                            (checked ? " ring-2 ring-primary border-primary" : "")
                           }
                           aria-pressed={checked}
                         >
