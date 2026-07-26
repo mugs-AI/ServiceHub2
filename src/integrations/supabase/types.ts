@@ -792,6 +792,8 @@ export type Database = {
         Row: {
           approval_note: string | null
           approval_reason: string | null
+          approval_remark_private: string | null
+          approval_remark_public: string | null
           approved_at: string | null
           approved_by_name_snapshot: string | null
           approved_by_user_id: string | null
@@ -848,6 +850,8 @@ export type Database = {
         Insert: {
           approval_note?: string | null
           approval_reason?: string | null
+          approval_remark_private?: string | null
+          approval_remark_public?: string | null
           approved_at?: string | null
           approved_by_name_snapshot?: string | null
           approved_by_user_id?: string | null
@@ -904,6 +908,8 @@ export type Database = {
         Update: {
           approval_note?: string | null
           approval_reason?: string | null
+          approval_remark_private?: string | null
+          approval_remark_public?: string | null
           approved_at?: string | null
           approved_by_name_snapshot?: string | null
           approved_by_user_id?: string | null
