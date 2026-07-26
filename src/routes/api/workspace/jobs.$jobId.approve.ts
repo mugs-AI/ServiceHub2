@@ -15,7 +15,16 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/approve")({
         try {
           const user = await requireAdministrator(request);
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-          const note = typeof body.note === "string" ? body.note.trim().slice(0, 2000) : null;
+          const asText = (v: unknown): string | null => {
+            if (typeof v !== "string") return null;
+            const s = v.trim();
+            return s ? s.slice(0, 2000) : null;
+          };
+          // Backwards compatible: accept legacy `note` as public remark.
+          const remarkPublic =
+            asText(body.remark_public) ?? asText(body.approval_remark_public) ?? asText(body.note);
+          const remarkPrivate =
+            asText(body.remark_private) ?? asText(body.approval_remark_private);
 
           const { data: job, error: jobErr } = await supabaseAdmin
             .from("service_jobs")
@@ -44,7 +53,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/approve")({
               status: "Open",
               requires_approval: false,
               approved_at: now,
-              approval_note: note,
+              approval_note: remarkPublic, // legacy column kept in sync
+              approval_remark_public: remarkPublic,
+              approval_remark_private: remarkPrivate,
               ...performer,
             })
             .eq("tenant_code", user.tenantCode)
@@ -53,16 +64,31 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/approve")({
             .single();
           if (upErr) throw upErr;
 
+          // Timeline records the public remark only. Private remark is stored
+          // on the row and surfaced to admins on Job Detail — never in the
+          // shared timeline.
           await supabaseAdmin.from("service_job_activity_log").insert({
             tenant_code: user.tenantCode,
             service_job_id: params.jobId,
             event_type: "approval_granted",
             old_value: "Pending Approval",
             new_value: "Open",
-            note,
+            note: remarkPublic,
             performed_by_user_id: performer.approved_by_user_id,
             performed_by_name_snapshot: performer.approved_by_name_snapshot,
           });
+          if (remarkPrivate) {
+            await supabaseAdmin.from("service_job_activity_log").insert({
+              tenant_code: user.tenantCode,
+              service_job_id: params.jobId,
+              event_type: "approval_remark_private",
+              old_value: null,
+              new_value: null,
+              note: null, // stored on the job row, admin-only
+              performed_by_user_id: performer.approved_by_user_id,
+              performed_by_name_snapshot: performer.approved_by_name_snapshot,
+            });
+          }
 
           return Response.json({ ok: true, job: updated });
         } catch (err) {
