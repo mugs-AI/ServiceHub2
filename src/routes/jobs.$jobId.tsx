@@ -220,7 +220,23 @@ function JobDetailPage() {
       )}
 
       {job.requires_approval && job.status === "Pending Approval" && (
-        <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reload} />
+        <div
+          role="alert"
+          className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm"
+        >
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+              Waiting for Approval
+            </span>
+            <span className="font-medium">
+              {job.approval_reason ?? "Administrator approval required before work can start."}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {job.requires_approval && job.status === "Pending Approval" && (
+        <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reloadAll} />
       )}
 
       {/* Top summary row — Job Info | Workflow | Assigned Technician.
@@ -228,7 +244,7 @@ function JobDetailPage() {
       <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
         <JobInfoCard job={job} />
         {!job.is_deleted ? (
-          <WorkflowActions job={job} onDone={reload} />
+          <WorkflowActions job={job} onDone={reloadAll} />
         ) : (
           <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -245,29 +261,24 @@ function JobDetailPage() {
           currentUserId={currentUserId}
           currentDisplayName={session.currentUser?.displayName || session.currentUser?.email || ""}
           onOpenPicker={() => setShowPicker(true)}
-          onReload={reload}
+          onReload={reloadAll}
         />
 
       </div>
 
+      {(job.subscription_category_snapshot ||
+        job.stock_code_snapshot ||
+        job.entitlement_status_snapshot ||
+        job.requires_approval ||
+        job.approved_at ||
+        job.rejected_at) && (
+        <EntitlementCard job={job} isAdmin={isAdmin} />
+      )}
+
       <Section title="Job details">
         <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
         <Kv k="Problem" v={job.problem_description} multiline />
-        <PriorityEditor job={job} onDone={reload} />
-        {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
-          <>
-            <Kv k="Entitlement" v={job.subscription_category_snapshot} />
-            <Kv k="Stock" v={job.stock_code_snapshot} />
-            <Kv
-              k="Expiry"
-              v={formatMY(job.entitlement_expiry_snapshot) || null}
-            />
-            <Kv k="Entitlement status" v={job.entitlement_status_snapshot} />
-          </>
-        )}
-        {job.requires_approval && (
-          <Kv k="Approval" v={job.status === "Pending Approval" ? "Pending" : (job.approved_at ? "Approved" : job.rejected_at ? "Rejected" : "Required")} />
-        )}
+        <PriorityEditor job={job} onDone={reloadAll} />
       </Section>
 
       <InternalNoteSection
