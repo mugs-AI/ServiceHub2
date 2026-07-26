@@ -25,7 +25,7 @@ export const Route = createFileRoute("/api/workspace/customer-subscriptions")({
           const { data, error } = await supabaseAdmin
             .from("customer_subscription_snapshots")
             .select(
-              "customer_code, customer_name, subscription_category, stock_code, stock_name, latest_document_no, latest_source_type, latest_document_date, renewal_cycle_value, renewal_cycle_unit, expiry_date, remaining_days, subscription_status, calculation_error, updated_at",
+              "id, customer_code, customer_name, subscription_category, stock_code, stock_name, latest_document_no, latest_source_type, latest_document_date, renewal_cycle_value, renewal_cycle_unit, expiry_date, remaining_days, subscription_status, calculation_error, updated_at",
             )
             .eq("tenant_code", user.tenantCode)
             .eq("customer_code", customerCode)
