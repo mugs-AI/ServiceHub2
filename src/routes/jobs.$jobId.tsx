@@ -49,6 +49,8 @@ interface JobDetail {
   approved_at: string | null;
   approved_by_name_snapshot: string | null;
   approval_note: string | null;
+  approval_remark_public: string | null;
+  approval_remark_private: string | null;
   rejected_at: string | null;
   rejected_by_name_snapshot: string | null;
   rejection_reason: string | null;
@@ -101,17 +103,27 @@ function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
 
+  // Progressive loading:
+  // - reload()   loads main job details first (blocks initial render),
+  //              then loads timeline + comments in the background.
+  // - reloadAll() re-fetches everything in parallel and awaits — used
+  //              after mutations so callers see refreshed timeline.
+  const loadSecondary = useCallback(async () => {
+    const [tlRes, cmRes] = await Promise.all([
+      fetch(`/api/workspace/jobs/${jobId}/timeline`, { headers: authHeaders() }),
+      fetch(`/api/workspace/jobs/${jobId}/comments`, { headers: authHeaders() }),
+    ]);
+    const tlBody = await tlRes.json().catch(() => ({}));
+    const cmBody = await cmRes.json().catch(() => ({}));
+    if (tlRes.ok) setTimeline(tlBody.timeline ?? []);
+    if (cmRes.ok) setComments(cmBody.comments ?? []);
+  }, [jobId]);
+
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [jobRes, tlRes, cmRes] = await Promise.all([
-        fetch(`/api/workspace/jobs/${jobId}`, { headers: authHeaders() }),
-        fetch(`/api/workspace/jobs/${jobId}/timeline`, { headers: authHeaders() }),
-        fetch(`/api/workspace/jobs/${jobId}/comments`, { headers: authHeaders() }),
-      ]);
+      const jobRes = await fetch(`/api/workspace/jobs/${jobId}`, { headers: authHeaders() });
       const jobBody = await jobRes.json().catch(() => ({}));
-      const tlBody = await tlRes.json().catch(() => ({}));
-      const cmBody = await cmRes.json().catch(() => ({}));
       if (!jobRes.ok) {
         setError(jobBody?.error ?? "Unable to load job.");
         setJob(null);
@@ -119,12 +131,17 @@ function JobDetailPage() {
         setError(null);
         setJob(jobBody.job);
       }
-      if (tlRes.ok) setTimeline(tlBody.timeline ?? []);
-      if (cmRes.ok) setComments(cmBody.comments ?? []);
     } finally {
       setLoading(false);
     }
-  }, [jobId]);
+    // Fire-and-forget secondary sections.
+    void loadSecondary();
+  }, [jobId, loadSecondary]);
+
+  const reloadAll = useCallback(async () => {
+    await reload();
+    await loadSecondary();
+  }, [reload, loadSecondary]);
 
   useEffect(() => {
     void reload();
