@@ -1323,6 +1323,8 @@ function formatEvent(it: TimelineItem): string {
       return `Restored`;
     case "approval_granted":
       return `Approved`;
+    case "approval_remark_private":
+      return `Private approval remark recorded`;
     case "approval_rejected":
       return `Rejected`;
     case "technician_assigned":
