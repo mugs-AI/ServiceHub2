@@ -387,7 +387,7 @@ export async function requireAuthenticatedN3User(
     userName ||
     "";
 
-  return {
+  const ctx: CurrentUserContext = {
     token,
     tenantCode,
     companyName,
@@ -417,6 +417,8 @@ export async function requireAuthenticatedN3User(
       },
     },
   };
+  writeCache(token, ctx);
+  return ctx;
 }
 
 export async function requireTenantContext(request: Request): Promise<CurrentUserContext> {
