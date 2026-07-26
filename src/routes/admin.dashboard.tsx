@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { AdminOnly } from "@/components/qne/AdminOnly";
@@ -28,11 +28,38 @@ interface HealthResponse {
 }
 
 
+interface AdminSummary {
+  jobsToday: number;
+  pendingApproval: number;
+  waitingCustomer: number;
+  waitingVendor: number;
+  dueSoonCustomers: number;
+  overdueCustomers: number;
+}
+interface WorkloadRow {
+  user_id: string;
+  name: string;
+  total: number;
+  inProgress: number;
+  waiting: number;
+}
+interface AdminDashboardResponse {
+  summary: AdminSummary;
+  userWorkload: WorkloadRow[];
+  generatedAt: string;
+}
+
+const AUTO_REFRESH_MS = 30_000;
+
 function AdminDashboard() {
   const { session, currentUser } = useSession();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ops, setOps] = useState<AdminDashboardResponse | null>(null);
+  const [opsErr, setOpsErr] = useState<string | null>(null);
+  const [opsLoading, setOpsLoading] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +85,38 @@ function AdminDashboard() {
     };
   }, []);
 
+  const loadOps = useCallback(async () => {
+    setOpsLoading(true);
+    setOpsErr(null);
+    try {
+      const token = getStoredToken();
+      const res = await fetch("/api/admin/dashboard", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = (await res.json()) as AdminDashboardResponse & { error?: string };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setOps(json);
+      setLastRefreshed(new Date());
+    } catch (e) {
+      setOpsErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOpsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadOps();
+    const iv = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadOps();
+    }, AUTO_REFRESH_MS);
+    const onFocus = () => void loadOps();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(iv);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadOps]);
+
   const healthMap = new Map<HealthRow["snapshot_type"], HealthRow>(
     (health?.snapshots ?? []).map((r) => [r.snapshot_type, r]),
   );
@@ -72,6 +131,7 @@ function AdminDashboard() {
     ? new Date(lastSyncs[0]).toLocaleString()
     : "—";
 
+  const s = ops?.summary;
 
   return (
     <div className="space-y-6">
@@ -88,7 +148,20 @@ function AdminDashboard() {
             {currentUser?.displayName || currentUser?.email || "administrator"}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="mr-2 text-[11px] text-muted-foreground">
+            {lastRefreshed
+              ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+              : "—"}
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadOps()}
+            disabled={opsLoading}
+            className="min-h-9 rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            {opsLoading ? "Refreshing…" : "Refresh"}
+          </button>
           <QuickLink to="/support" label="Workspace" />
           <QuickLink to="/admin/snapshots" label="Snapshot Console" primary />
           <QuickLink to="/settings" label="Settings" />
@@ -96,23 +169,50 @@ function AdminDashboard() {
       </header>
 
       <Section title="Operations">
+        {opsErr && (
+          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {opsErr}
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <StatCard label="Jobs Today" tone="blue" comingSoon />
-          <StatCard label="Pending Approval" tone="amber" comingSoon />
-          <StatCard label="Waiting Customer" tone="amber" comingSoon />
-          <StatCard label="Waiting Vendor" tone="purple" comingSoon />
-          <StatCard label="Due Soon Customers" tone="amber" comingSoon />
-          <StatCard label="Overdue Customers" tone="red" comingSoon />
+          <StatCard label="Jobs Today" value={s?.jobsToday ?? "—"} tone="blue" />
+          <StatCard label="Pending Approval" value={s?.pendingApproval ?? "—"} tone="amber" />
+          <StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" />
+          <StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" />
+          <StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" />
+          <StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" />
         </div>
       </Section>
 
-      <Section title="Management">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="User Workload" tone="blue" comingSoon />
-          <StatCard label="Renewal Summary" tone="green" comingSoon />
-          <StatCard label="Reports" tone="grey" comingSoon />
-          <StatCard label="Notifications" tone="purple" comingSoon />
-        </div>
+      <Section title="User workload">
+        {(!ops || ops.userWorkload.length === 0) ? (
+          <p className="rounded-lg border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+            No active assignments right now.
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2">Technician</th>
+                  <th className="px-3 py-2 text-right">Active jobs</th>
+                  <th className="px-3 py-2 text-right">In Progress</th>
+                  <th className="px-3 py-2 text-right">Waiting</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {ops.userWorkload.map((w) => (
+                  <tr key={w.user_id}>
+                    <td className="px-3 py-2 text-foreground">{w.name}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-foreground">{w.total}</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">{w.inProgress}</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">{w.waiting}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Section>
 
       <Section title="System health">

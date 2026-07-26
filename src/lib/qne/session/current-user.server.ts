@@ -276,6 +276,51 @@ async function fetchN3Users(token: string): Promise<UsersLoad & {
  * User identity comes from the JWT payload — NEVER from BasicInfo or the
  * browser.
  */
+// ---------------------------------------------------------------------------
+// Per-token session cache (Run 3 performance).
+// Resolving current-user runs 2 live N3 calls (BasicInfo + /api/Users).
+// Cache the CurrentUserContext for a short TTL keyed by the bearer token so
+// back-to-back requests (Job Detail: 3 parallel calls; Dashboard auto-refresh
+// every 30s) don't repeatedly hit N3.
+// ---------------------------------------------------------------------------
+
+interface CachedSession {
+  ctx: CurrentUserContext;
+  expiresAt: number;
+}
+const SESSION_TTL_MS = 60_000;
+const SESSION_CACHE = new Map<string, CachedSession>();
+const SESSION_CACHE_MAX = 500;
+
+function cacheKey(token: string): string {
+  // Bearer token is opaque to us; a short suffix keeps the map compact
+  // without weakening security (tokens never leave the server).
+  return token.length > 96 ? token.slice(-96) : token;
+}
+
+function readCache(token: string): CurrentUserContext | null {
+  const key = cacheKey(token);
+  const hit = SESSION_CACHE.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt < Date.now()) {
+    SESSION_CACHE.delete(key);
+    return null;
+  }
+  return hit.ctx;
+}
+
+function writeCache(token: string, ctx: CurrentUserContext): void {
+  if (SESSION_CACHE.size >= SESSION_CACHE_MAX) {
+    // Simple eviction: drop the oldest entry.
+    const first = SESSION_CACHE.keys().next().value;
+    if (first) SESSION_CACHE.delete(first);
+  }
+  SESSION_CACHE.set(cacheKey(token), {
+    ctx,
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  });
+}
+
 export async function requireAuthenticatedN3User(
   request: Request,
 ): Promise<CurrentUserContext> {
@@ -283,6 +328,9 @@ export async function requireAuthenticatedN3User(
   const match = auth.match(/^Bearer\s+(.+)$/i);
   if (!match) throw new UnauthorizedError("Missing Authorization bearer");
   const token = match[1].trim();
+
+  const cached = readCache(token);
+  if (cached) return cached;
 
   const claims = decodeJwtPayload(token);
   const jwtIdentity = identityFromJwt(claims);
@@ -339,7 +387,7 @@ export async function requireAuthenticatedN3User(
     userName ||
     "";
 
-  return {
+  const ctx: CurrentUserContext = {
     token,
     tenantCode,
     companyName,
@@ -369,6 +417,8 @@ export async function requireAuthenticatedN3User(
       },
     },
   };
+  writeCache(token, ctx);
+  return ctx;
 }
 
 export async function requireTenantContext(request: Request): Promise<CurrentUserContext> {

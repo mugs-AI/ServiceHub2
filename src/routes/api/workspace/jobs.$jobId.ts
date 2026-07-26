@@ -30,7 +30,11 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId")({
           if (data.is_deleted && !user.isAdministrator) {
             return Response.json({ error: "Job not found." }, { status: 404 });
           }
-          return Response.json({ job: data });
+          // Private approval remark is Owner/Admin only.
+          const row = user.isAdministrator
+            ? data
+            : { ...data, approval_remark_private: null };
+          return Response.json({ job: row });
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;

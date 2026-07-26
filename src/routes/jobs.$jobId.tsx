@@ -49,6 +49,8 @@ interface JobDetail {
   approved_at: string | null;
   approved_by_name_snapshot: string | null;
   approval_note: string | null;
+  approval_remark_public: string | null;
+  approval_remark_private: string | null;
   rejected_at: string | null;
   rejected_by_name_snapshot: string | null;
   rejection_reason: string | null;
@@ -101,17 +103,27 @@ function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
 
+  // Progressive loading:
+  // - reload()   loads main job details first (blocks initial render),
+  //              then loads timeline + comments in the background.
+  // - reloadAll() re-fetches everything in parallel and awaits — used
+  //              after mutations so callers see refreshed timeline.
+  const loadSecondary = useCallback(async () => {
+    const [tlRes, cmRes] = await Promise.all([
+      fetch(`/api/workspace/jobs/${jobId}/timeline`, { headers: authHeaders() }),
+      fetch(`/api/workspace/jobs/${jobId}/comments`, { headers: authHeaders() }),
+    ]);
+    const tlBody = await tlRes.json().catch(() => ({}));
+    const cmBody = await cmRes.json().catch(() => ({}));
+    if (tlRes.ok) setTimeline(tlBody.timeline ?? []);
+    if (cmRes.ok) setComments(cmBody.comments ?? []);
+  }, [jobId]);
+
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [jobRes, tlRes, cmRes] = await Promise.all([
-        fetch(`/api/workspace/jobs/${jobId}`, { headers: authHeaders() }),
-        fetch(`/api/workspace/jobs/${jobId}/timeline`, { headers: authHeaders() }),
-        fetch(`/api/workspace/jobs/${jobId}/comments`, { headers: authHeaders() }),
-      ]);
+      const jobRes = await fetch(`/api/workspace/jobs/${jobId}`, { headers: authHeaders() });
       const jobBody = await jobRes.json().catch(() => ({}));
-      const tlBody = await tlRes.json().catch(() => ({}));
-      const cmBody = await cmRes.json().catch(() => ({}));
       if (!jobRes.ok) {
         setError(jobBody?.error ?? "Unable to load job.");
         setJob(null);
@@ -119,12 +131,17 @@ function JobDetailPage() {
         setError(null);
         setJob(jobBody.job);
       }
-      if (tlRes.ok) setTimeline(tlBody.timeline ?? []);
-      if (cmRes.ok) setComments(cmBody.comments ?? []);
     } finally {
       setLoading(false);
     }
-  }, [jobId]);
+    // Fire-and-forget secondary sections.
+    void loadSecondary();
+  }, [jobId, loadSecondary]);
+
+  const reloadAll = useCallback(async () => {
+    await reload();
+    await loadSecondary();
+  }, [reload, loadSecondary]);
 
   useEffect(() => {
     void reload();
@@ -203,7 +220,23 @@ function JobDetailPage() {
       )}
 
       {job.requires_approval && job.status === "Pending Approval" && (
-        <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reload} />
+        <div
+          role="alert"
+          className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm"
+        >
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+              Waiting for Approval
+            </span>
+            <span className="font-medium">
+              {job.approval_reason ?? "Administrator approval required before work can start."}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {job.requires_approval && job.status === "Pending Approval" && (
+        <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reloadAll} />
       )}
 
       {/* Top summary row — Job Info | Workflow | Assigned Technician.
@@ -211,7 +244,7 @@ function JobDetailPage() {
       <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
         <JobInfoCard job={job} />
         {!job.is_deleted ? (
-          <WorkflowActions job={job} onDone={reload} />
+          <WorkflowActions job={job} onDone={reloadAll} />
         ) : (
           <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -228,42 +261,37 @@ function JobDetailPage() {
           currentUserId={currentUserId}
           currentDisplayName={session.currentUser?.displayName || session.currentUser?.email || ""}
           onOpenPicker={() => setShowPicker(true)}
-          onReload={reload}
+          onReload={reloadAll}
         />
 
       </div>
 
+      {(job.subscription_category_snapshot ||
+        job.stock_code_snapshot ||
+        job.entitlement_status_snapshot ||
+        job.requires_approval ||
+        job.approved_at ||
+        job.rejected_at) && (
+        <EntitlementCard job={job} isAdmin={isAdmin} />
+      )}
+
       <Section title="Job details">
         <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
         <Kv k="Problem" v={job.problem_description} multiline />
-        <PriorityEditor job={job} onDone={reload} />
-        {(job.subscription_category_snapshot || job.stock_code_snapshot) && (
-          <>
-            <Kv k="Entitlement" v={job.subscription_category_snapshot} />
-            <Kv k="Stock" v={job.stock_code_snapshot} />
-            <Kv
-              k="Expiry"
-              v={formatMY(job.entitlement_expiry_snapshot) || null}
-            />
-            <Kv k="Entitlement status" v={job.entitlement_status_snapshot} />
-          </>
-        )}
-        {job.requires_approval && (
-          <Kv k="Approval" v={job.status === "Pending Approval" ? "Pending" : (job.approved_at ? "Approved" : job.rejected_at ? "Rejected" : "Required")} />
-        )}
+        <PriorityEditor job={job} onDone={reloadAll} />
       </Section>
 
       <InternalNoteSection
         job={job}
         canEdit={isCreator && !job.is_deleted}
-        onReload={reload}
+        onReload={reloadAll}
       />
 
       <CommentsSection
         jobId={jobId}
         comments={comments}
         disabled={job.is_deleted}
-        onReload={reload}
+        onReload={reloadAll}
       />
 
       <TimelineSection items={timeline} />
@@ -277,7 +305,7 @@ function JobDetailPage() {
       </Section>
 
       {isAdmin && (
-        <AdminDangerZone job={job} onReload={reload} />
+        <AdminDangerZone job={job} onReload={reloadAll} />
       )}
 
       {showPicker && (
@@ -287,11 +315,86 @@ function JobDetailPage() {
           onClose={() => setShowPicker(false)}
           onDone={async () => {
             setShowPicker(false);
-            await reload();
+            await reloadAll();
           }}
         />
       )}
     </div>
+  );
+}
+
+/* ---------------- entitlement card ---------------- */
+
+function EntitlementCard({ job, isAdmin }: { job: JobDetail; isAdmin: boolean }) {
+  const status = (job.entitlement_status_snapshot ?? "").toLowerCase();
+  const tone =
+    status === "active"
+      ? "border-emerald-300 bg-emerald-50"
+      : status === "due soon"
+        ? "border-amber-300 bg-amber-50"
+        : status === "overdue" || status === "expired"
+          ? "border-rose-300 bg-rose-50"
+          : "border-border bg-card";
+  const badge =
+    status === "active"
+      ? "bg-emerald-600 text-white"
+      : status === "due soon"
+        ? "bg-amber-500 text-white"
+        : status === "overdue" || status === "expired"
+          ? "bg-rose-600 text-white"
+          : "bg-muted text-foreground";
+  const approvalLabel =
+    job.status === "Pending Approval"
+      ? "Waiting for Approval"
+      : job.approved_at
+        ? "Approved"
+        : job.rejected_at
+          ? "Rejected"
+          : job.requires_approval
+            ? "Approval required"
+            : null;
+  return (
+    <section className={`rounded-xl border-2 p-4 shadow-sm sm:p-6 ${tone}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Entitlement
+        </h2>
+        {job.entitlement_status_snapshot && (
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badge}`}>
+            {job.entitlement_status_snapshot}
+          </span>
+        )}
+      </div>
+      <dl className="grid gap-2 text-sm sm:grid-cols-2">
+        <Kv k="Category" v={job.subscription_category_snapshot ?? "—"} />
+        <Kv k="Stock" v={job.stock_code_snapshot ?? "—"} />
+        <Kv k="Expiry" v={formatMY(job.entitlement_expiry_snapshot) || "—"} />
+        {approvalLabel && <Kv k="Approval" v={approvalLabel} />}
+        {job.approval_reason && <Kv k="Approval reason" v={job.approval_reason} />}
+        {job.approved_at && (
+          <Kv k="Approved" v={`${formatMYDateTime(job.approved_at)}${job.approved_by_name_snapshot ? ` · ${job.approved_by_name_snapshot}` : ""}`} />
+        )}
+        {(job.approval_remark_public ?? job.approval_note) && (
+          <Kv k="Approval remark" v={job.approval_remark_public ?? job.approval_note} multiline />
+        )}
+        {isAdmin && job.approval_remark_private && (
+          <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-amber-900">
+              Private remark (Owner/Admin only)
+            </div>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950">
+              {job.approval_remark_private}
+            </p>
+          </div>
+        )}
+        {job.rejected_at && (
+          <Kv k="Rejected" v={`${formatMYDateTime(job.rejected_at)}${job.rejected_by_name_snapshot ? ` · ${job.rejected_by_name_snapshot}` : ""}`} />
+        )}
+        {job.rejection_reason && (
+          <Kv k="Rejection reason" v={job.rejection_reason} multiline />
+        )}
+      </dl>
+    </section>
   );
 }
 
@@ -653,7 +756,8 @@ function ApprovalPanel({
   onDone: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
-  const [note, setNote] = useState("");
+  const [remarkPublic, setRemarkPublic] = useState("");
+  const [remarkPrivate, setRemarkPrivate] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   async function approve() {
@@ -663,7 +767,10 @@ function ApprovalPanel({
       const res = await fetch(`/api/workspace/jobs/${job.id}/approve`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ note: note.trim() || null }),
+        body: JSON.stringify({
+          remark_public: remarkPublic.trim() || null,
+          remark_private: remarkPrivate.trim() || null,
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? "Failed");
@@ -704,14 +811,31 @@ function ApprovalPanel({
         {job.approval_reason ?? "This job needs Administrator approval before work can start."}
       </p>
       {isAdmin ? (
-        <div className="mt-3 space-y-2">
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional approval note"
-            rows={2}
-            className="w-full rounded-lg border-[1.5px] border-amber-300 bg-white px-3 py-2 text-sm outline-none focus:border-amber-600"
-          />
+        <div className="mt-3 space-y-3">
+          <label className="block">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-900">
+              Remark 1 — Public (posted to timeline, visible to all)
+            </div>
+            <textarea
+              value={remarkPublic}
+              onChange={(e) => setRemarkPublic(e.target.value)}
+              placeholder="Explain the approval so technicians and the customer-facing timeline stay informed…"
+              rows={3}
+              className="w-full rounded-lg border-[1.5px] border-amber-300 bg-white px-3 py-2 text-sm outline-none focus:border-amber-600"
+            />
+          </label>
+          <label className="block">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-900">
+              Remark 2 — Private (Owner / Admin only)
+            </div>
+            <textarea
+              value={remarkPrivate}
+              onChange={(e) => setRemarkPrivate(e.target.value)}
+              placeholder="Confidential context. Never shown on the timeline or to non-admin viewers."
+              rows={3}
+              className="w-full rounded-lg border-[1.5px] border-amber-400 bg-white px-3 py-2 text-sm outline-none focus:border-amber-700"
+            />
+          </label>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -1199,6 +1323,8 @@ function formatEvent(it: TimelineItem): string {
       return `Restored`;
     case "approval_granted":
       return `Approved`;
+    case "approval_remark_private":
+      return `Private approval remark recorded`;
     case "approval_rejected":
       return `Rejected`;
     case "technician_assigned":

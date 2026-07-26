@@ -15,6 +15,11 @@ interface QueueRow {
   priority: string;
   source: string;
   requires_approval: boolean;
+  approval_reason: string | null;
+  subscription_category_snapshot: string | null;
+  stock_code_snapshot: string | null;
+  entitlement_status_snapshot: string | null;
+  entitlement_expiry_snapshot: string | null;
   assigned_user_id: string | null;
   assigned_user_name_snapshot: string | null;
   created_at: string;
@@ -201,7 +206,7 @@ function PendingQueuePage() {
                   {r.customer_name_snapshot ?? r.customer_code_snapshot}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold uppercase">
-                  <span className="rounded-full border px-2 py-0.5">{r.status}</span>
+                  <span className={`rounded-full border px-2 py-0.5 ${statusTone(r.status)}`}>{r.status}</span>
                   <span className={`rounded-full border px-2 py-0.5 ${priorityTone(r.priority)}`}>
                     {r.priority}
                   </span>
@@ -209,8 +214,15 @@ function PendingQueuePage() {
                     {r.assigned_user_name_snapshot ?? "Unassigned"}
                   </span>
                   {r.requires_approval && (
-                    <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-amber-800">
-                      Approval
+                    <span className="rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 text-amber-900">
+                      Waiting for Approval{r.approval_reason ? ` · ${r.approval_reason}` : ""}
+                    </span>
+                  )}
+                  {(r.subscription_category_snapshot || r.stock_code_snapshot) && (
+                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 normal-case text-sky-900">
+                      {r.subscription_category_snapshot ?? "Entitlement"}
+                      {r.stock_code_snapshot ? ` · ${r.stock_code_snapshot}` : ""}
+                      {r.entitlement_status_snapshot ? ` · ${r.entitlement_status_snapshot}` : ""}
                     </span>
                   )}
                 </div>
@@ -252,5 +264,15 @@ function PendingQueuePage() {
 function priorityTone(p: string): string {
   if (p === "High") return "border-red-300 bg-red-50 text-red-800";
   if (p === "Medium") return "border-amber-300 bg-amber-50 text-amber-800";
+  return "";
+}
+
+function statusTone(s: string): string {
+  if (s === "Pending Approval") return "border-amber-400 bg-amber-50 text-amber-900";
+  if (s === "Draft") return "border-blue-200 bg-blue-50 text-blue-800";
+  if (s === "Open") return "border-sky-200 bg-sky-50 text-sky-900";
+  if (s === "Assigned") return "border-purple-200 bg-purple-50 text-purple-900";
+  if (s === "Waiting Customer" || s === "Waiting Vendor")
+    return "border-orange-200 bg-orange-50 text-orange-900";
   return "";
 }

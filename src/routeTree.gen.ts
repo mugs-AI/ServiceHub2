@@ -47,6 +47,7 @@ import { Route as ApiDiagnosticsDocumentSearchRouteImport } from './routes/api/d
 import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics/$type'
 import { Route as ApiDashboardMyWorkRouteImport } from './routes/api/dashboard/my-work'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
+import { Route as ApiAdminDashboardRouteImport } from './routes/api/admin/dashboard'
 import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
 import { Route as ApiWorkspaceJobsSummaryRouteImport } from './routes/api/workspace/jobs.summary'
 import { Route as ApiWorkspaceJobsPendingRouteImport } from './routes/api/workspace/jobs.pending'
@@ -262,6 +263,11 @@ const ApiAuthConnectRoute = ApiAuthConnectRouteImport.update({
   path: '/api/auth/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminDashboardRoute = ApiAdminDashboardRouteImport.update({
+  id: '/api/admin/dashboard',
+  path: '/api/admin/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminAllowlistRoute = ApiAdminAllowlistRouteImport.update({
   id: '/api/admin/allowlist',
   path: '/api/admin/allowlist',
@@ -371,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
+  '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -427,6 +434,7 @@ export interface FileRoutesByTo {
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
+  '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -484,6 +492,7 @@ export interface FileRoutesById {
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
+  '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
   '/api/diagnostics/$type': typeof ApiDiagnosticsTypeRoute
@@ -542,6 +551,7 @@ export interface FileRouteTypes {
     | '/jobs/new'
     | '/jobs/pending'
     | '/api/admin/allowlist'
+    | '/api/admin/dashboard'
     | '/api/auth/connect'
     | '/api/dashboard/my-work'
     | '/api/diagnostics/$type'
@@ -598,6 +608,7 @@ export interface FileRouteTypes {
     | '/jobs/new'
     | '/jobs/pending'
     | '/api/admin/allowlist'
+    | '/api/admin/dashboard'
     | '/api/auth/connect'
     | '/api/dashboard/my-work'
     | '/api/diagnostics/$type'
@@ -654,6 +665,7 @@ export interface FileRouteTypes {
     | '/jobs/new'
     | '/jobs/pending'
     | '/api/admin/allowlist'
+    | '/api/admin/dashboard'
     | '/api/auth/connect'
     | '/api/dashboard/my-work'
     | '/api/diagnostics/$type'
@@ -711,6 +723,7 @@ export interface RootRouteChildren {
   JobsNewRoute: typeof JobsNewRoute
   JobsPendingRoute: typeof JobsPendingRoute
   ApiAdminAllowlistRoute: typeof ApiAdminAllowlistRoute
+  ApiAdminDashboardRoute: typeof ApiAdminDashboardRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
   ApiDashboardMyWorkRoute: typeof ApiDashboardMyWorkRoute
   ApiDiagnosticsTypeRoute: typeof ApiDiagnosticsTypeRoute
@@ -1005,6 +1018,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/dashboard': {
+      id: '/api/admin/dashboard'
+      path: '/api/admin/dashboard'
+      fullPath: '/api/admin/dashboard'
+      preLoaderRoute: typeof ApiAdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/allowlist': {
       id: '/api/admin/allowlist'
       path: '/api/admin/allowlist'
@@ -1187,6 +1207,7 @@ const rootRouteChildren: RootRouteChildren = {
   JobsNewRoute: JobsNewRoute,
   JobsPendingRoute: JobsPendingRoute,
   ApiAdminAllowlistRoute: ApiAdminAllowlistRoute,
+  ApiAdminDashboardRoute: ApiAdminDashboardRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
   ApiDashboardMyWorkRoute: ApiDashboardMyWorkRoute,
   ApiDiagnosticsTypeRoute: ApiDiagnosticsTypeRoute,
