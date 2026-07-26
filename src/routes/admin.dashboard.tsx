@@ -175,28 +175,10 @@ function AdminDashboard() {
           </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <KpiLink to="/jobs/pending" label="Jobs Today" value={s?.jobsToday} tone="blue" />
-          <KpiLink
-            to="/jobs/pending"
-            search={{ queueType: "pending_approval" as const }}
-            label="Pending Approval"
-            value={s?.pendingApproval}
-            tone="amber"
-          />
-          <KpiLink
-            to="/jobs/pending"
-            search={{ queueType: "waiting_customer" as const }}
-            label="Waiting Customer"
-            value={s?.waitingCustomer}
-            tone="amber"
-          />
-          <KpiLink
-            to="/jobs/pending"
-            search={{ queueType: "waiting_vendor" as const }}
-            label="Waiting Vendor"
-            value={s?.waitingVendor}
-            tone="purple"
-          />
+          <StatCard label="Jobs Today" value={s?.jobsToday ?? "—"} tone="blue" />
+          <StatCard label="Pending Approval" value={s?.pendingApproval ?? "—"} tone="amber" />
+          <StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" />
+          <StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" />
           <StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" />
           <StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" />
         </div>
