@@ -756,7 +756,8 @@ function ApprovalPanel({
   onDone: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
-  const [note, setNote] = useState("");
+  const [remarkPublic, setRemarkPublic] = useState("");
+  const [remarkPrivate, setRemarkPrivate] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   async function approve() {
@@ -766,7 +767,10 @@ function ApprovalPanel({
       const res = await fetch(`/api/workspace/jobs/${job.id}/approve`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ note: note.trim() || null }),
+        body: JSON.stringify({
+          remark_public: remarkPublic.trim() || null,
+          remark_private: remarkPrivate.trim() || null,
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? "Failed");
@@ -807,14 +811,31 @@ function ApprovalPanel({
         {job.approval_reason ?? "This job needs Administrator approval before work can start."}
       </p>
       {isAdmin ? (
-        <div className="mt-3 space-y-2">
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional approval note"
-            rows={2}
-            className="w-full rounded-lg border-[1.5px] border-amber-300 bg-white px-3 py-2 text-sm outline-none focus:border-amber-600"
-          />
+        <div className="mt-3 space-y-3">
+          <label className="block">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-900">
+              Remark 1 — Public (posted to timeline, visible to all)
+            </div>
+            <textarea
+              value={remarkPublic}
+              onChange={(e) => setRemarkPublic(e.target.value)}
+              placeholder="Explain the approval so technicians and the customer-facing timeline stay informed…"
+              rows={3}
+              className="w-full rounded-lg border-[1.5px] border-amber-300 bg-white px-3 py-2 text-sm outline-none focus:border-amber-600"
+            />
+          </label>
+          <label className="block">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-900">
+              Remark 2 — Private (Owner / Admin only)
+            </div>
+            <textarea
+              value={remarkPrivate}
+              onChange={(e) => setRemarkPrivate(e.target.value)}
+              placeholder="Confidential context. Never shown on the timeline or to non-admin viewers."
+              rows={3}
+              className="w-full rounded-lg border-[1.5px] border-amber-400 bg-white px-3 py-2 text-sm outline-none focus:border-amber-700"
+            />
+          </label>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
