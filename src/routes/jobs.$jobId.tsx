@@ -284,14 +284,14 @@ function JobDetailPage() {
       <InternalNoteSection
         job={job}
         canEdit={isCreator && !job.is_deleted}
-        onReload={reload}
+        onReload={reloadAll}
       />
 
       <CommentsSection
         jobId={jobId}
         comments={comments}
         disabled={job.is_deleted}
-        onReload={reload}
+        onReload={reloadAll}
       />
 
       <TimelineSection items={timeline} />
@@ -305,7 +305,7 @@ function JobDetailPage() {
       </Section>
 
       {isAdmin && (
-        <AdminDangerZone job={job} onReload={reload} />
+        <AdminDangerZone job={job} onReload={reloadAll} />
       )}
 
       {showPicker && (
@@ -315,11 +315,86 @@ function JobDetailPage() {
           onClose={() => setShowPicker(false)}
           onDone={async () => {
             setShowPicker(false);
-            await reload();
+            await reloadAll();
           }}
         />
       )}
     </div>
+  );
+}
+
+/* ---------------- entitlement card ---------------- */
+
+function EntitlementCard({ job, isAdmin }: { job: JobDetail; isAdmin: boolean }) {
+  const status = (job.entitlement_status_snapshot ?? "").toLowerCase();
+  const tone =
+    status === "active"
+      ? "border-emerald-300 bg-emerald-50"
+      : status === "due soon"
+        ? "border-amber-300 bg-amber-50"
+        : status === "overdue" || status === "expired"
+          ? "border-rose-300 bg-rose-50"
+          : "border-border bg-card";
+  const badge =
+    status === "active"
+      ? "bg-emerald-600 text-white"
+      : status === "due soon"
+        ? "bg-amber-500 text-white"
+        : status === "overdue" || status === "expired"
+          ? "bg-rose-600 text-white"
+          : "bg-muted text-foreground";
+  const approvalLabel =
+    job.status === "Pending Approval"
+      ? "Waiting for Approval"
+      : job.approved_at
+        ? "Approved"
+        : job.rejected_at
+          ? "Rejected"
+          : job.requires_approval
+            ? "Approval required"
+            : null;
+  return (
+    <section className={`rounded-xl border-2 p-4 shadow-sm sm:p-6 ${tone}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Entitlement
+        </h2>
+        {job.entitlement_status_snapshot && (
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badge}`}>
+            {job.entitlement_status_snapshot}
+          </span>
+        )}
+      </div>
+      <dl className="grid gap-2 text-sm sm:grid-cols-2">
+        <Kv k="Category" v={job.subscription_category_snapshot ?? "—"} />
+        <Kv k="Stock" v={job.stock_code_snapshot ?? "—"} />
+        <Kv k="Expiry" v={formatMY(job.entitlement_expiry_snapshot) || "—"} />
+        {approvalLabel && <Kv k="Approval" v={approvalLabel} />}
+        {job.approval_reason && <Kv k="Approval reason" v={job.approval_reason} />}
+        {job.approved_at && (
+          <Kv k="Approved" v={`${formatMYDateTime(job.approved_at)}${job.approved_by_name_snapshot ? ` · ${job.approved_by_name_snapshot}` : ""}`} />
+        )}
+        {(job.approval_remark_public ?? job.approval_note) && (
+          <Kv k="Approval remark" v={job.approval_remark_public ?? job.approval_note} multiline />
+        )}
+        {isAdmin && job.approval_remark_private && (
+          <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-amber-900">
+              Private remark (Owner/Admin only)
+            </div>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950">
+              {job.approval_remark_private}
+            </p>
+          </div>
+        )}
+        {job.rejected_at && (
+          <Kv k="Rejected" v={`${formatMYDateTime(job.rejected_at)}${job.rejected_by_name_snapshot ? ` · ${job.rejected_by_name_snapshot}` : ""}`} />
+        )}
+        {job.rejection_reason && (
+          <Kv k="Rejection reason" v={job.rejection_reason} multiline />
+        )}
+      </dl>
+    </section>
   );
 }
 
