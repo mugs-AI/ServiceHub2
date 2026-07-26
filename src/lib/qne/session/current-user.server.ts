@@ -329,6 +329,9 @@ export async function requireAuthenticatedN3User(
   if (!match) throw new UnauthorizedError("Missing Authorization bearer");
   const token = match[1].trim();
 
+  const cached = readCache(token);
+  if (cached) return cached;
+
   const claims = decodeJwtPayload(token);
   const jwtIdentity = identityFromJwt(claims);
 
