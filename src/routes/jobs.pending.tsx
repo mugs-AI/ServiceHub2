@@ -38,6 +38,10 @@ const QUEUE_TABS = [
 export const Route = createFileRoute("/jobs/pending")({
   validateSearch: (s: Record<string, unknown>) => ({
     scope: s.scope === "team" ? ("team" as const) : undefined,
+    queueType: typeof s.queueType === "string" ? s.queueType : undefined,
+    technician: typeof s.technician === "string" ? s.technician : undefined,
+    technicianName:
+      typeof s.technicianName === "string" ? s.technicianName : undefined,
   }),
   component: PendingQueuePage,
 });
@@ -48,11 +52,12 @@ function authHeaders(): Record<string, string> {
 }
 
 function PendingQueuePage() {
-  const { scope } = Route.useSearch();
+  const { scope, queueType: qtInit, technician: techInit, technicianName } = Route.useSearch();
   const excludeMe = scope === "team";
-  const [queueType, setQueueType] = useState<string>("");
+  const [queueType, setQueueType] = useState<string>(qtInit ?? "");
   const [q, setQ] = useState("");
   const [priority, setPriority] = useState("");
+  const [technicianFilter] = useState<string>(techInit ?? "");
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
