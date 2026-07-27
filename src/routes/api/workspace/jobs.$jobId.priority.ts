@@ -45,6 +45,12 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/priority")({
               { status: 400 },
             );
           }
+          if (job.status === "Pending Approval" && !user.isAdministrator) {
+            return Response.json(
+              { error: "This Job is waiting for Owner/Admin approval. Operational updates are locked until approval." },
+              { status: 400 },
+            );
+          }
           if (job.priority === next) {
             return Response.json({ ok: true, noop: true, job });
           }
