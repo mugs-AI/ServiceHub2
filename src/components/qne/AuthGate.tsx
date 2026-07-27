@@ -178,6 +178,8 @@ function AppHeader() {
             >
               + New Service Job
             </Link>
+            {nav.map((item) => (
+              <NavLink key={item.to} item={item} onClick={() => setMobileOpen(false)} />
             ))}
             {isAdmin && (
               <>
