@@ -391,3 +391,19 @@ function QuickLink({ to, label, primary }: { to: string; label: string; primary?
     </Link>
   );
 }
+
+function StatLink({
+  to,
+  search,
+  children,
+}: {
+  to: string;
+  search?: Record<string, string>;
+  children: ReactNode;
+}) {
+  return (
+    <Link to={to} search={search as never} className="block transition-transform hover:scale-[1.01]">
+      {children}
+    </Link>
+  );
+}
