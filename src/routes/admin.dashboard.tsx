@@ -202,7 +202,13 @@ function AdminDashboard() {
               </thead>
               <tbody className="divide-y">
                 {ops.userWorkload.map((w) => (
-                  <tr key={w.user_id}>
+                  <tr
+                    key={w.user_id}
+                    className="cursor-pointer hover:bg-accent/40"
+                    onClick={() => {
+                      window.location.href = `/jobs/pending?technician=${encodeURIComponent(w.user_id)}&technicianName=${encodeURIComponent(w.name)}`;
+                    }}
+                  >
                     <td className="px-3 py-2 text-foreground">{w.name}</td>
                     <td className="px-3 py-2 text-right font-semibold text-foreground">{w.total}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{w.inProgress}</td>
