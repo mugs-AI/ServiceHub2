@@ -171,8 +171,13 @@ function AppHeader() {
       {mobileOpen && (
         <div className="border-t bg-card md:hidden">
           <nav className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3 text-sm">
-            {nav.map((item) => (
-              <NavLink key={item.to} item={item} onClick={() => setMobileOpen(false)} />
+            <Link
+              to="/jobs/new"
+              onClick={() => setMobileOpen(false)}
+              className="mb-1 rounded-md bg-primary px-3 py-2 text-center text-sm font-semibold text-primary-foreground"
+            >
+              + New Service Job
+            </Link>
             ))}
             {isAdmin && (
               <>
