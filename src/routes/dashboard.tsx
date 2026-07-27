@@ -616,3 +616,11 @@ function QuickLink({ to, label, primary }: { to: string; label: string; primary?
     </Link>
   );
 }
+
+function StatLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="block w-full text-left transition-transform hover:scale-[1.01]">
+      {children}
+    </button>
+  );
+}
