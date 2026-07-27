@@ -246,29 +246,32 @@ function JobDetailPage() {
 
       {/* Top summary row — Job Info | Workflow | Assigned Technician.
           Equal-height via grid; stacks on mobile. */}
-      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-3 md:grid-cols-3">
         <JobInfoCard job={job} />
-        {!job.is_deleted ? (
-          <WorkflowActions job={job} onDone={reloadAll} />
-        ) : (
-          <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Workflow
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              No actions available for a deleted job.
-            </p>
-          </section>
-        )}
-        <AssignmentSection
-          job={job}
-          canAssign={isAdmin && !job.is_deleted}
-          currentUserId={currentUserId}
-          currentDisplayName={session.currentUser?.displayName || session.currentUser?.email || ""}
-          onOpenPicker={() => setShowPicker(true)}
-          onReload={reloadAll}
-        />
-
+        <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
+          {!job.is_deleted ? (
+            <WorkflowActions job={job} onDone={reloadAll} />
+          ) : (
+            <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Workflow
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                No actions available for a deleted job.
+              </p>
+            </section>
+          )}
+        </div>
+        <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
+          <AssignmentSection
+            job={job}
+            canAssign={isAdmin && !job.is_deleted}
+            currentUserId={currentUserId}
+            currentDisplayName={session.currentUser?.displayName || session.currentUser?.email || ""}
+            onOpenPicker={() => setShowPicker(true)}
+            onReload={reloadAll}
+          />
+        </div>
       </div>
 
       {(job.subscription_category_snapshot ||
@@ -280,24 +283,26 @@ function JobDetailPage() {
         <EntitlementCard job={job} isAdmin={isAdmin} />
       )}
 
-      <Section title="Job details">
-        <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
-        <Kv k="Problem" v={job.problem_description} multiline />
-        <PriorityEditor job={job} onDone={reloadAll} />
-      </Section>
+      <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
+        <Section title="Job details">
+          <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
+          <Kv k="Problem" v={job.problem_description} multiline />
+          <PriorityEditor job={job} onDone={reloadAll} />
+        </Section>
 
-      <InternalNoteSection
-        job={job}
-        canEdit={isCreator && !job.is_deleted}
-        onReload={reloadAll}
-      />
+        <InternalNoteSection
+          job={job}
+          canEdit={isCreator && !job.is_deleted && !pendingLock}
+          onReload={reloadAll}
+        />
 
-      <CommentsSection
-        jobId={jobId}
-        comments={comments}
-        disabled={job.is_deleted}
-        onReload={reloadAll}
-      />
+        <CommentsSection
+          jobId={jobId}
+          comments={comments}
+          disabled={job.is_deleted || pendingLock}
+          onReload={reloadAll}
+        />
+      </div>
 
       <TimelineSection items={timeline} />
 
