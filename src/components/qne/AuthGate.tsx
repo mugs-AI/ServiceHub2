@@ -141,6 +141,19 @@ function AppHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <Link
+            to="/jobs/new"
+            className="hidden min-h-9 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:inline-flex"
+          >
+            + New Service Job
+          </Link>
+          <Link
+            to="/jobs/new"
+            aria-label="New Service Job"
+            className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground shadow-sm hover:bg-primary/90 sm:hidden"
+          >
+            +
+          </Link>
           <UserMenu user={currentUser} />
           <button
             type="button"
