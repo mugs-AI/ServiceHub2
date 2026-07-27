@@ -174,11 +174,11 @@ function AdminDashboard() {
             {opsErr}
           </p>
         )}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <StatCard label="Jobs Today" value={s?.jobsToday ?? "—"} tone="blue" />
-          <StatCard label="Pending Approval" value={s?.pendingApproval ?? "—"} tone="amber" />
-          <StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" />
-          <StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6">
+          <StatLink to="/support"><StatCard label="Jobs Today" value={s?.jobsToday ?? "—"} tone="blue" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "pending_approval" }}><StatCard label="Pending Approval" value={s?.pendingApproval ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "waiting_customer" }}><StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "waiting_vendor" }}><StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" /></StatLink>
           <StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" />
           <StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" />
         </div>
