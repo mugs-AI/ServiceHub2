@@ -38,6 +38,10 @@ const QUEUE_TABS = [
 export const Route = createFileRoute("/jobs/pending")({
   validateSearch: (s: Record<string, unknown>) => ({
     scope: s.scope === "team" ? ("team" as const) : undefined,
+    queueType: typeof s.queueType === "string" ? s.queueType : undefined,
+    technician: typeof s.technician === "string" ? s.technician : undefined,
+    technicianName:
+      typeof s.technicianName === "string" ? s.technicianName : undefined,
   }),
   component: PendingQueuePage,
 });
@@ -48,11 +52,12 @@ function authHeaders(): Record<string, string> {
 }
 
 function PendingQueuePage() {
-  const { scope } = Route.useSearch();
+  const { scope, queueType: qtInit, technician: techInit, technicianName } = Route.useSearch();
   const excludeMe = scope === "team";
-  const [queueType, setQueueType] = useState<string>("");
+  const [queueType, setQueueType] = useState<string>(qtInit ?? "");
   const [q, setQ] = useState("");
   const [priority, setPriority] = useState("");
+  const [technicianFilter] = useState<string>(techInit ?? "");
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
@@ -74,6 +79,7 @@ function PendingQueuePage() {
       if (queueType) sp.set("queueType", queueType);
       if (q.trim()) sp.set("q", q.trim());
       if (priority) sp.set("priority", priority);
+      if (technicianFilter) sp.set("technician", technicianFilter);
       if (excludeMe) sp.set("excludeMe", "1");
       const res = await fetch(`/api/workspace/jobs/pending?${sp.toString()}`, {
         headers: authHeaders(),
@@ -87,7 +93,7 @@ function PendingQueuePage() {
     } finally {
       setLoading(false);
     }
-  }, [queueType, q, priority, page]);
+  }, [queueType, q, priority, technicianFilter, excludeMe, page]);
 
   useEffect(() => {
     void reload();
@@ -115,6 +121,12 @@ function PendingQueuePage() {
               ? "Office-wide pending jobs, excluding jobs assigned to you."
               : "Sorted by priority (High → Low), then oldest waiting first."}
           </p>
+          {technicianFilter && (
+            <p className="mt-1 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              Technician: {technicianName ?? technicianFilter}
+              <Link to="/jobs/pending" className="text-primary/70 hover:text-primary">clear</Link>
+            </p>
+          )}
         </div>
         <Link
           to="/support"

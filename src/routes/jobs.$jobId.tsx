@@ -172,19 +172,21 @@ function JobDetailPage() {
     !!currentUserId &&
     job.created_by_user_id === currentUserId;
 
+  const pendingLock = job.status === "Pending Approval" && !isAdmin;
+
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <header className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-3">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               Service Job
             </span>
-            <span className="font-mono text-2xl font-bold text-foreground sm:text-3xl">
+            <h1 className="font-mono text-2xl font-bold text-foreground sm:text-3xl">
               {job.job_number}
-            </span>
-          </h1>
-          <p className="mt-1 break-words text-base font-medium text-muted-foreground sm:text-lg">
+            </h1>
+          </div>
+          <p className="mt-1 break-words text-lg font-bold text-foreground sm:text-xl">
             {job.subject}
           </p>
         </div>
@@ -226,12 +228,15 @@ function JobDetailPage() {
         >
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-              Waiting for Approval
+              🔒 Waiting for Approval
             </span>
             <span className="font-medium">
               {job.approval_reason ?? "Administrator approval required before work can start."}
             </span>
           </div>
+          <p className="mt-1 text-xs text-amber-800">
+            This Job is waiting for Owner/Admin approval. Operational updates are locked until approval.
+          </p>
         </div>
       )}
 
@@ -241,29 +246,32 @@ function JobDetailPage() {
 
       {/* Top summary row — Job Info | Workflow | Assigned Technician.
           Equal-height via grid; stacks on mobile. */}
-      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-3 md:grid-cols-3">
         <JobInfoCard job={job} />
-        {!job.is_deleted ? (
-          <WorkflowActions job={job} onDone={reloadAll} />
-        ) : (
-          <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Workflow
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              No actions available for a deleted job.
-            </p>
-          </section>
-        )}
-        <AssignmentSection
-          job={job}
-          canAssign={isAdmin && !job.is_deleted}
-          currentUserId={currentUserId}
-          currentDisplayName={session.currentUser?.displayName || session.currentUser?.email || ""}
-          onOpenPicker={() => setShowPicker(true)}
-          onReload={reloadAll}
-        />
-
+        <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
+          {!job.is_deleted ? (
+            <WorkflowActions job={job} onDone={reloadAll} />
+          ) : (
+            <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Workflow
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                No actions available for a deleted job.
+              </p>
+            </section>
+          )}
+        </div>
+        <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
+          <AssignmentSection
+            job={job}
+            canAssign={isAdmin && !job.is_deleted}
+            currentUserId={currentUserId}
+            currentDisplayName={session.currentUser?.displayName || session.currentUser?.email || ""}
+            onOpenPicker={() => setShowPicker(true)}
+            onReload={reloadAll}
+          />
+        </div>
       </div>
 
       {(job.subscription_category_snapshot ||
@@ -275,24 +283,26 @@ function JobDetailPage() {
         <EntitlementCard job={job} isAdmin={isAdmin} />
       )}
 
-      <Section title="Job details">
-        <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
-        <Kv k="Problem" v={job.problem_description} multiline />
-        <PriorityEditor job={job} onDone={reloadAll} />
-      </Section>
+      <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
+        <Section title="Job details">
+          <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
+          <Kv k="Problem" v={job.problem_description} multiline />
+          <PriorityEditor job={job} onDone={reloadAll} />
+        </Section>
 
-      <InternalNoteSection
-        job={job}
-        canEdit={isCreator && !job.is_deleted}
-        onReload={reloadAll}
-      />
+        <InternalNoteSection
+          job={job}
+          canEdit={isCreator && !job.is_deleted && !pendingLock}
+          onReload={reloadAll}
+        />
 
-      <CommentsSection
-        jobId={jobId}
-        comments={comments}
-        disabled={job.is_deleted}
-        onReload={reloadAll}
-      />
+        <CommentsSection
+          jobId={jobId}
+          comments={comments}
+          disabled={job.is_deleted || pendingLock}
+          onReload={reloadAll}
+        />
+      </div>
 
       <TimelineSection items={timeline} />
 
@@ -353,11 +363,21 @@ function EntitlementCard({ job, isAdmin }: { job: JobDetail; isAdmin: boolean })
           : job.requires_approval
             ? "Approval required"
             : null;
+  const hasApproval =
+    approvalLabel ||
+    job.approval_reason ||
+    job.approved_at ||
+    job.approval_remark_public ||
+    job.approval_note ||
+    (isAdmin && job.approval_remark_private) ||
+    job.rejected_at ||
+    job.rejection_reason;
+
   return (
-    <section className={`rounded-xl border-2 p-4 shadow-sm sm:p-6 ${tone}`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Entitlement
+    <section className={`rounded-xl border-2 p-3 shadow-sm sm:p-4 ${tone}`}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Entitlement &amp; Approval
         </h2>
         {job.entitlement_status_snapshot && (
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badge}`}>
@@ -365,35 +385,51 @@ function EntitlementCard({ job, isAdmin }: { job: JobDetail; isAdmin: boolean })
           </span>
         )}
       </div>
-      <dl className="grid gap-2 text-sm sm:grid-cols-2">
-        <Kv k="Category" v={job.subscription_category_snapshot ?? "—"} />
-        <Kv k="Stock" v={job.stock_code_snapshot ?? "—"} />
-        <Kv k="Expiry" v={formatMY(job.entitlement_expiry_snapshot) || "—"} />
-        {approvalLabel && <Kv k="Approval" v={approvalLabel} />}
-        {job.approval_reason && <Kv k="Approval reason" v={job.approval_reason} />}
-        {job.approved_at && (
-          <Kv k="Approved" v={`${formatMYDateTime(job.approved_at)}${job.approved_by_name_snapshot ? ` · ${job.approved_by_name_snapshot}` : ""}`} />
-        )}
-        {(job.approval_remark_public ?? job.approval_note) && (
-          <Kv k="Approval remark" v={job.approval_remark_public ?? job.approval_note} multiline />
-        )}
-        {isAdmin && job.approval_remark_private && (
-          <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-amber-900">
-              Private remark (Owner/Admin only)
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            Entitlement details
+          </div>
+          <dl className="grid gap-1.5 text-sm">
+            <Kv k="Category" v={job.subscription_category_snapshot ?? "—"} />
+            <Kv k="Stock" v={job.stock_code_snapshot ?? "—"} />
+            <Kv k="Expiry" v={formatMY(job.entitlement_expiry_snapshot) || "—"} />
+          </dl>
+        </div>
+        {hasApproval && (
+          <div className="md:border-l md:border-border/60 md:pl-4">
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Approval
             </div>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950">
-              {job.approval_remark_private}
-            </p>
+            <dl className="grid gap-1.5 text-sm">
+              {approvalLabel && <Kv k="Status" v={approvalLabel} />}
+              {job.approval_reason && <Kv k="Reason" v={job.approval_reason} />}
+              {job.approved_at && (
+                <Kv k="Approved" v={`${formatMYDateTime(job.approved_at)}${job.approved_by_name_snapshot ? ` · ${job.approved_by_name_snapshot}` : ""}`} />
+              )}
+              {(job.approval_remark_public ?? job.approval_note) && (
+                <Kv k="Remark" v={job.approval_remark_public ?? job.approval_note} multiline />
+              )}
+              {job.rejected_at && (
+                <Kv k="Rejected" v={`${formatMYDateTime(job.rejected_at)}${job.rejected_by_name_snapshot ? ` · ${job.rejected_by_name_snapshot}` : ""}`} />
+              )}
+              {job.rejection_reason && (
+                <Kv k="Rejection reason" v={job.rejection_reason} multiline />
+              )}
+            </dl>
+            {isAdmin && job.approval_remark_private && (
+              <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                  Private remark (Owner/Admin only)
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950">
+                  {job.approval_remark_private}
+                </p>
+              </div>
+            )}
           </div>
         )}
-        {job.rejected_at && (
-          <Kv k="Rejected" v={`${formatMYDateTime(job.rejected_at)}${job.rejected_by_name_snapshot ? ` · ${job.rejected_by_name_snapshot}` : ""}`} />
-        )}
-        {job.rejection_reason && (
-          <Kv k="Rejection reason" v={job.rejection_reason} multiline />
-        )}
-      </dl>
+      </div>
     </section>
   );
 }
@@ -408,14 +444,14 @@ function priorityTone(p: string): string {
 
 function JobInfoCard({ job }: { job: JobDetail }) {
   return (
-    <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+    <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Job information
       </h2>
-      <dl className="space-y-2 text-sm">
+      <dl className="space-y-1.5 text-sm">
         <div className="flex justify-between gap-3">
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Source</dt>
-          <dd className="text-right text-foreground">{job.source}</dd>
+          <dd className="text-right font-semibold text-foreground">{job.source}</dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Created</dt>
@@ -696,15 +732,10 @@ function WorkflowActions({
   }
 
   return (
-    <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+    <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Workflow
       </h2>
-      {job.status === "Draft" && (
-        <p className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-900 ring-1 ring-blue-200">
-          Draft jobs auto-route: submitting with a technician assigned goes to <strong>Assigned</strong>; without one, it goes to <strong>Open</strong>.
-        </p>
-      )}
       <div className="flex flex-wrap gap-2">
         {transitions.map((to) => (
           <button
@@ -712,7 +743,7 @@ function WorkflowActions({
             type="button"
             onClick={() => transition(to)}
             disabled={!!busy}
-            className={`min-h-11 rounded-lg px-4 text-sm font-semibold shadow-sm disabled:opacity-50 ${
+            className={`min-h-10 rounded-lg px-3 text-sm font-semibold shadow-sm disabled:opacity-50 ${
               to === "Cancelled"
                 ? "border border-destructive/40 bg-white text-destructive hover:bg-destructive/10"
                 : "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -722,6 +753,11 @@ function WorkflowActions({
           </button>
         ))}
       </div>
+      {job.status === "Draft" && (
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          Submitting a Draft with a technician assigned routes to <strong>Assigned</strong>; without one, to <strong>Open</strong>.
+        </p>
+      )}
       {err && (
         <div className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {err}

@@ -57,12 +57,18 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/comments")({
 
           const { data: job } = await supabaseAdmin
             .from("service_jobs")
-            .select("id, is_deleted")
+            .select("id, is_deleted, status")
             .eq("tenant_code", user.tenantCode)
             .eq("id", params.jobId)
             .maybeSingle();
           if (!job) return Response.json({ error: "Job not found." }, { status: 404 });
           if (job.is_deleted) return Response.json({ error: "Deleted job cannot be commented on." }, { status: 400 });
+          if (job.status === "Pending Approval" && !user.isAdministrator) {
+            return Response.json(
+              { error: "This Job is waiting for Owner/Admin approval. Comments are locked until approval." },
+              { status: 400 },
+            );
+          }
 
           const actorId = user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
           const actorName = user.displayName || user.email || null;

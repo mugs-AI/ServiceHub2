@@ -258,13 +258,13 @@ function UserDashboard() {
 
       <section>
         <SectionTitle>My work</SectionTitle>
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
-          <MiniStat label="My Pending Tasks" value={summary.myPendingTasks} tone="blue" emphasise />
-          <MiniStat label="Assigned to Me" value={summary.assignedToMe} tone="blue" />
-          <MiniStat label="Waiting Approval" value={summary.myWaitingApproval} tone="amber" />
-          <MiniStat label="My In Progress" value={summary.myInProgress} tone="amber" />
-          <MiniStat label="My Waiting Customer" value={summary.myWaitingCustomer} tone="amber" />
-          <MiniStat label="My Waiting Vendor" value={summary.myWaitingVendor} tone="purple" />
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS })}><MiniStat label="My Pending Tasks" value={summary.myPendingTasks} tone="blue" emphasise /></StatLink>
+          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["Assigned"] })}><MiniStat label="Assigned to Me" value={summary.assignedToMe} tone="blue" /></StatLink>
+          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["Pending Approval"] })}><MiniStat label="Waiting Approval" value={summary.myWaitingApproval} tone="amber" /></StatLink>
+          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["In Progress"] })}><MiniStat label="My In Progress" value={summary.myInProgress} tone="amber" /></StatLink>
+          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["Waiting Customer"] })}><MiniStat label="My Waiting Customer" value={summary.myWaitingCustomer} tone="amber" /></StatLink>
+          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["Waiting Vendor"] })}><MiniStat label="My Waiting Vendor" value={summary.myWaitingVendor} tone="purple" /></StatLink>
           <MiniStat label="Completed by Me Today" value={summary.completedByMeToday} tone="green" />
         </div>
         <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -614,5 +614,13 @@ function QuickLink({ to, label, primary }: { to: string; label: string; primary?
     >
       {label}
     </Link>
+  );
+}
+
+function StatLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="block w-full text-left transition-transform hover:scale-[1.01]">
+      {children}
+    </button>
   );
 }

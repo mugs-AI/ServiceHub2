@@ -141,6 +141,19 @@ function AppHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <Link
+            to="/jobs/new"
+            className="hidden min-h-9 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:inline-flex"
+          >
+            + New Service Job
+          </Link>
+          <Link
+            to="/jobs/new"
+            aria-label="New Service Job"
+            className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground shadow-sm hover:bg-primary/90 sm:hidden"
+          >
+            +
+          </Link>
           <UserMenu user={currentUser} />
           <button
             type="button"
@@ -158,6 +171,13 @@ function AppHeader() {
       {mobileOpen && (
         <div className="border-t bg-card md:hidden">
           <nav className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3 text-sm">
+            <Link
+              to="/jobs/new"
+              onClick={() => setMobileOpen(false)}
+              className="mb-1 rounded-md bg-primary px-3 py-2 text-center text-sm font-semibold text-primary-foreground"
+            >
+              + New Service Job
+            </Link>
             {nav.map((item) => (
               <NavLink key={item.to} item={item} onClick={() => setMobileOpen(false)} />
             ))}
