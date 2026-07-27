@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/internal-note")
 
           const { data: job, error: jobErr } = await supabaseAdmin
             .from("service_jobs")
-            .select("id, is_deleted, created_by_user_id, internal_note")
+            .select("id, is_deleted, status, created_by_user_id, internal_note")
             .eq("tenant_code", user.tenantCode)
             .eq("id", params.jobId)
             .maybeSingle();
@@ -29,6 +29,12 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/internal-note")
           if (!job) return Response.json({ error: "Job not found." }, { status: 404 });
           if (job.is_deleted) {
             return Response.json({ error: "Deleted job cannot be modified." }, { status: 400 });
+          }
+          if (job.status === "Pending Approval" && !user.isAdministrator) {
+            return Response.json(
+              { error: "This Job is waiting for Owner/Admin approval. Operational updates are locked until approval." },
+              { status: 400 },
+            );
           }
 
           const actorId = user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
