@@ -79,6 +79,7 @@ function PendingQueuePage() {
       if (queueType) sp.set("queueType", queueType);
       if (q.trim()) sp.set("q", q.trim());
       if (priority) sp.set("priority", priority);
+      if (technicianFilter) sp.set("technician", technicianFilter);
       if (excludeMe) sp.set("excludeMe", "1");
       const res = await fetch(`/api/workspace/jobs/pending?${sp.toString()}`, {
         headers: authHeaders(),
@@ -92,7 +93,7 @@ function PendingQueuePage() {
     } finally {
       setLoading(false);
     }
-  }, [queueType, q, priority, page]);
+  }, [queueType, q, priority, technicianFilter, excludeMe, page]);
 
   useEffect(() => {
     void reload();
