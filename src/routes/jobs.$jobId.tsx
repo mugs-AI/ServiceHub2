@@ -418,14 +418,14 @@ function priorityTone(p: string): string {
 
 function JobInfoCard({ job }: { job: JobDetail }) {
   return (
-    <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+    <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Job information
       </h2>
-      <dl className="space-y-2 text-sm">
+      <dl className="space-y-1.5 text-sm">
         <div className="flex justify-between gap-3">
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Source</dt>
-          <dd className="text-right text-foreground">{job.source}</dd>
+          <dd className="text-right font-semibold text-foreground">{job.source}</dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Created</dt>
