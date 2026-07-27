@@ -706,15 +706,10 @@ function WorkflowActions({
   }
 
   return (
-    <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+    <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Workflow
       </h2>
-      {job.status === "Draft" && (
-        <p className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-900 ring-1 ring-blue-200">
-          Draft jobs auto-route: submitting with a technician assigned goes to <strong>Assigned</strong>; without one, it goes to <strong>Open</strong>.
-        </p>
-      )}
       <div className="flex flex-wrap gap-2">
         {transitions.map((to) => (
           <button
@@ -722,7 +717,7 @@ function WorkflowActions({
             type="button"
             onClick={() => transition(to)}
             disabled={!!busy}
-            className={`min-h-11 rounded-lg px-4 text-sm font-semibold shadow-sm disabled:opacity-50 ${
+            className={`min-h-10 rounded-lg px-3 text-sm font-semibold shadow-sm disabled:opacity-50 ${
               to === "Cancelled"
                 ? "border border-destructive/40 bg-white text-destructive hover:bg-destructive/10"
                 : "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -732,6 +727,11 @@ function WorkflowActions({
           </button>
         ))}
       </div>
+      {job.status === "Draft" && (
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          Submitting a Draft with a technician assigned routes to <strong>Assigned</strong>; without one, to <strong>Open</strong>.
+        </p>
+      )}
       {err && (
         <div className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {err}
