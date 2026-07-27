@@ -363,11 +363,21 @@ function EntitlementCard({ job, isAdmin }: { job: JobDetail; isAdmin: boolean })
           : job.requires_approval
             ? "Approval required"
             : null;
+  const hasApproval =
+    approvalLabel ||
+    job.approval_reason ||
+    job.approved_at ||
+    job.approval_remark_public ||
+    job.approval_note ||
+    (isAdmin && job.approval_remark_private) ||
+    job.rejected_at ||
+    job.rejection_reason;
+
   return (
-    <section className={`rounded-xl border-2 p-4 shadow-sm sm:p-6 ${tone}`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Entitlement
+    <section className={`rounded-xl border-2 p-3 shadow-sm sm:p-4 ${tone}`}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Entitlement &amp; Approval
         </h2>
         {job.entitlement_status_snapshot && (
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badge}`}>
@@ -375,35 +385,51 @@ function EntitlementCard({ job, isAdmin }: { job: JobDetail; isAdmin: boolean })
           </span>
         )}
       </div>
-      <dl className="grid gap-2 text-sm sm:grid-cols-2">
-        <Kv k="Category" v={job.subscription_category_snapshot ?? "—"} />
-        <Kv k="Stock" v={job.stock_code_snapshot ?? "—"} />
-        <Kv k="Expiry" v={formatMY(job.entitlement_expiry_snapshot) || "—"} />
-        {approvalLabel && <Kv k="Approval" v={approvalLabel} />}
-        {job.approval_reason && <Kv k="Approval reason" v={job.approval_reason} />}
-        {job.approved_at && (
-          <Kv k="Approved" v={`${formatMYDateTime(job.approved_at)}${job.approved_by_name_snapshot ? ` · ${job.approved_by_name_snapshot}` : ""}`} />
-        )}
-        {(job.approval_remark_public ?? job.approval_note) && (
-          <Kv k="Approval remark" v={job.approval_remark_public ?? job.approval_note} multiline />
-        )}
-        {isAdmin && job.approval_remark_private && (
-          <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-amber-900">
-              Private remark (Owner/Admin only)
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            Entitlement details
+          </div>
+          <dl className="grid gap-1.5 text-sm">
+            <Kv k="Category" v={job.subscription_category_snapshot ?? "—"} />
+            <Kv k="Stock" v={job.stock_code_snapshot ?? "—"} />
+            <Kv k="Expiry" v={formatMY(job.entitlement_expiry_snapshot) || "—"} />
+          </dl>
+        </div>
+        {hasApproval && (
+          <div className="md:border-l md:border-border/60 md:pl-4">
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Approval
             </div>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950">
-              {job.approval_remark_private}
-            </p>
+            <dl className="grid gap-1.5 text-sm">
+              {approvalLabel && <Kv k="Status" v={approvalLabel} />}
+              {job.approval_reason && <Kv k="Reason" v={job.approval_reason} />}
+              {job.approved_at && (
+                <Kv k="Approved" v={`${formatMYDateTime(job.approved_at)}${job.approved_by_name_snapshot ? ` · ${job.approved_by_name_snapshot}` : ""}`} />
+              )}
+              {(job.approval_remark_public ?? job.approval_note) && (
+                <Kv k="Remark" v={job.approval_remark_public ?? job.approval_note} multiline />
+              )}
+              {job.rejected_at && (
+                <Kv k="Rejected" v={`${formatMYDateTime(job.rejected_at)}${job.rejected_by_name_snapshot ? ` · ${job.rejected_by_name_snapshot}` : ""}`} />
+              )}
+              {job.rejection_reason && (
+                <Kv k="Rejection reason" v={job.rejection_reason} multiline />
+              )}
+            </dl>
+            {isAdmin && job.approval_remark_private && (
+              <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                  Private remark (Owner/Admin only)
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-amber-950">
+                  {job.approval_remark_private}
+                </p>
+              </div>
+            )}
           </div>
         )}
-        {job.rejected_at && (
-          <Kv k="Rejected" v={`${formatMYDateTime(job.rejected_at)}${job.rejected_by_name_snapshot ? ` · ${job.rejected_by_name_snapshot}` : ""}`} />
-        )}
-        {job.rejection_reason && (
-          <Kv k="Rejection reason" v={job.rejection_reason} multiline />
-        )}
-      </dl>
+      </div>
     </section>
   );
 }
