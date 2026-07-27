@@ -172,19 +172,21 @@ function JobDetailPage() {
     !!currentUserId &&
     job.created_by_user_id === currentUserId;
 
+  const pendingLock = job.status === "Pending Approval" && !isAdmin;
+
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <header className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-3">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               Service Job
             </span>
-            <span className="font-mono text-2xl font-bold text-foreground sm:text-3xl">
+            <h1 className="font-mono text-2xl font-bold text-foreground sm:text-3xl">
               {job.job_number}
-            </span>
-          </h1>
-          <p className="mt-1 break-words text-base font-medium text-muted-foreground sm:text-lg">
+            </h1>
+          </div>
+          <p className="mt-1 break-words text-lg font-bold text-foreground sm:text-xl">
             {job.subject}
           </p>
         </div>
@@ -226,12 +228,15 @@ function JobDetailPage() {
         >
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-              Waiting for Approval
+              🔒 Waiting for Approval
             </span>
             <span className="font-medium">
               {job.approval_reason ?? "Administrator approval required before work can start."}
             </span>
           </div>
+          <p className="mt-1 text-xs text-amber-800">
+            This Job is waiting for Owner/Admin approval. Operational updates are locked until approval.
+          </p>
         </div>
       )}
 
