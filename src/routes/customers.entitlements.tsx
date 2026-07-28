@@ -34,10 +34,7 @@ function authHeaders(): Record<string, string> {
 }
 
 function EntitlementCustomersPage() {
-  const { status: rawStatus } = Route.useSearch();
-  const status = ["active", "due_soon", "overdue"].includes(rawStatus)
-    ? rawStatus
-    : "due_soon";
+  const { status } = Route.useSearch();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
