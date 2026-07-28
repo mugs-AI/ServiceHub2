@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 import { useTabs } from "@/lib/tabs";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
+import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
 
 export const Route = createFileRoute("/dashboard")({
   component: UserDashboard,
