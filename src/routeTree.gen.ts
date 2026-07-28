@@ -25,6 +25,7 @@ import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as ApiWorkspaceTechniciansRouteImport } from './routes/api/workspace/technicians'
 import { Route as ApiWorkspaceJobsRouteImport } from './routes/api/workspace/jobs'
+import { Route as ApiWorkspaceEntitlementCustomersRouteImport } from './routes/api/workspace/entitlement-customers'
 import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspace/customers'
 import { Route as ApiWorkspaceCustomerSubscriptionsRouteImport } from './routes/api/workspace/customer-subscriptions'
 import { Route as ApiSyncSubscriptionsRouteImport } from './routes/api/sync/subscriptions'
@@ -145,6 +146,12 @@ const ApiWorkspaceJobsRoute = ApiWorkspaceJobsRouteImport.update({
   path: '/api/workspace/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceEntitlementCustomersRoute =
+  ApiWorkspaceEntitlementCustomersRouteImport.update({
+    id: '/api/workspace/entitlement-customers',
+    path: '/api/workspace/entitlement-customers',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiWorkspaceCustomersRoute = ApiWorkspaceCustomersRouteImport.update({
   id: '/api/workspace/customers',
   path: '/api/workspace/customers',
@@ -400,6 +407,7 @@ export interface FileRoutesByFullPath {
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
+  '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
@@ -457,6 +465,7 @@ export interface FileRoutesByTo {
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
+  '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
@@ -515,6 +524,7 @@ export interface FileRoutesById {
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
+  '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
@@ -574,6 +584,7 @@ export interface FileRouteTypes {
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
+    | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
@@ -631,6 +642,7 @@ export interface FileRouteTypes {
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
+    | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
@@ -688,6 +700,7 @@ export interface FileRouteTypes {
     | '/api/sync/subscriptions'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
+    | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
     | '/api/workspace/jobs/$jobId'
@@ -746,6 +759,7 @@ export interface RootRouteChildren {
   ApiSyncSubscriptionsRoute: typeof ApiSyncSubscriptionsRoute
   ApiWorkspaceCustomerSubscriptionsRoute: typeof ApiWorkspaceCustomerSubscriptionsRoute
   ApiWorkspaceCustomersRoute: typeof ApiWorkspaceCustomersRoute
+  ApiWorkspaceEntitlementCustomersRoute: typeof ApiWorkspaceEntitlementCustomersRoute
   ApiWorkspaceJobsRoute: typeof ApiWorkspaceJobsRouteWithChildren
   ApiWorkspaceTechniciansRoute: typeof ApiWorkspaceTechniciansRoute
 }
@@ -862,6 +876,13 @@ declare module '@tanstack/react-router' {
       path: '/api/workspace/jobs'
       fullPath: '/api/workspace/jobs'
       preLoaderRoute: typeof ApiWorkspaceJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/entitlement-customers': {
+      id: '/api/workspace/entitlement-customers'
+      path: '/api/workspace/entitlement-customers'
+      fullPath: '/api/workspace/entitlement-customers'
+      preLoaderRoute: typeof ApiWorkspaceEntitlementCustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workspace/customers': {
@@ -1233,6 +1254,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceCustomerSubscriptionsRoute:
     ApiWorkspaceCustomerSubscriptionsRoute,
   ApiWorkspaceCustomersRoute: ApiWorkspaceCustomersRoute,
+  ApiWorkspaceEntitlementCustomersRoute: ApiWorkspaceEntitlementCustomersRoute,
   ApiWorkspaceJobsRoute: ApiWorkspaceJobsRouteWithChildren,
   ApiWorkspaceTechniciansRoute: ApiWorkspaceTechniciansRoute,
 }

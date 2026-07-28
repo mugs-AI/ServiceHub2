@@ -108,10 +108,22 @@ function MYDateInput({
   value: string;
   onChange: (iso: string) => void;
 }) {
+  // Single field: renders as text (dd/mm/yyyy) but the native calendar
+  // picker is opened via the calendar icon button on the right. No
+  // duplicate date box, no double-control on mobile.
   const [text, setText] = useState(isoToMY(value));
+  const pickerRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => setText(isoToMY(value)), [value]);
+  const openPicker = () => {
+    const el = pickerRef.current;
+    if (!el) return;
+    // Chromium & modern Safari support showPicker(); fall back to click.
+    const anyEl = el as HTMLInputElement & { showPicker?: () => void };
+    if (typeof anyEl.showPicker === "function") anyEl.showPicker();
+    else el.click();
+  };
   return (
-    <div className="flex items-center gap-1">
+    <div className="relative w-40">
       <input
         type="text"
         inputMode="numeric"
@@ -123,14 +135,27 @@ function MYDateInput({
           if (iso) onChange(iso);
           else setText(isoToMY(value));
         }}
-        className="min-h-11 w-32 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+        className="min-h-11 w-full rounded-lg border-[1.5px] border-gray-300 bg-white pl-3 pr-10 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
       />
+      <button
+        type="button"
+        onClick={openPicker}
+        aria-label="Open calendar"
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+      </button>
       <input
+        ref={pickerRef}
         type="date"
         value={value}
         onChange={(e) => e.target.value && onChange(e.target.value)}
-        className="min-h-11 w-11 cursor-pointer rounded-lg border-[1.5px] border-gray-300 bg-white px-1 text-sm outline-none focus:border-blue-600"
-        aria-label="Pick date"
+        className="pointer-events-none absolute inset-0 h-0 w-0 opacity-0"
+        tabIndex={-1}
+        aria-hidden="true"
       />
     </div>
   );
