@@ -5,6 +5,8 @@ import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
 import { formatMY } from "@/lib/format-date";
+import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
+
 
 
 export const Route = createFileRoute("/support")({
@@ -108,10 +110,22 @@ function MYDateInput({
   value: string;
   onChange: (iso: string) => void;
 }) {
+  // Single field: renders as text (dd/mm/yyyy) but the native calendar
+  // picker is opened via the calendar icon button on the right. No
+  // duplicate date box, no double-control on mobile.
   const [text, setText] = useState(isoToMY(value));
+  const pickerRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => setText(isoToMY(value)), [value]);
+  const openPicker = () => {
+    const el = pickerRef.current;
+    if (!el) return;
+    // Chromium & modern Safari support showPicker(); fall back to click.
+    const anyEl = el as HTMLInputElement & { showPicker?: () => void };
+    if (typeof anyEl.showPicker === "function") anyEl.showPicker();
+    else el.click();
+  };
   return (
-    <div className="flex items-center gap-1">
+    <div className="relative w-40">
       <input
         type="text"
         inputMode="numeric"
@@ -123,14 +137,27 @@ function MYDateInput({
           if (iso) onChange(iso);
           else setText(isoToMY(value));
         }}
-        className="min-h-11 w-32 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+        className="min-h-11 w-full rounded-lg border-[1.5px] border-gray-300 bg-white pl-3 pr-10 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
       />
+      <button
+        type="button"
+        onClick={openPicker}
+        aria-label="Open calendar"
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+      </button>
       <input
+        ref={pickerRef}
         type="date"
         value={value}
         onChange={(e) => e.target.value && onChange(e.target.value)}
-        className="min-h-11 w-11 cursor-pointer rounded-lg border-[1.5px] border-gray-300 bg-white px-1 text-sm outline-none focus:border-blue-600"
-        aria-label="Pick date"
+        className="pointer-events-none absolute inset-0 h-0 w-0 opacity-0"
+        tabIndex={-1}
+        aria-hidden="true"
       />
     </div>
   );
@@ -216,15 +243,15 @@ function SupportWorkspace() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Customer search
           </h2>
-          <Link
-            to="/jobs/new"
-            search={
-              customer ? { customerCode: customer.customer_code } : undefined
-            }
-            className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-          >
-            + New Service Job
-          </Link>
+          {customer && (
+            <Link
+              to="/jobs/new"
+              search={{ customerCode: customer.customer_code }}
+              className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+            >
+              + New Job for This Customer
+            </Link>
+          )}
         </div>
         <CustomerSearchBox
           selected={customer}
@@ -337,70 +364,73 @@ function CustomerSearchBox({
     return () => clearTimeout(t);
   }, [q, run]);
 
-  if (selected) {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 text-sm">
-        <div>
-          <div className="font-semibold text-foreground">
-            {selected.customer_name ?? "(no name)"}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {selected.customer_code}
-            {selected.contact_person ? ` · ${selected.contact_person}` : ""}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            onClear();
-            setQ("");
-            setRows([]);
-          }}
-          className="min-h-11 rounded-lg border px-3 text-xs font-semibold text-muted-foreground hover:bg-accent"
-        >
-          Change customer
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative">
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onFocus={() => rows.length > 0 && setOpen(true)}
-        placeholder="Search Customer name, code, phone or email…"
-        className="min-h-11 w-full rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
-      />
-      {err && <p className="mt-1 text-xs text-destructive">{err}</p>}
-      {loading && <p className="mt-1 text-xs text-muted-foreground">Searching…</p>}
-      {open && rows.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border bg-popover shadow-lg">
-          {rows.map((c) => (
-            <li key={c.customer_code}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelect(c);
-                  setOpen(false);
-                  setQ("");
-                  setRows([]);
-                }}
-                className="block w-full border-b px-3 py-2 text-left text-sm hover:bg-accent"
-              >
-                <div className="font-medium text-foreground">
-                  {c.customer_name ?? "(no name)"}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {c.customer_code}
-                  {c.contact_person ? ` · ${c.contact_person}` : ""}
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
+    <div className="space-y-2">
+      {selected && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-primary/5 px-3 py-2 text-sm">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-foreground">
+              {selected.customer_name ?? "(no name)"}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">
+              {selected.customer_code}
+              {selected.contact_person ? ` · ${selected.contact_person}` : ""}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onClear();
+              setQ("");
+              setRows([]);
+            }}
+            className="min-h-9 shrink-0 rounded-md border bg-background px-3 text-xs font-semibold text-muted-foreground hover:bg-accent"
+          >
+            Clear
+          </button>
+        </div>
       )}
+      <div className="relative">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => rows.length > 0 && setOpen(true)}
+          placeholder={
+            selected
+              ? "Search another Customer to switch…"
+              : "Search Customer name, code, phone or email…"
+          }
+          className="min-h-11 w-full rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+        />
+        {err && <p className="mt-1 text-xs text-destructive">{err}</p>}
+        {loading && <p className="mt-1 text-xs text-muted-foreground">Searching…</p>}
+        {open && rows.length > 0 && (
+          <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border bg-popover shadow-lg">
+            {rows.map((c) => (
+              <li key={c.customer_code}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(c);
+                    setOpen(false);
+                    setQ("");
+                    setRows([]);
+                  }}
+                  className="block w-full border-b px-3 py-2 text-left text-sm hover:bg-accent"
+                >
+                  <div className="font-medium text-foreground">
+                    {c.customer_name ?? "(no name)"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {c.customer_code}
+                    {c.contact_person ? ` · ${c.contact_person}` : ""}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -733,8 +763,14 @@ function JobList({
           {err}
         </div>
       )}
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
-      {!loading && rows.length === 0 && (
+      {loading && (
+        <div className="space-y-2">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      )}
+      {!loading && rows.length === 0 && !err && (
         <div className="rounded-lg border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
           No service jobs match these filters.
         </div>
@@ -772,9 +808,9 @@ function JobList({
                       <div className="font-medium">{j.customer_name_snapshot ?? "—"}</div>
                       <div className="text-xs text-muted-foreground">{j.customer_code_snapshot}</div>
                     </td>
-                    <td className="max-w-[280px] truncate px-3 py-2" title={j.subject}>{j.subject}</td>
-                    <td className="px-3 py-2 text-xs">{j.status}</td>
-                    <td className="px-3 py-2 text-xs">{j.priority}</td>
+                    <td className="max-w-[280px] truncate px-3 py-2 font-semibold text-foreground" title={j.subject}>{j.subject}</td>
+                    <td className="px-3 py-2"><StatusBadge status={j.status} /></td>
+                    <td className="px-3 py-2"><PriorityBadge priority={j.priority} /></td>
                     <td className="px-3 py-2 text-xs">
                       {j.assigned_user_name_snapshot ?? (
                         <span className="text-muted-foreground">Unassigned</span>
@@ -806,10 +842,10 @@ function JobList({
                   <div className="mt-1 text-xs text-muted-foreground">
                     {j.customer_name_snapshot ?? j.customer_code_snapshot}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold uppercase">
-                    <span className="rounded-full border px-2 py-0.5">{j.status}</span>
-                    <span className="rounded-full border px-2 py-0.5">{j.priority}</span>
-                    <span className="rounded-full border px-2 py-0.5">
+                  <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                    <StatusBadge status={j.status} />
+                    <PriorityBadge priority={j.priority} />
+                    <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
                       {j.assigned_user_name_snapshot ?? "Unassigned"}
                     </span>
                   </div>

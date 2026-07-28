@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getStoredToken } from "@/lib/qne/tokens";
 import { useTabs } from "@/lib/tabs";
 import { formatMYDateTime } from "@/lib/format-date";
+import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
 
 interface QueueRow {
   id: string;
@@ -189,9 +190,15 @@ function PendingQueuePage() {
           {err}
         </div>
       )}
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {loading && (
+        <div className="space-y-2">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      )}
       {!loading && rows.length === 0 && !err && (
-        <div className="rounded-lg border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
           {QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg ?? "No jobs."}
         </div>
       )}
@@ -217,12 +224,10 @@ function PendingQueuePage() {
                 <div className="text-xs text-muted-foreground">
                   {r.customer_name_snapshot ?? r.customer_code_snapshot}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold uppercase">
-                  <span className={`rounded-full border px-2 py-0.5 ${statusTone(r.status)}`}>{r.status}</span>
-                  <span className={`rounded-full border px-2 py-0.5 ${priorityTone(r.priority)}`}>
-                    {r.priority}
-                  </span>
-                  <span className="rounded-full border px-2 py-0.5">
+                <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                  <StatusBadge status={r.status} />
+                  <PriorityBadge priority={r.priority} />
+                  <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
                     {r.assigned_user_name_snapshot ?? "Unassigned"}
                   </span>
                   {r.requires_approval && (
@@ -273,18 +278,3 @@ function PendingQueuePage() {
   );
 }
 
-function priorityTone(p: string): string {
-  if (p === "High") return "border-red-300 bg-red-50 text-red-800";
-  if (p === "Medium") return "border-amber-300 bg-amber-50 text-amber-800";
-  return "";
-}
-
-function statusTone(s: string): string {
-  if (s === "Pending Approval") return "border-amber-400 bg-amber-50 text-amber-900";
-  if (s === "Draft") return "border-blue-200 bg-blue-50 text-blue-800";
-  if (s === "Open") return "border-sky-200 bg-sky-50 text-sky-900";
-  if (s === "Assigned") return "border-purple-200 bg-purple-50 text-purple-900";
-  if (s === "Waiting Customer" || s === "Waiting Vendor")
-    return "border-orange-200 bg-orange-50 text-orange-900";
-  return "";
-}

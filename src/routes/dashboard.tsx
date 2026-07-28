@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 import { useTabs } from "@/lib/tabs";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
+import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
 
 export const Route = createFileRoute("/dashboard")({
   component: UserDashboard,
@@ -377,9 +378,7 @@ function UserDashboard() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-sm font-semibold text-foreground">{r.job_number}</span>
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${priorityTone(r.priority)}`}>
-                      {r.priority}
-                    </span>
+                    <PriorityBadge priority={r.priority} />
                   </div>
                   <div className="truncate text-sm font-medium text-foreground">{r.subject}</div>
                   <div className="truncate text-xs text-muted-foreground">
@@ -423,11 +422,7 @@ function UserDashboard() {
                     <td className="px-3 py-2 text-foreground">{r.customer_name_snapshot ?? r.customer_code_snapshot}</td>
                     <td className="px-3 py-2 text-foreground">{r.subject}</td>
                     <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                    <td className="px-3 py-2">
-                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${priorityTone(r.priority)}`}>
-                        {r.priority}
-                      </span>
-                    </td>
+                    <td className="px-3 py-2"><PriorityBadge priority={r.priority} /></td>
                     <td className="px-3 py-2 text-muted-foreground">{waitingAge(r.assigned_at ?? r.created_at)}</td>
                     <td className="px-3 py-2 text-muted-foreground">{formatMY(r.created_at)}</td>
                     <td className="px-3 py-2 text-muted-foreground">{formatMYDateTime(r.updated_at ?? r.created_at)}</td>
@@ -500,27 +495,6 @@ function DateBox({ value, onChange }: { value: string; onChange: (v: string) => 
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const tone: Record<string, string> = {
-    "Assigned": "bg-blue-50 text-blue-700 ring-blue-200",
-    "In Progress": "bg-amber-50 text-amber-800 ring-amber-200",
-    "Waiting Customer": "bg-amber-50 text-amber-800 ring-amber-200",
-    "Waiting Vendor": "bg-purple-50 text-purple-700 ring-purple-200",
-    "Completed": "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  };
-  const cls = tone[status] ?? "bg-slate-100 text-slate-600 ring-slate-200";
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${cls}`}>
-      {status}
-    </span>
-  );
-}
-
-function priorityTone(p: string): string {
-  if (p === "High") return "border-red-300 bg-red-50 text-red-700";
-  if (p === "Medium") return "border-amber-300 bg-amber-50 text-amber-800";
-  return "border-slate-300 bg-slate-50 text-slate-600";
-}
 
 function SectionTitle({ children }: { children: ReactNode }) {
   return (

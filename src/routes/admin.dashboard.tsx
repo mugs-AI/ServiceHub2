@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -6,6 +6,7 @@ import { AdminOnly } from "@/components/qne/AdminOnly";
 import { StatCard } from "./dashboard";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
+
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: () => (
@@ -53,6 +54,7 @@ const AUTO_REFRESH_MS = 30_000;
 
 function AdminDashboard() {
   const { session, currentUser } = useSession();
+  const navigate = useNavigate();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,8 +181,8 @@ function AdminDashboard() {
           <StatLink to="/jobs/pending" search={{ queueType: "pending_approval" }}><StatCard label="Pending Approval" value={s?.pendingApproval ?? "—"} tone="amber" /></StatLink>
           <StatLink to="/jobs/pending" search={{ queueType: "waiting_customer" }}><StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" /></StatLink>
           <StatLink to="/jobs/pending" search={{ queueType: "waiting_vendor" }}><StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" /></StatLink>
-          <StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" />
-          <StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" />
+          <StatLink to="/customers/entitlements" search={{ status: "due_soon" }}><StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/customers/entitlements" search={{ status: "overdue" }}><StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" /></StatLink>
         </div>
       </Section>
 
@@ -205,9 +207,12 @@ function AdminDashboard() {
                   <tr
                     key={w.user_id}
                     className="cursor-pointer hover:bg-accent/40"
-                    onClick={() => {
-                      window.location.href = `/jobs/pending?technician=${encodeURIComponent(w.user_id)}&technicianName=${encodeURIComponent(w.name)}`;
-                    }}
+                    onClick={() =>
+                      navigate({
+                        to: "/jobs/pending",
+                        search: { technician: w.user_id, technicianName: w.name },
+                      })
+                    }
                   >
                     <td className="px-3 py-2 text-foreground">{w.name}</td>
                     <td className="px-3 py-2 text-right font-semibold text-foreground">{w.total}</td>
