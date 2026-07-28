@@ -1,18 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { z } from "zod";
-import { fallback, zodValidator } from "@tanstack/zod-adapter";
 
 import { getStoredToken } from "@/lib/qne/tokens";
 import { formatMY } from "@/lib/format-date";
 import { EntitlementBadge, Skeleton } from "@/components/qne/badges";
 
-const searchSchema = z.object({
-  status: fallback(z.string(), "due_soon").default("due_soon"),
-});
+type StatusKey = "active" | "due_soon" | "overdue";
 
 export const Route = createFileRoute("/customers/entitlements")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: (s: Record<string, unknown>): { status: StatusKey } => {
+    const raw = typeof s.status === "string" ? s.status : "due_soon";
+    const status: StatusKey =
+      raw === "active" || raw === "overdue" || raw === "due_soon"
+        ? (raw as StatusKey)
+        : "due_soon";
+    return { status };
+  },
   component: EntitlementCustomersPage,
 });
 
