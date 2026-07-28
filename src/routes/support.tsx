@@ -5,6 +5,8 @@ import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
 import { formatMY } from "@/lib/format-date";
+import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
+
 
 
 export const Route = createFileRoute("/support")({
@@ -362,70 +364,73 @@ function CustomerSearchBox({
     return () => clearTimeout(t);
   }, [q, run]);
 
-  if (selected) {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 text-sm">
-        <div>
-          <div className="font-semibold text-foreground">
-            {selected.customer_name ?? "(no name)"}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {selected.customer_code}
-            {selected.contact_person ? ` · ${selected.contact_person}` : ""}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            onClear();
-            setQ("");
-            setRows([]);
-          }}
-          className="min-h-11 rounded-lg border px-3 text-xs font-semibold text-muted-foreground hover:bg-accent"
-        >
-          Change customer
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative">
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onFocus={() => rows.length > 0 && setOpen(true)}
-        placeholder="Search Customer name, code, phone or email…"
-        className="min-h-11 w-full rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
-      />
-      {err && <p className="mt-1 text-xs text-destructive">{err}</p>}
-      {loading && <p className="mt-1 text-xs text-muted-foreground">Searching…</p>}
-      {open && rows.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border bg-popover shadow-lg">
-          {rows.map((c) => (
-            <li key={c.customer_code}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelect(c);
-                  setOpen(false);
-                  setQ("");
-                  setRows([]);
-                }}
-                className="block w-full border-b px-3 py-2 text-left text-sm hover:bg-accent"
-              >
-                <div className="font-medium text-foreground">
-                  {c.customer_name ?? "(no name)"}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {c.customer_code}
-                  {c.contact_person ? ` · ${c.contact_person}` : ""}
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
+    <div className="space-y-2">
+      {selected && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-primary/5 px-3 py-2 text-sm">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-foreground">
+              {selected.customer_name ?? "(no name)"}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">
+              {selected.customer_code}
+              {selected.contact_person ? ` · ${selected.contact_person}` : ""}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onClear();
+              setQ("");
+              setRows([]);
+            }}
+            className="min-h-9 shrink-0 rounded-md border bg-background px-3 text-xs font-semibold text-muted-foreground hover:bg-accent"
+          >
+            Clear
+          </button>
+        </div>
       )}
+      <div className="relative">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => rows.length > 0 && setOpen(true)}
+          placeholder={
+            selected
+              ? "Search another Customer to switch…"
+              : "Search Customer name, code, phone or email…"
+          }
+          className="min-h-11 w-full rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+        />
+        {err && <p className="mt-1 text-xs text-destructive">{err}</p>}
+        {loading && <p className="mt-1 text-xs text-muted-foreground">Searching…</p>}
+        {open && rows.length > 0 && (
+          <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border bg-popover shadow-lg">
+            {rows.map((c) => (
+              <li key={c.customer_code}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(c);
+                    setOpen(false);
+                    setQ("");
+                    setRows([]);
+                  }}
+                  className="block w-full border-b px-3 py-2 text-left text-sm hover:bg-accent"
+                >
+                  <div className="font-medium text-foreground">
+                    {c.customer_name ?? "(no name)"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {c.customer_code}
+                    {c.contact_person ? ` · ${c.contact_person}` : ""}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
