@@ -241,15 +241,15 @@ function SupportWorkspace() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Customer search
           </h2>
-          <Link
-            to="/jobs/new"
-            search={
-              customer ? { customerCode: customer.customer_code } : undefined
-            }
-            className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-          >
-            + New Service Job
-          </Link>
+          {customer && (
+            <Link
+              to="/jobs/new"
+              search={{ customerCode: customer.customer_code }}
+              className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+            >
+              + New Job for This Customer
+            </Link>
+          )}
         </div>
         <CustomerSearchBox
           selected={customer}
