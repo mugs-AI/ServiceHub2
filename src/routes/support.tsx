@@ -763,8 +763,14 @@ function JobList({
           {err}
         </div>
       )}
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
-      {!loading && rows.length === 0 && (
+      {loading && (
+        <div className="space-y-2">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      )}
+      {!loading && rows.length === 0 && !err && (
         <div className="rounded-lg border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
           No service jobs match these filters.
         </div>
@@ -802,9 +808,9 @@ function JobList({
                       <div className="font-medium">{j.customer_name_snapshot ?? "—"}</div>
                       <div className="text-xs text-muted-foreground">{j.customer_code_snapshot}</div>
                     </td>
-                    <td className="max-w-[280px] truncate px-3 py-2" title={j.subject}>{j.subject}</td>
-                    <td className="px-3 py-2 text-xs">{j.status}</td>
-                    <td className="px-3 py-2 text-xs">{j.priority}</td>
+                    <td className="max-w-[280px] truncate px-3 py-2 font-semibold text-foreground" title={j.subject}>{j.subject}</td>
+                    <td className="px-3 py-2"><StatusBadge status={j.status} /></td>
+                    <td className="px-3 py-2"><PriorityBadge priority={j.priority} /></td>
                     <td className="px-3 py-2 text-xs">
                       {j.assigned_user_name_snapshot ?? (
                         <span className="text-muted-foreground">Unassigned</span>
@@ -836,10 +842,10 @@ function JobList({
                   <div className="mt-1 text-xs text-muted-foreground">
                     {j.customer_name_snapshot ?? j.customer_code_snapshot}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold uppercase">
-                    <span className="rounded-full border px-2 py-0.5">{j.status}</span>
-                    <span className="rounded-full border px-2 py-0.5">{j.priority}</span>
-                    <span className="rounded-full border px-2 py-0.5">
+                  <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                    <StatusBadge status={j.status} />
+                    <PriorityBadge priority={j.priority} />
+                    <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
                       {j.assigned_user_name_snapshot ?? "Unassigned"}
                     </span>
                   </div>
