@@ -182,8 +182,22 @@ function NewJobPage() {
         );
         const body = await res.json().catch(() => ({}));
         if (!cancelled) {
-          setSubs(res.ok ? (body.subscriptions ?? []) : []);
-          setSelectedSubId("");
+          const list: SubscriptionRow[] = res.ok ? (body.subscriptions ?? []) : [];
+          setSubs(list);
+          // Preselect entitlement when arriving via ?entitlementId=<id>.
+          if (search.entitlementId) {
+            const match = list.find((s) => s.id === search.entitlementId);
+            if (match) {
+              setSelectedSubId(match.id);
+            } else {
+              setSelectedSubId("");
+              setPrefillNotice(
+                "The requested entitlement isn't available for this customer — pick one below.",
+              );
+            }
+          } else {
+            setSelectedSubId("");
+          }
         }
       } finally {
         if (!cancelled) setSubsLoading(false);
