@@ -39,12 +39,18 @@ interface TechnicianRow {
 
 interface JobsNewSearch {
   customerCode?: string;
+  customerId?: string;
+  entitlementId?: string;
 }
 
 export const Route = createFileRoute("/jobs/new")({
   validateSearch: (search: Record<string, unknown>): JobsNewSearch => ({
     customerCode:
       typeof search.customerCode === "string" ? search.customerCode : undefined,
+    customerId:
+      typeof search.customerId === "string" ? search.customerId : undefined,
+    entitlementId:
+      typeof search.entitlementId === "string" ? search.entitlementId : undefined,
   }),
   component: NewJobPage,
 });
@@ -62,6 +68,7 @@ function NewJobPage() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [prefillNotice, setPrefillNotice] = useState<string | null>(null);
 
   const [customer, setCustomer] = useState<CustomerRow | null>(null);
   const [subs, setSubs] = useState<SubscriptionRow[]>([]);
@@ -85,6 +92,7 @@ function NewJobPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const inflightRef = useRef(false);
+  const prefillRanRef = useRef(false);
 
   const runSearch = useCallback(async (term: string) => {
     const trimmed = term.trim();
@@ -114,10 +122,48 @@ function NewJobPage() {
     }
   }, []);
 
-  // Auto-search when landing with ?customerCode=…
+  // Auto-hydrate customer from ?customerId= or ?customerCode= exactly once.
+  // On exact code match, auto-select the customer so entitlements load
+  // immediately and contact fields prefill — no second click required.
   useEffect(() => {
-    if (search.customerCode) runSearch(search.customerCode);
-  }, [search.customerCode, runSearch]);
+    if (prefillRanRef.current) return;
+    const code = search.customerCode ?? search.customerId;
+    if (!code) return;
+    prefillRanRef.current = true;
+    (async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `/api/workspace/customers?q=${encodeURIComponent(code)}`,
+          { headers: authHeaders() },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setSearchError(body?.error ?? "Prefill failed — search manually.");
+          return;
+        }
+        const rows: CustomerRow[] = body.rows ?? [];
+        const exact =
+          rows.find(
+            (r) => (r.customer_code ?? "").toLowerCase() === code.toLowerCase(),
+          ) ?? (rows.length === 1 ? rows[0] : null);
+        if (exact) {
+          setCustomer(exact);
+          setCustomers([]);
+          setQ("");
+        } else {
+          setCustomers(rows);
+          setPrefillNotice(
+            `Couldn't auto-select "${code}" — pick the customer below.`,
+          );
+        }
+      } catch {
+        setSearchError("Prefill failed — search manually.");
+      } finally {
+        setSearching(false);
+      }
+    })();
+  }, [search.customerCode, search.customerId]);
 
   // Load entitlements for the picked customer.
   useEffect(() => {
@@ -136,8 +182,22 @@ function NewJobPage() {
         );
         const body = await res.json().catch(() => ({}));
         if (!cancelled) {
-          setSubs(res.ok ? (body.subscriptions ?? []) : []);
-          setSelectedSubId("");
+          const list: SubscriptionRow[] = res.ok ? (body.subscriptions ?? []) : [];
+          setSubs(list);
+          // Preselect entitlement when arriving via ?entitlementId=<id>.
+          if (search.entitlementId) {
+            const match = list.find((s) => s.id === search.entitlementId);
+            if (match) {
+              setSelectedSubId(match.id);
+            } else {
+              setSelectedSubId("");
+              setPrefillNotice(
+                "The requested entitlement isn't available for this customer — pick one below.",
+              );
+            }
+          } else {
+            setSelectedSubId("");
+          }
         }
       } finally {
         if (!cancelled) setSubsLoading(false);
@@ -286,6 +346,11 @@ function NewJobPage() {
               {searchError && (
                 <p className="text-sm text-destructive">{searchError}</p>
               )}
+              {prefillNotice && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {prefillNotice}
+                </p>
+              )}
               {customers.length > 0 && (
                 <ul className="max-h-72 overflow-y-auto rounded-lg border bg-card">
                   {customers.map((c) => (
@@ -309,25 +374,38 @@ function NewJobPage() {
               )}
             </div>
           ) : (
-            <div className="flex items-start justify-between gap-3 rounded-lg border bg-background p-3">
-              <div>
-                <div className="text-sm font-semibold text-foreground">
-                  {customer.customer_name ?? "(no name)"}
+            <div className="space-y-2">
+              <div className="flex items-start justify-between gap-3 rounded-lg border bg-background p-3">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {customer.customer_name ?? "(no name)"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {customer.customer_code}
+                    {customer.contact_person ? ` · ${customer.contact_person}` : ""}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {customer.customer_code}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomer(null);
+                    setPrefillNotice(null);
+                    prefillRanRef.current = true;
+                  }}
+                  className="text-xs font-medium text-primary hover:text-primary/80"
+                >
+                  Change
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setCustomer(null)}
-                className="text-xs font-medium text-primary hover:text-primary/80"
-              >
-                Change
-              </button>
+              {prefillNotice && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {prefillNotice}
+                </p>
+              )}
             </div>
           )}
         </Section>
+
 
         {/* 2. Entitlement */}
         {customer && (
@@ -424,7 +502,7 @@ function NewJobPage() {
 
         {/* 3. Job details */}
         <Section title="Job details">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-3">
             <Field label="Subject *">
               <input
                 value={subject}
@@ -433,31 +511,33 @@ function NewJobPage() {
                 className="input"
               />
             </Field>
-            <Field label="Priority">
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as Priority)}
-                className="input"
-              >
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
-              </select>
-            </Field>
-            <Field label="Source">
-              <select
-                value={source}
-                onChange={(e) => setSource(e.target.value as SourceType)}
-                className="input"
-              >
-                {["Phone", "WhatsApp", "Email", "Walk-in", "Remote Support", "Other"].map(
-                  (s) => (
-                    <option key={s}>{s}</option>
-                  ),
-                )}
-              </select>
-            </Field>
-            <Field label="Problem description *" className="sm:col-span-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Source">
+                <select
+                  value={source}
+                  onChange={(e) => setSource(e.target.value as SourceType)}
+                  className="input"
+                >
+                  {["Phone", "WhatsApp", "Email", "Walk-in", "Remote Support", "Other"].map(
+                    (s) => (
+                      <option key={s}>{s}</option>
+                    ),
+                  )}
+                </select>
+              </Field>
+              <Field label="Priority">
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as Priority)}
+                  className="input"
+                >
+                  <option>High</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </Field>
+            </div>
+            <Field label="Problem description *">
               <textarea
                 value={problem}
                 onChange={(e) => setProblem(e.target.value)}
@@ -466,7 +546,7 @@ function NewJobPage() {
                 className="input"
               />
             </Field>
-            <Field label="Assign to (optional)" className="sm:col-span-2">
+            <Field label="Assign to (optional)">
               {assignee ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background p-3 text-sm">
                   <div>
@@ -514,17 +594,38 @@ function NewJobPage() {
 
         {/* 4. Contact details */}
         <Section title="Contact details">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Contact person">
-              <input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="input" />
-            </Field>
-            <Field label="Contact phone">
-              <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className="input" />
-            </Field>
-            <Field label="Contact email">
-              <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="input" />
-            </Field>
-            <Field label="Service address" className="sm:col-span-2">
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Contact person">
+                <input
+                  value={contactPerson}
+                  onChange={(e) => setContactPerson(e.target.value)}
+                  autoComplete="name"
+                  className="input"
+                />
+              </Field>
+              <Field label="Contact phone">
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  className="input"
+                />
+              </Field>
+              <Field label="Contact email">
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="input"
+                />
+              </Field>
+            </div>
+            <Field label="Service address">
               <textarea
                 value={serviceAddress}
                 onChange={(e) => setServiceAddress(e.target.value)}
@@ -534,6 +635,7 @@ function NewJobPage() {
             </Field>
           </div>
         </Section>
+
 
         {/* 5. Internal note */}
         <Section title="Internal note">
