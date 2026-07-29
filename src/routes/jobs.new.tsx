@@ -346,6 +346,11 @@ function NewJobPage() {
               {searchError && (
                 <p className="text-sm text-destructive">{searchError}</p>
               )}
+              {prefillNotice && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {prefillNotice}
+                </p>
+              )}
               {customers.length > 0 && (
                 <ul className="max-h-72 overflow-y-auto rounded-lg border bg-card">
                   {customers.map((c) => (
