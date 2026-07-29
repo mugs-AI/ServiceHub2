@@ -374,25 +374,38 @@ function NewJobPage() {
               )}
             </div>
           ) : (
-            <div className="flex items-start justify-between gap-3 rounded-lg border bg-background p-3">
-              <div>
-                <div className="text-sm font-semibold text-foreground">
-                  {customer.customer_name ?? "(no name)"}
+            <div className="space-y-2">
+              <div className="flex items-start justify-between gap-3 rounded-lg border bg-background p-3">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {customer.customer_name ?? "(no name)"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {customer.customer_code}
+                    {customer.contact_person ? ` · ${customer.contact_person}` : ""}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {customer.customer_code}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomer(null);
+                    setPrefillNotice(null);
+                    prefillRanRef.current = true;
+                  }}
+                  className="text-xs font-medium text-primary hover:text-primary/80"
+                >
+                  Change
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setCustomer(null)}
-                className="text-xs font-medium text-primary hover:text-primary/80"
-              >
-                Change
-              </button>
+              {prefillNotice && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {prefillNotice}
+                </p>
+              )}
             </div>
           )}
         </Section>
+
 
         {/* 2. Entitlement */}
         {customer && (
