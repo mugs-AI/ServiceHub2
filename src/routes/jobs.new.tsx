@@ -39,12 +39,18 @@ interface TechnicianRow {
 
 interface JobsNewSearch {
   customerCode?: string;
+  customerId?: string;
+  entitlementId?: string;
 }
 
 export const Route = createFileRoute("/jobs/new")({
   validateSearch: (search: Record<string, unknown>): JobsNewSearch => ({
     customerCode:
       typeof search.customerCode === "string" ? search.customerCode : undefined,
+    customerId:
+      typeof search.customerId === "string" ? search.customerId : undefined,
+    entitlementId:
+      typeof search.entitlementId === "string" ? search.entitlementId : undefined,
   }),
   component: NewJobPage,
 });
@@ -62,6 +68,7 @@ function NewJobPage() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [prefillNotice, setPrefillNotice] = useState<string | null>(null);
 
   const [customer, setCustomer] = useState<CustomerRow | null>(null);
   const [subs, setSubs] = useState<SubscriptionRow[]>([]);
@@ -85,6 +92,7 @@ function NewJobPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const inflightRef = useRef(false);
+  const prefillRanRef = useRef(false);
 
   const runSearch = useCallback(async (term: string) => {
     const trimmed = term.trim();
@@ -114,10 +122,48 @@ function NewJobPage() {
     }
   }, []);
 
-  // Auto-search when landing with ?customerCode=…
+  // Auto-hydrate customer from ?customerId= or ?customerCode= exactly once.
+  // On exact code match, auto-select the customer so entitlements load
+  // immediately and contact fields prefill — no second click required.
   useEffect(() => {
-    if (search.customerCode) runSearch(search.customerCode);
-  }, [search.customerCode, runSearch]);
+    if (prefillRanRef.current) return;
+    const code = search.customerCode ?? search.customerId;
+    if (!code) return;
+    prefillRanRef.current = true;
+    (async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `/api/workspace/customers?q=${encodeURIComponent(code)}`,
+          { headers: authHeaders() },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setSearchError(body?.error ?? "Prefill failed — search manually.");
+          return;
+        }
+        const rows: CustomerRow[] = body.rows ?? [];
+        const exact =
+          rows.find(
+            (r) => (r.customer_code ?? "").toLowerCase() === code.toLowerCase(),
+          ) ?? (rows.length === 1 ? rows[0] : null);
+        if (exact) {
+          setCustomer(exact);
+          setCustomers([]);
+          setQ("");
+        } else {
+          setCustomers(rows);
+          setPrefillNotice(
+            `Couldn't auto-select "${code}" — pick the customer below.`,
+          );
+        }
+      } catch {
+        setSearchError("Prefill failed — search manually.");
+      } finally {
+        setSearching(false);
+      }
+    })();
+  }, [search.customerCode, search.customerId]);
 
   // Load entitlements for the picked customer.
   useEffect(() => {
