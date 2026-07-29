@@ -502,7 +502,7 @@ function NewJobPage() {
 
         {/* 3. Job details */}
         <Section title="Job details">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-3">
             <Field label="Subject *">
               <input
                 value={subject}
@@ -511,31 +511,33 @@ function NewJobPage() {
                 className="input"
               />
             </Field>
-            <Field label="Priority">
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as Priority)}
-                className="input"
-              >
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
-              </select>
-            </Field>
-            <Field label="Source">
-              <select
-                value={source}
-                onChange={(e) => setSource(e.target.value as SourceType)}
-                className="input"
-              >
-                {["Phone", "WhatsApp", "Email", "Walk-in", "Remote Support", "Other"].map(
-                  (s) => (
-                    <option key={s}>{s}</option>
-                  ),
-                )}
-              </select>
-            </Field>
-            <Field label="Problem description *" className="sm:col-span-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Source">
+                <select
+                  value={source}
+                  onChange={(e) => setSource(e.target.value as SourceType)}
+                  className="input"
+                >
+                  {["Phone", "WhatsApp", "Email", "Walk-in", "Remote Support", "Other"].map(
+                    (s) => (
+                      <option key={s}>{s}</option>
+                    ),
+                  )}
+                </select>
+              </Field>
+              <Field label="Priority">
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as Priority)}
+                  className="input"
+                >
+                  <option>High</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </Field>
+            </div>
+            <Field label="Problem description *">
               <textarea
                 value={problem}
                 onChange={(e) => setProblem(e.target.value)}
@@ -544,7 +546,7 @@ function NewJobPage() {
                 className="input"
               />
             </Field>
-            <Field label="Assign to (optional)" className="sm:col-span-2">
+            <Field label="Assign to (optional)">
               {assignee ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background p-3 text-sm">
                   <div>
@@ -592,17 +594,38 @@ function NewJobPage() {
 
         {/* 4. Contact details */}
         <Section title="Contact details">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Contact person">
-              <input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="input" />
-            </Field>
-            <Field label="Contact phone">
-              <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className="input" />
-            </Field>
-            <Field label="Contact email">
-              <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="input" />
-            </Field>
-            <Field label="Service address" className="sm:col-span-2">
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Contact person">
+                <input
+                  value={contactPerson}
+                  onChange={(e) => setContactPerson(e.target.value)}
+                  autoComplete="name"
+                  className="input"
+                />
+              </Field>
+              <Field label="Contact phone">
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  className="input"
+                />
+              </Field>
+              <Field label="Contact email">
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="input"
+                />
+              </Field>
+            </div>
+            <Field label="Service address">
               <textarea
                 value={serviceAddress}
                 onChange={(e) => setServiceAddress(e.target.value)}
@@ -612,6 +635,7 @@ function NewJobPage() {
             </Field>
           </div>
         </Section>
+
 
         {/* 5. Internal note */}
         <Section title="Internal note">
