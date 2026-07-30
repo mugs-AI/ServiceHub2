@@ -1,7 +1,7 @@
 // Pure, client-safe entitlement grouping/filtering/sorting helpers.
 // Imported by query.server.ts and by unit tests.
 
-import type { EntitlementRecord } from "./types";
+import type { EntitlementRecord, EntitlementStatusKey } from "./types";
 
 export interface EntitlementFilters {
   q?: string | null;

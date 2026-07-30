@@ -1,4 +1,6 @@
-// Client-safe entitlement read-model row shape.
+// Client-safe entitlement read-model types.
+export type EntitlementStatusKey = "due_soon" | "overdue" | "active";
+
 export interface EntitlementRecord {
   id: string;
   customer_code: string;

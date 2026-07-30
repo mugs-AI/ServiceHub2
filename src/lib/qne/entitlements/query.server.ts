@@ -10,12 +10,10 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadAllPaginated } from "@/lib/qne/sync/pagination.server";
-import type { EntitlementRecord } from "./types";
+import type { EntitlementRecord, EntitlementStatusKey } from "./types";
 
-export type { EntitlementRecord } from "./types";
+export type { EntitlementRecord, EntitlementStatusKey } from "./types";
 export * from "./grouping";
-
-export type EntitlementStatusKey = "due_soon" | "overdue" | "active";
 
 export const STATUS_LABEL: Record<EntitlementStatusKey, string> = {
   due_soon: "Due Soon",
