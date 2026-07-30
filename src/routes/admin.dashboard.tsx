@@ -181,8 +181,9 @@ function AdminDashboard() {
           <StatLink to="/jobs/pending" search={{ queueType: "pending_approval" }}><StatCard label="Pending Approval" value={s?.pendingApproval ?? "—"} tone="amber" /></StatLink>
           <StatLink to="/jobs/pending" search={{ queueType: "waiting_customer" }}><StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" /></StatLink>
           <StatLink to="/jobs/pending" search={{ queueType: "waiting_vendor" }}><StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" /></StatLink>
-          <StatLink to="/customers/entitlements" search={{ status: "due_soon" }}><StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" /></StatLink>
-          <StatLink to="/customers/entitlements" search={{ status: "overdue" }}><StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" /></StatLink>
+          <StatLink to="/customers/due-soon"><StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/customers/overdue"><StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" /></StatLink>
+
         </div>
       </Section>
 

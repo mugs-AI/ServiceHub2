@@ -21,7 +21,6 @@ import { Route as JobsPendingRouteImport } from './routes/jobs.pending'
 import { Route as JobsNewRouteImport } from './routes/jobs.new'
 import { Route as JobsJobIdRouteImport } from './routes/jobs.$jobId'
 import { Route as CustomersOverdueRouteImport } from './routes/customers.overdue'
-import { Route as CustomersEntitlementsRouteImport } from './routes/customers.entitlements'
 import { Route as CustomersDueSoonRouteImport } from './routes/customers.due-soon'
 import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
@@ -128,11 +127,6 @@ const JobsJobIdRoute = JobsJobIdRouteImport.update({
 const CustomersOverdueRoute = CustomersOverdueRouteImport.update({
   id: '/overdue',
   path: '/overdue',
-  getParentRoute: () => CustomersRoute,
-} as any)
-const CustomersEntitlementsRoute = CustomersEntitlementsRouteImport.update({
-  id: '/entitlements',
-  path: '/entitlements',
   getParentRoute: () => CustomersRoute,
 } as any)
 const CustomersDueSoonRoute = CustomersDueSoonRouteImport.update({
@@ -406,7 +400,6 @@ export interface FileRoutesByFullPath {
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
   '/customers/due-soon': typeof CustomersDueSoonRoute
-  '/customers/entitlements': typeof CustomersEntitlementsRoute
   '/customers/overdue': typeof CustomersOverdueRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
@@ -468,7 +461,6 @@ export interface FileRoutesByTo {
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
   '/customers/due-soon': typeof CustomersDueSoonRoute
-  '/customers/entitlements': typeof CustomersEntitlementsRoute
   '/customers/overdue': typeof CustomersOverdueRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
@@ -531,7 +523,6 @@ export interface FileRoutesById {
   '/admin/snapshots': typeof AdminSnapshotsRoute
   '/api/proxy': typeof ApiProxyRoute
   '/customers/due-soon': typeof CustomersDueSoonRoute
-  '/customers/entitlements': typeof CustomersEntitlementsRoute
   '/customers/overdue': typeof CustomersOverdueRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
@@ -595,7 +586,6 @@ export interface FileRouteTypes {
     | '/admin/snapshots'
     | '/api/proxy'
     | '/customers/due-soon'
-    | '/customers/entitlements'
     | '/customers/overdue'
     | '/jobs/$jobId'
     | '/jobs/new'
@@ -657,7 +647,6 @@ export interface FileRouteTypes {
     | '/admin/snapshots'
     | '/api/proxy'
     | '/customers/due-soon'
-    | '/customers/entitlements'
     | '/customers/overdue'
     | '/jobs/$jobId'
     | '/jobs/new'
@@ -719,7 +708,6 @@ export interface FileRouteTypes {
     | '/admin/snapshots'
     | '/api/proxy'
     | '/customers/due-soon'
-    | '/customers/entitlements'
     | '/customers/overdue'
     | '/jobs/$jobId'
     | '/jobs/new'
@@ -898,13 +886,6 @@ declare module '@tanstack/react-router' {
       path: '/overdue'
       fullPath: '/customers/overdue'
       preLoaderRoute: typeof CustomersOverdueRouteImport
-      parentRoute: typeof CustomersRoute
-    }
-    '/customers/entitlements': {
-      id: '/customers/entitlements'
-      path: '/entitlements'
-      fullPath: '/customers/entitlements'
-      preLoaderRoute: typeof CustomersEntitlementsRouteImport
       parentRoute: typeof CustomersRoute
     }
     '/customers/due-soon': {
@@ -1241,13 +1222,11 @@ declare module '@tanstack/react-router' {
 
 interface CustomersRouteChildren {
   CustomersDueSoonRoute: typeof CustomersDueSoonRoute
-  CustomersEntitlementsRoute: typeof CustomersEntitlementsRoute
   CustomersOverdueRoute: typeof CustomersOverdueRoute
 }
 
 const CustomersRouteChildren: CustomersRouteChildren = {
   CustomersDueSoonRoute: CustomersDueSoonRoute,
-  CustomersEntitlementsRoute: CustomersEntitlementsRoute,
   CustomersOverdueRoute: CustomersOverdueRoute,
 }
 
