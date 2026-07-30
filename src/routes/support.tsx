@@ -213,6 +213,31 @@ function SupportWorkspace() {
 
   const [customer, setCustomer] = useState<CustomerRow | null>(null);
 
+  // Deep link from the Due Soon / Overdue lists: ?customerCode=… selects the
+  // customer immediately, no manual search step.
+  const { customerCode: deepLinkCode } = Route.useSearch();
+  const hydratedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!deepLinkCode || hydratedRef.current === deepLinkCode) return;
+    hydratedRef.current = deepLinkCode;
+    let cancelled = false;
+    fetch(
+      `/api/workspace/customer-resolve?customerCode=${encodeURIComponent(deepLinkCode)}`,
+      { headers: authHeaders() },
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (cancelled || !body?.customer) return;
+        setCustomer(body.customer as CustomerRow);
+        setPage(1);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [deepLinkCode]);
+
+
   const [filters, setFilters] = useState<Filters>(loadFilters);
 
   const [page, setPage] = useState(1);
