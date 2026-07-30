@@ -1,16 +1,13 @@
-// GET /api/workspace/entitlement-customers?status=due_soon|overdue|active
-// Returns tenant-scoped customers who have at least one entitlement in the
-// requested status, plus a summary of expiring stocks and earliest expiry.
-// Read-only. Authenticated N3 user in the tenant.
+// GET /api/workspace/entitlement-customers
+//   ?status=due_soon|overdue|active
+//   &q=&stock=&category=&from=&to=&sort=&page=&pageSize=
+//
+// Tenant-scoped, grouped-by-customer entitlement list backed by the SHARED
+// read model in src/lib/qne/entitlements/query.server.ts — the same module
+// that produces the Admin Dashboard KPI counts, so counts and lists can never
+// disagree. Read-only; any authenticated N3 user in the tenant.
 
 import { createFileRoute } from "@tanstack/react-router";
-
-const VALID = new Set(["active", "due_soon", "overdue"]);
-const STATUS_MAP: Record<string, string> = {
-  active: "Active",
-  due_soon: "Due Soon",
-  overdue: "Overdue",
-};
 
 export const Route = createFileRoute("/api/workspace/entitlement-customers")({
   server: {
@@ -19,85 +16,57 @@ export const Route = createFileRoute("/api/workspace/entitlement-customers")({
         const { requireAuthenticatedN3User, guardResponse } = await import(
           "@/lib/qne/session/current-user.server"
         );
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
+        const ent = await import("@/lib/qne/entitlements/query.server");
         try {
           const user = await requireAuthenticatedN3User(request);
           const sp = new URL(request.url).searchParams;
-          const raw = (sp.get("status") ?? "due_soon").toLowerCase();
-          if (!VALID.has(raw)) {
+          const status = ent.parseStatusKey(sp.get("status") ?? "due_soon");
+          if (!status) {
             return Response.json(
               { error: "Invalid status; use active, due_soon or overdue." },
               { status: 400 },
             );
           }
-          const status = STATUS_MAP[raw];
 
-          const { data, error } = await supabaseAdmin
-            .from("customer_subscription_snapshots")
-            .select(
-              "customer_code, customer_name, subscription_category, stock_code, stock_name, expiry_date, remaining_days, subscription_status",
-            )
-            .eq("tenant_code", user.tenantCode)
-            .eq("subscription_status", status)
-            .order("expiry_date", { ascending: true })
-            .limit(2000);
-          if (error) throw error;
+          const all = await ent.loadEntitlementRecords(user.tenantCode, status);
+          const unfilteredTotals = ent.totalsFromRecords(all);
+          const categories = ent.distinctCategories(all);
 
-          interface Row {
-            customer_code: string;
-            customer_name: string | null;
-            entitlements: number;
-            earliestExpiry: string | null;
-            minRemainingDays: number | null;
-            samples: string[];
-          }
-          const map = new Map<string, Row>();
-          for (const r of data ?? []) {
-            const key = r.customer_code;
-            if (!key) continue;
-            const row =
-              map.get(key) ??
-              ({
-                customer_code: key,
-                customer_name: r.customer_name,
-                entitlements: 0,
-                earliestExpiry: null,
-                minRemainingDays: null,
-                samples: [],
-              } as Row);
-            row.entitlements++;
-            if (
-              r.expiry_date &&
-              (!row.earliestExpiry || r.expiry_date < row.earliestExpiry)
-            ) {
-              row.earliestExpiry = r.expiry_date;
-            }
-            if (typeof r.remaining_days === "number") {
-              row.minRemainingDays =
-                row.minRemainingDays == null
-                  ? r.remaining_days
-                  : Math.min(row.minRemainingDays, r.remaining_days);
-            }
-            if (row.samples.length < 3 && r.stock_code) {
-              row.samples.push(
-                `${r.subscription_category ?? ""}·${r.stock_code}`.trim(),
-              );
-            }
-            map.set(key, row);
-          }
-          const rows = Array.from(map.values()).sort((a, b) => {
-            const ax = a.earliestExpiry ?? "9999-12-31";
-            const bx = b.earliestExpiry ?? "9999-12-31";
-            return ax.localeCompare(bx);
+          const filtered = ent.filterRecords(all, {
+            q: sp.get("q"),
+            stock: sp.get("stock"),
+            category: sp.get("category"),
+            from: sp.get("from"),
+            to: sp.get("to"),
           });
+          const filteredTotals = ent.totalsFromRecords(filtered);
+
+          const sort = ent.parseSort(sp.get("sort"), status);
+          const groups = ent.groupByCustomer(filtered, sort);
+
+          const pageSize = Math.min(
+            Math.max(Number(sp.get("pageSize")) || 20, 5),
+            100,
+          );
+          const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+          const page = Math.min(Math.max(Number(sp.get("page")) || 1, 1), totalPages);
+          const pageGroups = groups.slice((page - 1) * pageSize, page * pageSize);
 
           return Response.json({
             tenantCode: user.tenantCode,
             status,
-            total: rows.length,
-            rows,
+            statusLabel: ent.STATUS_LABEL[status],
+            sort,
+            page,
+            pageSize,
+            totalPages,
+            // Unfiltered totals — these MUST equal the Dashboard KPI.
+            totals: unfilteredTotals,
+            // Totals after the user's filters (what the page renders).
+            filteredTotals,
+            categories,
+            groups: pageGroups,
+            generatedAt: new Date().toISOString(),
           });
         } catch (err) {
           const resp = guardResponse(err);
