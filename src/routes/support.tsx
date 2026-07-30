@@ -10,8 +10,15 @@ import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
 
 
 export const Route = createFileRoute("/support")({
+  validateSearch: (s: Record<string, unknown>): { customerCode?: string } => ({
+    customerCode:
+      typeof s.customerCode === "string" && s.customerCode.trim()
+        ? s.customerCode.trim()
+        : undefined,
+  }),
   component: SupportWorkspace,
 });
+
 
 /* ---------------- helpers ---------------- */
 
