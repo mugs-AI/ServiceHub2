@@ -57,22 +57,17 @@ export const Route = createFileRoute("/api/admin/dashboard")({
             if (r.error) throw r.error;
           }
 
-          // Distinct customer counts by entitlement status.
-          const distinctCustomers = async (status: string): Promise<number> => {
-            const { data, error } = await supabaseAdmin
-              .from("customer_subscription_snapshots")
-              .select("customer_code")
-              .eq("tenant_code", user.tenantCode)
-              .eq("subscription_status", status);
-            if (error) throw error;
-            const set = new Set<string>();
-            for (const r of data ?? []) if (r.customer_code) set.add(r.customer_code);
-            return set.size;
-          };
-          const [dueSoonCustomers, overdueCustomers] = await Promise.all([
-            distinctCustomers("Due Soon"),
-            distinctCustomers("Overdue"),
+          // Distinct customer counts by entitlement status — SHARED read model,
+          // the same module that powers the Due Soon / Overdue list pages, so a
+          // KPI can never disagree with the page it links to.
+          const ent = await import("@/lib/qne/entitlements/query.server");
+          const [dueSoonRecords, overdueRecords] = await Promise.all([
+            ent.loadEntitlementRecords(user.tenantCode, "due_soon"),
+            ent.loadEntitlementRecords(user.tenantCode, "overdue"),
           ]);
+          const dueSoonCustomers = ent.totalsFromRecords(dueSoonRecords).customers;
+          const overdueCustomers = ent.totalsFromRecords(overdueRecords).customers;
+
 
           // User workload — group by assignee for active jobs.
           const ACTIVE = [
