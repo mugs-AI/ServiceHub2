@@ -6,6 +6,13 @@ import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
 import { allowedTransitionsClient } from "@/lib/qne/service-jobs/workflow";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
+import {
+  canScheduleJob,
+  formatDuration,
+  myLocalToUtcIso,
+  utcIsoToMyLocal,
+  validateWindow,
+} from "@/lib/qne/service-jobs/scheduling";
 
 interface JobDetail {
   id: string;
@@ -38,6 +45,10 @@ interface JobDetail {
   assigned_at: string | null;
   assigned_by_user_id: string | null;
   assigned_by_name_snapshot: string | null;
+  scheduled_start_at: string | null;
+  scheduled_end_at: string | null;
+  schedule_status: string | null;
+  scheduled_by_name_snapshot: string | null;
   is_deleted: boolean;
   deleted_at: string | null;
   deleted_by_name_snapshot: string | null;
@@ -283,6 +294,13 @@ function JobDetailPage() {
         <EntitlementCard job={job} isAdmin={isAdmin} />
       )}
 
+      <ScheduleCard
+        job={job}
+        locked={pendingLock || job.is_deleted}
+        canEdit={isAdmin || currentUserId === job.assigned_user_id}
+        onDone={reloadAll}
+      />
+
       <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
         <Section title="Job details">
           <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
@@ -330,6 +348,216 @@ function JobDetailPage() {
         />
       )}
     </div>
+  );
+}
+
+/* ---------------- schedule card ---------------- */
+
+function ScheduleCard({
+  job,
+  locked,
+  canEdit,
+  onDone,
+}: {
+  job: JobDetail;
+  locked: boolean;
+  canEdit: boolean;
+  onDone: () => Promise<void> | void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [start, setStart] = useState(utcIsoToMyLocal(job.scheduled_start_at));
+  const [end, setEnd] = useState(utcIsoToMyLocal(job.scheduled_end_at));
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<
+    { id: string; job_number: string; scheduled_start_at: string | null }[]
+  >([]);
+
+  const scheduled = Boolean(job.scheduled_start_at);
+  const allowed = canScheduleJob(job);
+
+  async function submit(force: boolean) {
+    setErr(null);
+    const startIso = myLocalToUtcIso(start);
+    const endIso = myLocalToUtcIso(end);
+    const check = validateWindow(startIso, endIso);
+    if (!check.ok) {
+      setErr(check.error ?? "Invalid appointment window.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/schedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ start: startIso, end: endIso, reason: reason || null, force }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        setConflicts(body.conflicts ?? []);
+        setErr(body.error ?? "Scheduling conflict.");
+        return;
+      }
+      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+      setConflicts([]);
+      setOpen(false);
+      setReason("");
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to save appointment");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unschedule() {
+    if (!window.confirm("Remove this appointment?")) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/schedule`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ reason: reason || null }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+      setStart("");
+      setEnd("");
+      setOpen(false);
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to remove appointment");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Appointment
+        </h2>
+        {locked ? (
+          <span className="text-xs font-semibold text-amber-700">Locked</span>
+        ) : canEdit && allowed.ok ? (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="min-h-9 rounded-md border px-3 text-xs font-semibold hover:bg-accent"
+            >
+              {open ? "Close" : scheduled ? "Reschedule" : "Schedule"}
+            </button>
+            {scheduled && (
+              <button
+                type="button"
+                onClick={() => void unschedule()}
+                disabled={busy}
+                className="min-h-9 rounded-md border border-destructive/40 px-3 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              >
+                Unschedule
+              </button>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-2 grid grid-cols-1 gap-1 text-sm sm:grid-cols-3">
+        <div>
+          <span className="text-xs text-muted-foreground">Start: </span>
+          <span className="font-semibold text-foreground">
+            {job.scheduled_start_at ? formatMYDateTime(job.scheduled_start_at) : "Not scheduled"}
+          </span>
+        </div>
+        <div>
+          <span className="text-xs text-muted-foreground">End: </span>
+          <span className="font-medium text-foreground">
+            {job.scheduled_end_at ? formatMYDateTime(job.scheduled_end_at) : "—"}
+          </span>
+        </div>
+        <div>
+          <span className="text-xs text-muted-foreground">Duration: </span>
+          <span className="font-medium text-foreground">
+            {formatDuration(job.scheduled_start_at, job.scheduled_end_at)}
+          </span>
+        </div>
+      </div>
+      {!allowed.ok && !locked && (
+        <p className="mt-1 text-xs text-muted-foreground">{allowed.reason}</p>
+      )}
+
+      {open && !locked && (
+        <div className="mt-3 space-y-2 rounded-lg border bg-background p-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="block text-xs font-semibold text-muted-foreground">
+              Start (Malaysia time)
+              <input
+                type="datetime-local"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-muted-foreground">
+              End (Malaysia time)
+              <input
+                type="datetime-local"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
+              />
+            </label>
+          </div>
+          <label className="block text-xs font-semibold text-muted-foreground">
+            Reason / note (optional)
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
+            />
+          </label>
+
+          {err && (
+            <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {err}
+              {conflicts.length > 0 && (
+                <ul className="mt-1 list-disc pl-4">
+                  {conflicts.map((c) => (
+                    <li key={c.id}>
+                      {c.job_number} — {formatMYDateTime(c.scheduled_start_at)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void submit(false)}
+              disabled={busy}
+              className="min-h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save appointment"}
+            </button>
+            {conflicts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void submit(true)}
+                disabled={busy}
+                className="min-h-11 rounded-md border border-amber-500 px-4 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+              >
+                Book anyway
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

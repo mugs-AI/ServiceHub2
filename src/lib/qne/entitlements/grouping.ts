@@ -147,3 +147,19 @@ export function distinctCategories(rows: EntitlementRecord[]): string[] {
   for (const r of rows) if (r.subscription_category) set.add(r.subscription_category);
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
+
+export interface EntitlementTotals {
+  customers: number;
+  entitlements: number;
+}
+
+/**
+ * Canonical totals. The Admin Dashboard KPI and the Due Soon / Overdue list
+ * headers BOTH derive their numbers from this one function, so a KPI count can
+ * never disagree with the page it links to.
+ */
+export function totalsFromRecords(rows: EntitlementRecord[]): EntitlementTotals {
+  const set = new Set<string>();
+  for (const r of rows) if (r.customer_code) set.add(r.customer_code);
+  return { customers: set.size, entitlements: rows.length };
+}

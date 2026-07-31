@@ -788,6 +788,57 @@ export type Database = {
           },
         ]
       }
+      service_job_schedule_history: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by_name_snapshot: string | null
+          changed_by_user_id: string | null
+          id: string
+          new_end_at: string | null
+          new_start_at: string | null
+          new_technician_user_id: string | null
+          previous_end_at: string | null
+          previous_start_at: string | null
+          previous_technician_user_id: string | null
+          reason: string | null
+          service_job_id: string
+          tenant_code: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by_name_snapshot?: string | null
+          changed_by_user_id?: string | null
+          id?: string
+          new_end_at?: string | null
+          new_start_at?: string | null
+          new_technician_user_id?: string | null
+          previous_end_at?: string | null
+          previous_start_at?: string | null
+          previous_technician_user_id?: string | null
+          reason?: string | null
+          service_job_id: string
+          tenant_code: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by_name_snapshot?: string | null
+          changed_by_user_id?: string | null
+          id?: string
+          new_end_at?: string | null
+          new_start_at?: string | null
+          new_technician_user_id?: string | null
+          previous_end_at?: string | null
+          previous_start_at?: string | null
+          previous_technician_user_id?: string | null
+          reason?: string | null
+          service_job_id?: string
+          tenant_code?: string
+        }
+        Relationships: []
+      }
       service_jobs: {
         Row: {
           approval_note: string | null
@@ -836,6 +887,14 @@ export type Database = {
           rejected_by_user_id: string | null
           rejection_reason: string | null
           requires_approval: boolean
+          schedule_status: string
+          schedule_updated_at: string | null
+          scheduled_at: string | null
+          scheduled_by_name_snapshot: string | null
+          scheduled_by_user_id: string | null
+          scheduled_end_at: string | null
+          scheduled_start_at: string | null
+          scheduled_timezone: string
           service_address: string | null
           source: string
           started_at: string | null
@@ -894,6 +953,14 @@ export type Database = {
           rejected_by_user_id?: string | null
           rejection_reason?: string | null
           requires_approval?: boolean
+          schedule_status?: string
+          schedule_updated_at?: string | null
+          scheduled_at?: string | null
+          scheduled_by_name_snapshot?: string | null
+          scheduled_by_user_id?: string | null
+          scheduled_end_at?: string | null
+          scheduled_start_at?: string | null
+          scheduled_timezone?: string
           service_address?: string | null
           source?: string
           started_at?: string | null
@@ -952,6 +1019,14 @@ export type Database = {
           rejected_by_user_id?: string | null
           rejection_reason?: string | null
           requires_approval?: boolean
+          schedule_status?: string
+          schedule_updated_at?: string | null
+          scheduled_at?: string | null
+          scheduled_by_name_snapshot?: string | null
+          scheduled_by_user_id?: string | null
+          scheduled_end_at?: string | null
+          scheduled_start_at?: string | null
+          scheduled_timezone?: string
           service_address?: string | null
           source?: string
           started_at?: string | null
