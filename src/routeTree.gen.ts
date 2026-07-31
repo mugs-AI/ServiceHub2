@@ -31,6 +31,7 @@ import { Route as ApiWorkspaceEntitlementCustomersRouteImport } from './routes/a
 import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspace/customers'
 import { Route as ApiWorkspaceCustomerSubscriptionsRouteImport } from './routes/api/workspace/customer-subscriptions'
 import { Route as ApiWorkspaceCustomerResolveRouteImport } from './routes/api/workspace/customer-resolve'
+import { Route as ApiWorkspaceCalendarRouteImport } from './routes/api/workspace/calendar'
 import { Route as ApiSyncSubscriptionsRouteImport } from './routes/api/sync/subscriptions'
 import { Route as ApiSyncStockRouteImport } from './routes/api/sync/stock'
 import { Route as ApiSyncRecoverStaleRouteImport } from './routes/api/sync/recover-stale'
@@ -58,6 +59,7 @@ import { Route as ApiWorkspaceJobsPendingRouteImport } from './routes/api/worksp
 import { Route as ApiWorkspaceJobsJobIdRouteImport } from './routes/api/workspace/jobs.$jobId'
 import { Route as ApiWorkspaceJobsJobIdTimelineRouteImport } from './routes/api/workspace/jobs.$jobId.timeline'
 import { Route as ApiWorkspaceJobsJobIdStatusRouteImport } from './routes/api/workspace/jobs.$jobId.status'
+import { Route as ApiWorkspaceJobsJobIdScheduleRouteImport } from './routes/api/workspace/jobs.$jobId.schedule'
 import { Route as ApiWorkspaceJobsJobIdRestoreRouteImport } from './routes/api/workspace/jobs.$jobId.restore'
 import { Route as ApiWorkspaceJobsJobIdRejectRouteImport } from './routes/api/workspace/jobs.$jobId.reject'
 import { Route as ApiWorkspaceJobsJobIdPurgeRouteImport } from './routes/api/workspace/jobs.$jobId.purge'
@@ -182,6 +184,11 @@ const ApiWorkspaceCustomerResolveRoute =
     path: '/api/workspace/customer-resolve',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiWorkspaceCalendarRoute = ApiWorkspaceCalendarRouteImport.update({
+  id: '/api/workspace/calendar',
+  path: '/api/workspace/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSyncSubscriptionsRoute = ApiSyncSubscriptionsRouteImport.update({
   id: '/api/sync/subscriptions',
   path: '/api/sync/subscriptions',
@@ -326,6 +333,12 @@ const ApiWorkspaceJobsJobIdStatusRoute =
     path: '/status',
     getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
   } as any)
+const ApiWorkspaceJobsJobIdScheduleRoute =
+  ApiWorkspaceJobsJobIdScheduleRouteImport.update({
+    id: '/schedule',
+    path: '/schedule',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdRestoreRoute =
   ApiWorkspaceJobsJobIdRestoreRouteImport.update({
     id: '/restore',
@@ -426,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/calendar': typeof ApiWorkspaceCalendarRoute
   '/api/workspace/customer-resolve': typeof ApiWorkspaceCustomerResolveRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
@@ -445,6 +459,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs/$jobId/purge': typeof ApiWorkspaceJobsJobIdPurgeRoute
   '/api/workspace/jobs/$jobId/reject': typeof ApiWorkspaceJobsJobIdRejectRoute
   '/api/workspace/jobs/$jobId/restore': typeof ApiWorkspaceJobsJobIdRestoreRoute
+  '/api/workspace/jobs/$jobId/schedule': typeof ApiWorkspaceJobsJobIdScheduleRoute
   '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
   '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
 }
@@ -487,6 +502,7 @@ export interface FileRoutesByTo {
   '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/calendar': typeof ApiWorkspaceCalendarRoute
   '/api/workspace/customer-resolve': typeof ApiWorkspaceCustomerResolveRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
@@ -506,6 +522,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs/$jobId/purge': typeof ApiWorkspaceJobsJobIdPurgeRoute
   '/api/workspace/jobs/$jobId/reject': typeof ApiWorkspaceJobsJobIdRejectRoute
   '/api/workspace/jobs/$jobId/restore': typeof ApiWorkspaceJobsJobIdRestoreRoute
+  '/api/workspace/jobs/$jobId/schedule': typeof ApiWorkspaceJobsJobIdScheduleRoute
   '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
   '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
 }
@@ -549,6 +566,7 @@ export interface FileRoutesById {
   '/api/sync/recover-stale': typeof ApiSyncRecoverStaleRoute
   '/api/sync/stock': typeof ApiSyncStockRoute
   '/api/sync/subscriptions': typeof ApiSyncSubscriptionsRoute
+  '/api/workspace/calendar': typeof ApiWorkspaceCalendarRoute
   '/api/workspace/customer-resolve': typeof ApiWorkspaceCustomerResolveRoute
   '/api/workspace/customer-subscriptions': typeof ApiWorkspaceCustomerSubscriptionsRoute
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
@@ -568,6 +586,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs/$jobId/purge': typeof ApiWorkspaceJobsJobIdPurgeRoute
   '/api/workspace/jobs/$jobId/reject': typeof ApiWorkspaceJobsJobIdRejectRoute
   '/api/workspace/jobs/$jobId/restore': typeof ApiWorkspaceJobsJobIdRestoreRoute
+  '/api/workspace/jobs/$jobId/schedule': typeof ApiWorkspaceJobsJobIdScheduleRoute
   '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
   '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
 }
@@ -612,6 +631,7 @@ export interface FileRouteTypes {
     | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/calendar'
     | '/api/workspace/customer-resolve'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
@@ -631,6 +651,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/purge'
     | '/api/workspace/jobs/$jobId/reject'
     | '/api/workspace/jobs/$jobId/restore'
+    | '/api/workspace/jobs/$jobId/schedule'
     | '/api/workspace/jobs/$jobId/status'
     | '/api/workspace/jobs/$jobId/timeline'
   fileRoutesByTo: FileRoutesByTo
@@ -673,6 +694,7 @@ export interface FileRouteTypes {
     | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/calendar'
     | '/api/workspace/customer-resolve'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
@@ -692,6 +714,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/purge'
     | '/api/workspace/jobs/$jobId/reject'
     | '/api/workspace/jobs/$jobId/restore'
+    | '/api/workspace/jobs/$jobId/schedule'
     | '/api/workspace/jobs/$jobId/status'
     | '/api/workspace/jobs/$jobId/timeline'
   id:
@@ -734,6 +757,7 @@ export interface FileRouteTypes {
     | '/api/sync/recover-stale'
     | '/api/sync/stock'
     | '/api/sync/subscriptions'
+    | '/api/workspace/calendar'
     | '/api/workspace/customer-resolve'
     | '/api/workspace/customer-subscriptions'
     | '/api/workspace/customers'
@@ -753,6 +777,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/purge'
     | '/api/workspace/jobs/$jobId/reject'
     | '/api/workspace/jobs/$jobId/restore'
+    | '/api/workspace/jobs/$jobId/schedule'
     | '/api/workspace/jobs/$jobId/status'
     | '/api/workspace/jobs/$jobId/timeline'
   fileRoutesById: FileRoutesById
@@ -794,6 +819,7 @@ export interface RootRouteChildren {
   ApiSyncRecoverStaleRoute: typeof ApiSyncRecoverStaleRoute
   ApiSyncStockRoute: typeof ApiSyncStockRoute
   ApiSyncSubscriptionsRoute: typeof ApiSyncSubscriptionsRoute
+  ApiWorkspaceCalendarRoute: typeof ApiWorkspaceCalendarRoute
   ApiWorkspaceCustomerResolveRoute: typeof ApiWorkspaceCustomerResolveRoute
   ApiWorkspaceCustomerSubscriptionsRoute: typeof ApiWorkspaceCustomerSubscriptionsRoute
   ApiWorkspaceCustomersRoute: typeof ApiWorkspaceCustomersRoute
@@ -956,6 +982,13 @@ declare module '@tanstack/react-router' {
       path: '/api/workspace/customer-resolve'
       fullPath: '/api/workspace/customer-resolve'
       preLoaderRoute: typeof ApiWorkspaceCustomerResolveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/calendar': {
+      id: '/api/workspace/calendar'
+      path: '/api/workspace/calendar'
+      fullPath: '/api/workspace/calendar'
+      preLoaderRoute: typeof ApiWorkspaceCalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sync/subscriptions': {
@@ -1147,6 +1180,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdStatusRouteImport
       parentRoute: typeof ApiWorkspaceJobsJobIdRoute
     }
+    '/api/workspace/jobs/$jobId/schedule': {
+      id: '/api/workspace/jobs/$jobId/schedule'
+      path: '/schedule'
+      fullPath: '/api/workspace/jobs/$jobId/schedule'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdScheduleRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
     '/api/workspace/jobs/$jobId/restore': {
       id: '/api/workspace/jobs/$jobId/restore'
       path: '/restore'
@@ -1245,6 +1285,7 @@ interface ApiWorkspaceJobsJobIdRouteChildren {
   ApiWorkspaceJobsJobIdPurgeRoute: typeof ApiWorkspaceJobsJobIdPurgeRoute
   ApiWorkspaceJobsJobIdRejectRoute: typeof ApiWorkspaceJobsJobIdRejectRoute
   ApiWorkspaceJobsJobIdRestoreRoute: typeof ApiWorkspaceJobsJobIdRestoreRoute
+  ApiWorkspaceJobsJobIdScheduleRoute: typeof ApiWorkspaceJobsJobIdScheduleRoute
   ApiWorkspaceJobsJobIdStatusRoute: typeof ApiWorkspaceJobsJobIdStatusRoute
   ApiWorkspaceJobsJobIdTimelineRoute: typeof ApiWorkspaceJobsJobIdTimelineRoute
 }
@@ -1261,6 +1302,7 @@ const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
   ApiWorkspaceJobsJobIdPurgeRoute: ApiWorkspaceJobsJobIdPurgeRoute,
   ApiWorkspaceJobsJobIdRejectRoute: ApiWorkspaceJobsJobIdRejectRoute,
   ApiWorkspaceJobsJobIdRestoreRoute: ApiWorkspaceJobsJobIdRestoreRoute,
+  ApiWorkspaceJobsJobIdScheduleRoute: ApiWorkspaceJobsJobIdScheduleRoute,
   ApiWorkspaceJobsJobIdStatusRoute: ApiWorkspaceJobsJobIdStatusRoute,
   ApiWorkspaceJobsJobIdTimelineRoute: ApiWorkspaceJobsJobIdTimelineRoute,
 }
@@ -1324,6 +1366,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSyncRecoverStaleRoute: ApiSyncRecoverStaleRoute,
   ApiSyncStockRoute: ApiSyncStockRoute,
   ApiSyncSubscriptionsRoute: ApiSyncSubscriptionsRoute,
+  ApiWorkspaceCalendarRoute: ApiWorkspaceCalendarRoute,
   ApiWorkspaceCustomerResolveRoute: ApiWorkspaceCustomerResolveRoute,
   ApiWorkspaceCustomerSubscriptionsRoute:
     ApiWorkspaceCustomerSubscriptionsRoute,
