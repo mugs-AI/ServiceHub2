@@ -6,6 +6,7 @@ import { getStoredToken } from "@/lib/qne/tokens";
 import { useTabs } from "@/lib/tabs";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
+import { MyDayPanel } from "@/components/qne/DaySchedule";
 
 export const Route = createFileRoute("/dashboard")({
   component: UserDashboard,
@@ -246,6 +247,7 @@ function UserDashboard() {
           </button>
           <QuickLink to="/support" label="Workspace" />
           <QuickLink to="/jobs/pending" label="Pending Queue" />
+          <QuickLink to="/calendar" label="Calendar" />
           <QuickLink to="/jobs/new" label="New Service Job" primary />
         </div>
       </header>
@@ -256,6 +258,8 @@ function UserDashboard() {
           Ask an administrator to grant you access.
         </div>
       )}
+
+      <MyDayPanel />
 
       <section>
         <SectionTitle>My work</SectionTitle>
