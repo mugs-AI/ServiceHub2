@@ -14,6 +14,8 @@ import type { EntitlementRecord, EntitlementStatusKey } from "./types";
 
 export type { EntitlementRecord, EntitlementStatusKey } from "./types";
 export * from "./grouping";
+import { totalsFromRecords, type EntitlementTotals } from "./grouping";
+export type { EntitlementTotals } from "./grouping";
 
 export const STATUS_LABEL: Record<EntitlementStatusKey, string> = {
   due_soon: "Due Soon",
@@ -52,11 +54,6 @@ export async function loadEntitlementRecords(
   );
 }
 
-export interface EntitlementTotals {
-  customers: number;
-  entitlements: number;
-}
-
 /** The canonical KPI numbers. Dashboard and list pages both use this. */
 export async function entitlementTotals(
   tenantCode: string,
@@ -65,10 +62,3 @@ export async function entitlementTotals(
   const rows = await loadEntitlementRecords(tenantCode, status);
   return totalsFromRecords(rows);
 }
-
-export function totalsFromRecords(rows: EntitlementRecord[]): EntitlementTotals {
-  const set = new Set<string>();
-  for (const r of rows) if (r.customer_code) set.add(r.customer_code);
-  return { customers: set.size, entitlements: rows.length };
-}
-
