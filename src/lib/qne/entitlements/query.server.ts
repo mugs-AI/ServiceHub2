@@ -15,7 +15,6 @@ import type { EntitlementRecord, EntitlementStatusKey } from "./types";
 export type { EntitlementRecord, EntitlementStatusKey } from "./types";
 export * from "./grouping";
 import { totalsFromRecords, type EntitlementTotals } from "./grouping";
-export type { EntitlementTotals } from "./grouping";
 
 export const STATUS_LABEL: Record<EntitlementStatusKey, string> = {
   due_soon: "Due Soon",
