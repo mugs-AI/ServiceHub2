@@ -89,6 +89,14 @@ function AuthenticatedShell({
         closable: false,
         kind: "pinned",
       },
+      {
+        key: "pin:calendar",
+        label: "Calendar",
+        href: "/calendar",
+        closable: false,
+        kind: "pinned",
+      },
+
     ],
     [isAdmin],
   );
