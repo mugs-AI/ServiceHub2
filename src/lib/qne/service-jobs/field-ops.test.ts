@@ -71,7 +71,7 @@ describe("attachment validation", () => {
 });
 
 describe("completion gate", () => {
-  function draft(over: Record<string, unknown> = {}) {
+  function draft(over: Record<string, unknown> = {}): CompletionDraft {
     return {
       checklist: defaultChecklist().map((i) => ({ ...i, state: "done" as const })),
       resolution_summary: "Fixed",
@@ -84,6 +84,7 @@ describe("completion gate", () => {
       ...over,
     };
   }
+
 
   it("passes a complete draft", () => {
     expect(validateCompletion(draft(), { status: "In Progress" }).ok).toBe(true);
