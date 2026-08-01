@@ -458,8 +458,8 @@ function ScheduleCard({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
-      setStart("");
-      setEnd("");
+      setEndTouched(false);
+
       setOpen(false);
       await onDone();
     } catch (e) {
