@@ -20,10 +20,16 @@ export interface AppTab {
 interface TabsContextValue {
   tabs: AppTab[];
   activeKey: string | null;
-  openJobTab: (jobId: string, jobNumber: string) => void;
+  /**
+   * Central open-or-focus helper. Opens the Job tab if absent, reuses it if it
+   * already exists, and (unless `focus: false`) makes it the active tab by
+   * navigating to it. Never creates a duplicate tab.
+   */
+  openJobTab: (jobId: string, jobNumber: string, opts?: { focus?: boolean }) => void;
   activate: (key: string) => void;
   close: (key: string) => void;
 }
+
 
 const TabsContext = createContext<TabsContextValue | null>(null);
 const STORAGE_KEY = "sh2:openTabs:v1";
