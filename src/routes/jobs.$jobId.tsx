@@ -167,7 +167,7 @@ function JobDetailPage() {
 
   const { openJobTab } = useTabs();
   useEffect(() => {
-    if (job?.job_number) openJobTab(jobId, job.job_number);
+    if (job?.job_number) openJobTab(jobId, job.job_number, { focus: false });
   }, [jobId, job?.job_number, openJobTab]);
 
   if (loading && !job) {
