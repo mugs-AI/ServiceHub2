@@ -18,6 +18,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CustomersIndexRouteImport } from './routes/customers.index'
 import { Route as JobsPendingRouteImport } from './routes/jobs.pending'
 import { Route as JobsNewRouteImport } from './routes/jobs.new'
 import { Route as JobsJobIdRouteImport } from './routes/jobs.$jobId'
@@ -116,6 +117,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const CustomersIndexRoute = CustomersIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CustomersRoute,
 } as any)
 const JobsPendingRoute = JobsPendingRouteImport.update({
   id: '/jobs/pending',
@@ -424,6 +430,7 @@ export interface FileRoutesByFullPath {
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
+  '/customers/': typeof CustomersIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
@@ -473,7 +480,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
-  '/customers': typeof CustomersRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/invoices': typeof InvoicesRoute
   '/settings': typeof SettingsRoute
@@ -488,6 +494,7 @@ export interface FileRoutesByTo {
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
+  '/customers': typeof CustomersIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
@@ -553,6 +560,7 @@ export interface FileRoutesById {
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
+  '/customers/': typeof CustomersIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
@@ -619,6 +627,7 @@ export interface FileRouteTypes {
     | '/jobs/$jobId'
     | '/jobs/new'
     | '/jobs/pending'
+    | '/customers/'
     | '/api/admin/allowlist'
     | '/api/admin/dashboard'
     | '/api/auth/connect'
@@ -668,7 +677,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/calendar'
-    | '/customers'
     | '/dashboard'
     | '/invoices'
     | '/settings'
@@ -683,6 +691,7 @@ export interface FileRouteTypes {
     | '/jobs/$jobId'
     | '/jobs/new'
     | '/jobs/pending'
+    | '/customers'
     | '/api/admin/allowlist'
     | '/api/admin/dashboard'
     | '/api/auth/connect'
@@ -747,6 +756,7 @@ export interface FileRouteTypes {
     | '/jobs/$jobId'
     | '/jobs/new'
     | '/jobs/pending'
+    | '/customers/'
     | '/api/admin/allowlist'
     | '/api/admin/dashboard'
     | '/api/auth/connect'
@@ -905,6 +915,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/customers/': {
+      id: '/customers/'
+      path: '/'
+      fullPath: '/customers/'
+      preLoaderRoute: typeof CustomersIndexRouteImport
+      parentRoute: typeof CustomersRoute
     }
     '/jobs/pending': {
       id: '/jobs/pending'
@@ -1283,11 +1300,13 @@ declare module '@tanstack/react-router' {
 interface CustomersRouteChildren {
   CustomersDueSoonRoute: typeof CustomersDueSoonRoute
   CustomersOverdueRoute: typeof CustomersOverdueRoute
+  CustomersIndexRoute: typeof CustomersIndexRoute
 }
 
 const CustomersRouteChildren: CustomersRouteChildren = {
   CustomersDueSoonRoute: CustomersDueSoonRoute,
   CustomersOverdueRoute: CustomersOverdueRoute,
+  CustomersIndexRoute: CustomersIndexRoute,
 }
 
 const CustomersRouteWithChildren = CustomersRoute._addFileChildren(
