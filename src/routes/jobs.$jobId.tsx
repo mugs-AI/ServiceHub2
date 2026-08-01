@@ -6,13 +6,20 @@ import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
 import { allowedTransitionsClient } from "@/lib/qne/service-jobs/workflow";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
+import { DateField, TimeField } from "@/components/qne/DateTimeFields";
 import {
+  addMinutesLocal,
   canScheduleJob,
   formatDuration,
+  joinLocal,
+  minutesBetweenLocal,
   myLocalToUtcIso,
+  nextSlotNow,
+  splitLocal,
   utcIsoToMyLocal,
   validateWindow,
 } from "@/lib/qne/service-jobs/scheduling";
+
 
 interface JobDetail {
   id: string;
@@ -160,7 +167,7 @@ function JobDetailPage() {
 
   const { openJobTab } = useTabs();
   useEffect(() => {
-    if (job?.job_number) openJobTab(jobId, job.job_number);
+    if (job?.job_number) openJobTab(jobId, job.job_number, { focus: false });
   }, [jobId, job?.job_number, openJobTab]);
 
   if (loading && !job) {
@@ -365,8 +372,20 @@ function ScheduleCard({
   onDone: () => Promise<void> | void;
 }) {
   const [open, setOpen] = useState(false);
-  const [start, setStart] = useState(utcIsoToMyLocal(job.scheduled_start_at));
-  const [end, setEnd] = useState(utcIsoToMyLocal(job.scheduled_end_at));
+  const initial = useMemo(() => {
+    const s = splitLocal(utcIsoToMyLocal(job.scheduled_start_at));
+    const e = splitLocal(utcIsoToMyLocal(job.scheduled_end_at));
+    if (s.date && s.time) return { s, e: e.date && e.time ? e : addMinutesLocal(s.date, s.time, 60) };
+    const now = nextSlotNow();
+    return { s: now, e: addMinutesLocal(now.date, now.time, 60) };
+  }, [job.scheduled_start_at, job.scheduled_end_at]);
+
+  const [startDate, setStartDate] = useState(initial.s.date);
+  const [startTime, setStartTime] = useState(initial.s.time);
+  const [endDate, setEndDate] = useState(initial.e.date);
+  const [endTime, setEndTime] = useState(initial.e.time);
+  // Once the user edits End directly we stop auto-shifting it with Start.
+  const [endTouched, setEndTouched] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -374,8 +393,24 @@ function ScheduleCard({
     { id: string; job_number: string; scheduled_start_at: string | null }[]
   >([]);
 
+  const start = joinLocal(startDate, startTime);
+  const end = joinLocal(endDate, endTime);
   const scheduled = Boolean(job.scheduled_start_at);
   const allowed = canScheduleJob(job);
+
+  /** Changing Start preserves the current duration unless End was edited. */
+  function updateStart(nextDate: string, nextTime: string) {
+    const prevMins = minutesBetweenLocal(startDate, startTime, endDate, endTime);
+    setStartDate(nextDate);
+    setStartTime(nextTime);
+    if (!endTouched) {
+      const keep = prevMins && prevMins > 0 ? prevMins : 60;
+      const shifted = addMinutesLocal(nextDate, nextTime, keep);
+      setEndDate(shifted.date);
+      setEndTime(shifted.time);
+    }
+  }
+
 
   async function submit(force: boolean) {
     setErr(null);
@@ -423,8 +458,8 @@ function ScheduleCard({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
-      setStart("");
-      setEnd("");
+      setEndTouched(false);
+
       setOpen(false);
       await onDone();
     } catch (e) {
@@ -491,26 +526,42 @@ function ScheduleCard({
 
       {open && !locked && (
         <div className="mt-3 space-y-2 rounded-lg border bg-background p-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <label className="block text-xs font-semibold text-muted-foreground">
-              Start (Malaysia time)
-              <input
-                type="datetime-local"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
-              />
-            </label>
-            <label className="block text-xs font-semibold text-muted-foreground">
-              End (Malaysia time)
-              <input
-                type="datetime-local"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
-              />
-            </label>
+          <p className="text-xs text-muted-foreground">
+            All times are Malaysia time (Asia/Kuala_Lumpur), in 30-minute slots.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <DateField
+              id="appt-start-date"
+              label="Start Date"
+              value={startDate}
+              onChange={(d) => updateStart(d, startTime)}
+            />
+            <TimeField
+              id="appt-start-time"
+              label="Start Time"
+              value={startTime}
+              onChange={(t) => updateStart(startDate, t)}
+            />
+            <DateField
+              id="appt-end-date"
+              label="End Date"
+              value={endDate}
+              onChange={(d) => {
+                setEndTouched(true);
+                setEndDate(d);
+              }}
+            />
+            <TimeField
+              id="appt-end-time"
+              label="End Time"
+              value={endTime}
+              onChange={(t) => {
+                setEndTouched(true);
+                setEndTime(t);
+              }}
+            />
           </div>
+
           <label className="block text-xs font-semibold text-muted-foreground">
             Reason / note (optional)
             <input

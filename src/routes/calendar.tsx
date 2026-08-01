@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { DaySchedule, useDaySchedule } from "@/components/qne/DaySchedule";
 import { myDayKey, shiftDayKey } from "@/lib/qne/service-jobs/scheduling";
@@ -25,12 +25,26 @@ export const Route = createFileRoute("/calendar")({
   component: CalendarPage,
 });
 
+const DATE_KEY = "sh2:calendarDate:v1";
+
+function initialDate(): string {
+  if (typeof window === "undefined") return myDayKey();
+  const saved = window.sessionStorage.getItem(DATE_KEY);
+  return saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) ? saved : myDayKey();
+}
+
 function CalendarPage() {
   const session = useSession();
   const isAdmin = !!session.currentUser?.isAdministrator;
-  const [date, setDate] = useState(myDayKey());
+  const [date, setDate] = useState(initialDate);
   const [scope, setScope] = useState<"me" | "team">("me");
   const { items, loading, error, reload } = useDaySchedule(date, scope);
+
+  // Returning to the Calendar tab restores the same selected date.
+  useEffect(() => {
+    window.sessionStorage.setItem(DATE_KEY, date);
+  }, [date]);
+
 
   return (
     <div className="space-y-4">

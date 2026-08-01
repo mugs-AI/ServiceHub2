@@ -158,3 +158,97 @@ export function formatDuration(startIso?: string | null, endIso?: string | null)
   const m = mins % 60;
   return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
 }
+
+/* ------------------------------------------------------------------ *
+ * Separate date + time field support (30-minute slots, Malaysia time)
+ * ------------------------------------------------------------------ */
+
+export const SLOT_MINUTES = 30;
+export const SLOT_START_HOUR = 7; // 07:00 AM
+export const SLOT_END_HOUR = 23; // last slot 11:30 PM
+
+/** All selectable `HH:mm` slots in business range, 30-minute increments. */
+export const TIME_SLOTS: string[] = (() => {
+  const out: string[] = [];
+  for (let h = SLOT_START_HOUR; h <= SLOT_END_HOUR; h++) {
+    for (let m = 0; m < 60; m += SLOT_MINUTES) {
+      out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
+  }
+  return out;
+})();
+
+/** "14:30" -> "02:30 PM" */
+export function slotLabel(hhmm: string): string {
+  const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  if (!m) return hhmm;
+  const h = Number(m[1]);
+  const suffix = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${String(h12).padStart(2, "0")}:${m[2]} ${suffix}`;
+}
+
+/** Round a `HH:mm` up to the nearest selectable slot (clamped to range). */
+export function snapToSlot(hhmm: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm ?? "");
+  if (!m) return TIME_SLOTS[0]!;
+  const total = Number(m[1]) * 60 + Number(m[2]);
+  const snapped = Math.ceil(total / SLOT_MINUTES) * SLOT_MINUTES;
+  const first = SLOT_START_HOUR * 60;
+  const last = SLOT_END_HOUR * 60 + 30;
+  const v = Math.min(Math.max(snapped, first), last);
+  return `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`;
+}
+
+/** Split a Malaysia-local `yyyy-mm-ddTHH:mm` into date + snapped time parts. */
+export function splitLocal(local: string): { date: string; time: string } {
+  if (!local) return { date: "", time: "" };
+  return { date: local.slice(0, 10), time: snapToSlot(local.slice(11, 16)) };
+}
+
+export function joinLocal(date: string, time: string): string {
+  return date && time ? `${date}T${time}` : "";
+}
+
+/** Add minutes to a Malaysia-local date/time pair, rolling the date over. */
+export function addMinutesLocal(
+  date: string,
+  time: string,
+  minutes: number,
+): { date: string; time: string } {
+  const iso = myLocalToUtcIso(joinLocal(date, time));
+  if (!iso) return { date, time };
+  const next = utcIsoToMyLocal(new Date(new Date(iso).getTime() + minutes * 60000).toISOString());
+  return splitLocal(next);
+}
+
+/** Malaysia-local minutes between two date/time pairs. */
+export function minutesBetweenLocal(
+  aDate: string,
+  aTime: string,
+  bDate: string,
+  bTime: string,
+): number | null {
+  const a = myLocalToUtcIso(joinLocal(aDate, aTime));
+  const b = myLocalToUtcIso(joinLocal(bDate, bTime));
+  if (!a || !b) return null;
+  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000);
+}
+
+/** Next 30-minute slot from now, in Malaysia time. */
+export function nextSlotNow(now: Date = new Date()): { date: string; time: string } {
+  const local = utcIsoToMyLocal(now.toISOString());
+  const { date, time } = splitLocal(local);
+  // If "now" is past the last slot of the day, move to the first slot tomorrow.
+  const raw = local.slice(11, 16);
+  const total = Number(raw.slice(0, 2)) * 60 + Number(raw.slice(3, 5));
+  if (total > SLOT_END_HOUR * 60 + 30) return { date: shiftDayKey(date, 1), time: TIME_SLOTS[0]! };
+  if (total < SLOT_START_HOUR * 60) return { date, time: TIME_SLOTS[0]! };
+  return { date, time };
+}
+
+/** `yyyy-mm-dd` -> `dd/mm/yyyy` (empty-safe). */
+export function toDisplayDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+}
