@@ -81,18 +81,27 @@ export function TabsProvider({
   }, [jobTabs]);
 
   const openJobTab = useCallback(
-    (jobId: string, jobNumber: string) => {
+    (jobId: string, jobNumber: string, opts?: { focus?: boolean }) => {
       const key = `job:${jobId}`;
+      const href = `/jobs/${jobId}`;
       setJobTabs((prev) => {
-        if (prev.some((t) => t.key === key)) return prev;
-        return [
-          ...prev,
-          { key, label: jobNumber || "Job", href: `/jobs/${jobId}` },
-        ];
+        const existing = prev.find((t) => t.key === key);
+        if (existing) {
+          // Reuse: only refresh the label if we learned a better one.
+          if (jobNumber && existing.label !== jobNumber) {
+            return prev.map((t) => (t.key === key ? { ...t, label: jobNumber } : t));
+          }
+          return prev;
+        }
+        return [...prev, { key, label: jobNumber || "Job", href }];
       });
+      if (opts?.focus !== false && pathname !== href) {
+        void router.navigate({ to: href });
+      }
     },
-    [],
+    [pathname, router],
   );
+
 
   const activate = useCallback(
     (key: string) => {
