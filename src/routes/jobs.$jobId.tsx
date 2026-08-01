@@ -365,8 +365,20 @@ function ScheduleCard({
   onDone: () => Promise<void> | void;
 }) {
   const [open, setOpen] = useState(false);
-  const [start, setStart] = useState(utcIsoToMyLocal(job.scheduled_start_at));
-  const [end, setEnd] = useState(utcIsoToMyLocal(job.scheduled_end_at));
+  const initial = useMemo(() => {
+    const s = splitLocal(utcIsoToMyLocal(job.scheduled_start_at));
+    const e = splitLocal(utcIsoToMyLocal(job.scheduled_end_at));
+    if (s.date && s.time) return { s, e: e.date && e.time ? e : addMinutesLocal(s.date, s.time, 60) };
+    const now = nextSlotNow();
+    return { s: now, e: addMinutesLocal(now.date, now.time, 60) };
+  }, [job.scheduled_start_at, job.scheduled_end_at]);
+
+  const [startDate, setStartDate] = useState(initial.s.date);
+  const [startTime, setStartTime] = useState(initial.s.time);
+  const [endDate, setEndDate] = useState(initial.e.date);
+  const [endTime, setEndTime] = useState(initial.e.time);
+  // Once the user edits End directly we stop auto-shifting it with Start.
+  const [endTouched, setEndTouched] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -374,8 +386,24 @@ function ScheduleCard({
     { id: string; job_number: string; scheduled_start_at: string | null }[]
   >([]);
 
+  const start = joinLocal(startDate, startTime);
+  const end = joinLocal(endDate, endTime);
   const scheduled = Boolean(job.scheduled_start_at);
   const allowed = canScheduleJob(job);
+
+  /** Changing Start preserves the current duration unless End was edited. */
+  function updateStart(nextDate: string, nextTime: string) {
+    const prevMins = minutesBetweenLocal(startDate, startTime, endDate, endTime);
+    setStartDate(nextDate);
+    setStartTime(nextTime);
+    if (!endTouched) {
+      const keep = prevMins && prevMins > 0 ? prevMins : 60;
+      const shifted = addMinutesLocal(nextDate, nextTime, keep);
+      setEndDate(shifted.date);
+      setEndTime(shifted.time);
+    }
+  }
+
 
   async function submit(force: boolean) {
     setErr(null);
