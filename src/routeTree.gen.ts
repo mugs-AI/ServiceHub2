@@ -59,6 +59,7 @@ import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowl
 import { Route as ApiWorkspaceJobsSummaryRouteImport } from './routes/api/workspace/jobs.summary'
 import { Route as ApiWorkspaceJobsPendingRouteImport } from './routes/api/workspace/jobs.pending'
 import { Route as ApiWorkspaceJobsJobIdRouteImport } from './routes/api/workspace/jobs.$jobId'
+import { Route as ApiWorkspaceJobsJobIdWorkNotesRouteImport } from './routes/api/workspace/jobs.$jobId.work-notes'
 import { Route as ApiWorkspaceJobsJobIdTimelineRouteImport } from './routes/api/workspace/jobs.$jobId.timeline'
 import { Route as ApiWorkspaceJobsJobIdStatusRouteImport } from './routes/api/workspace/jobs.$jobId.status'
 import { Route as ApiWorkspaceJobsJobIdScheduleRouteImport } from './routes/api/workspace/jobs.$jobId.schedule'
@@ -71,6 +72,7 @@ import { Route as ApiWorkspaceJobsJobIdHistoryRouteImport } from './routes/api/w
 import { Route as ApiWorkspaceJobsJobIdFieldRouteImport } from './routes/api/workspace/jobs.$jobId.field'
 import { Route as ApiWorkspaceJobsJobIdCommentsRouteImport } from './routes/api/workspace/jobs.$jobId.comments'
 import { Route as ApiWorkspaceJobsJobIdClaimRouteImport } from './routes/api/workspace/jobs.$jobId.claim'
+import { Route as ApiWorkspaceJobsJobIdAttachmentsRouteImport } from './routes/api/workspace/jobs.$jobId.attachments'
 import { Route as ApiWorkspaceJobsJobIdAssignRouteImport } from './routes/api/workspace/jobs.$jobId.assign'
 import { Route as ApiWorkspaceJobsJobIdApproveRouteImport } from './routes/api/workspace/jobs.$jobId.approve'
 
@@ -334,6 +336,12 @@ const ApiWorkspaceJobsJobIdRoute = ApiWorkspaceJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiWorkspaceJobsRoute,
 } as any)
+const ApiWorkspaceJobsJobIdWorkNotesRoute =
+  ApiWorkspaceJobsJobIdWorkNotesRouteImport.update({
+    id: '/work-notes',
+    path: '/work-notes',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdTimelineRoute =
   ApiWorkspaceJobsJobIdTimelineRouteImport.update({
     id: '/timeline',
@@ -406,6 +414,12 @@ const ApiWorkspaceJobsJobIdClaimRoute =
     path: '/claim',
     getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
   } as any)
+const ApiWorkspaceJobsJobIdAttachmentsRoute =
+  ApiWorkspaceJobsJobIdAttachmentsRouteImport.update({
+    id: '/attachments',
+    path: '/attachments',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdAssignRoute =
   ApiWorkspaceJobsJobIdAssignRouteImport.update({
     id: '/assign',
@@ -472,6 +486,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/attachments': typeof ApiWorkspaceJobsJobIdAttachmentsRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
@@ -484,6 +499,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs/$jobId/schedule': typeof ApiWorkspaceJobsJobIdScheduleRoute
   '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
   '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
+  '/api/workspace/jobs/$jobId/work-notes': typeof ApiWorkspaceJobsJobIdWorkNotesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -537,6 +553,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/attachments': typeof ApiWorkspaceJobsJobIdAttachmentsRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
@@ -549,6 +566,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs/$jobId/schedule': typeof ApiWorkspaceJobsJobIdScheduleRoute
   '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
   '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
+  '/api/workspace/jobs/$jobId/work-notes': typeof ApiWorkspaceJobsJobIdWorkNotesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -604,6 +622,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs/summary': typeof ApiWorkspaceJobsSummaryRoute
   '/api/workspace/jobs/$jobId/approve': typeof ApiWorkspaceJobsJobIdApproveRoute
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
+  '/api/workspace/jobs/$jobId/attachments': typeof ApiWorkspaceJobsJobIdAttachmentsRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
@@ -616,6 +635,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs/$jobId/schedule': typeof ApiWorkspaceJobsJobIdScheduleRoute
   '/api/workspace/jobs/$jobId/status': typeof ApiWorkspaceJobsJobIdStatusRoute
   '/api/workspace/jobs/$jobId/timeline': typeof ApiWorkspaceJobsJobIdTimelineRoute
+  '/api/workspace/jobs/$jobId/work-notes': typeof ApiWorkspaceJobsJobIdWorkNotesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -672,6 +692,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/attachments'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/field'
@@ -684,6 +705,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/schedule'
     | '/api/workspace/jobs/$jobId/status'
     | '/api/workspace/jobs/$jobId/timeline'
+    | '/api/workspace/jobs/$jobId/work-notes'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -737,6 +759,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/attachments'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/field'
@@ -749,6 +772,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/schedule'
     | '/api/workspace/jobs/$jobId/status'
     | '/api/workspace/jobs/$jobId/timeline'
+    | '/api/workspace/jobs/$jobId/work-notes'
   id:
     | '__root__'
     | '/'
@@ -803,6 +827,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/summary'
     | '/api/workspace/jobs/$jobId/approve'
     | '/api/workspace/jobs/$jobId/assign'
+    | '/api/workspace/jobs/$jobId/attachments'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/field'
@@ -815,6 +840,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/schedule'
     | '/api/workspace/jobs/$jobId/status'
     | '/api/workspace/jobs/$jobId/timeline'
+    | '/api/workspace/jobs/$jobId/work-notes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1216,6 +1242,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdRouteImport
       parentRoute: typeof ApiWorkspaceJobsRoute
     }
+    '/api/workspace/jobs/$jobId/work-notes': {
+      id: '/api/workspace/jobs/$jobId/work-notes'
+      path: '/work-notes'
+      fullPath: '/api/workspace/jobs/$jobId/work-notes'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdWorkNotesRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
     '/api/workspace/jobs/$jobId/timeline': {
       id: '/api/workspace/jobs/$jobId/timeline'
       path: '/timeline'
@@ -1300,6 +1333,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdClaimRouteImport
       parentRoute: typeof ApiWorkspaceJobsJobIdRoute
     }
+    '/api/workspace/jobs/$jobId/attachments': {
+      id: '/api/workspace/jobs/$jobId/attachments'
+      path: '/attachments'
+      fullPath: '/api/workspace/jobs/$jobId/attachments'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdAttachmentsRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
     '/api/workspace/jobs/$jobId/assign': {
       id: '/api/workspace/jobs/$jobId/assign'
       path: '/assign'
@@ -1336,6 +1376,7 @@ const CustomersRouteWithChildren = CustomersRoute._addFileChildren(
 interface ApiWorkspaceJobsJobIdRouteChildren {
   ApiWorkspaceJobsJobIdApproveRoute: typeof ApiWorkspaceJobsJobIdApproveRoute
   ApiWorkspaceJobsJobIdAssignRoute: typeof ApiWorkspaceJobsJobIdAssignRoute
+  ApiWorkspaceJobsJobIdAttachmentsRoute: typeof ApiWorkspaceJobsJobIdAttachmentsRoute
   ApiWorkspaceJobsJobIdClaimRoute: typeof ApiWorkspaceJobsJobIdClaimRoute
   ApiWorkspaceJobsJobIdCommentsRoute: typeof ApiWorkspaceJobsJobIdCommentsRoute
   ApiWorkspaceJobsJobIdFieldRoute: typeof ApiWorkspaceJobsJobIdFieldRoute
@@ -1348,11 +1389,13 @@ interface ApiWorkspaceJobsJobIdRouteChildren {
   ApiWorkspaceJobsJobIdScheduleRoute: typeof ApiWorkspaceJobsJobIdScheduleRoute
   ApiWorkspaceJobsJobIdStatusRoute: typeof ApiWorkspaceJobsJobIdStatusRoute
   ApiWorkspaceJobsJobIdTimelineRoute: typeof ApiWorkspaceJobsJobIdTimelineRoute
+  ApiWorkspaceJobsJobIdWorkNotesRoute: typeof ApiWorkspaceJobsJobIdWorkNotesRoute
 }
 
 const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
   ApiWorkspaceJobsJobIdApproveRoute: ApiWorkspaceJobsJobIdApproveRoute,
   ApiWorkspaceJobsJobIdAssignRoute: ApiWorkspaceJobsJobIdAssignRoute,
+  ApiWorkspaceJobsJobIdAttachmentsRoute: ApiWorkspaceJobsJobIdAttachmentsRoute,
   ApiWorkspaceJobsJobIdClaimRoute: ApiWorkspaceJobsJobIdClaimRoute,
   ApiWorkspaceJobsJobIdCommentsRoute: ApiWorkspaceJobsJobIdCommentsRoute,
   ApiWorkspaceJobsJobIdFieldRoute: ApiWorkspaceJobsJobIdFieldRoute,
@@ -1366,6 +1409,7 @@ const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
   ApiWorkspaceJobsJobIdScheduleRoute: ApiWorkspaceJobsJobIdScheduleRoute,
   ApiWorkspaceJobsJobIdStatusRoute: ApiWorkspaceJobsJobIdStatusRoute,
   ApiWorkspaceJobsJobIdTimelineRoute: ApiWorkspaceJobsJobIdTimelineRoute,
+  ApiWorkspaceJobsJobIdWorkNotesRoute: ApiWorkspaceJobsJobIdWorkNotesRoute,
 }
 
 const ApiWorkspaceJobsJobIdRouteWithChildren =
@@ -1440,3 +1484,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

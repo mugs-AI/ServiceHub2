@@ -47,7 +47,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             signed = Object.fromEntries(
               (urls ?? [])
                 .filter((u) => u.signedUrl && u.path)
-                .map((u) => [u.path as string, u.signedUrl]),
+                .map((u) => [String(u.path), String(u.signedUrl)]),
             );
           }
 
