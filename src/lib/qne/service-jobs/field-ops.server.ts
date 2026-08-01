@@ -146,7 +146,7 @@ export async function logFieldEvent(
     old_value: opts.oldValue ?? null,
     new_value: opts.newValue ?? null,
     note: opts.note ?? null,
-    metadata_json: opts.metadata ?? null,
+    metadata_json: (opts.metadata ?? null) as never,
     performed_by_user_id: actor.userId,
     performed_by_name_snapshot: actor.name,
   });
@@ -183,9 +183,9 @@ export async function setJobStatus(
     .eq("id", job.id);
   if (error) throw error;
   if (job.status !== to) {
-    await logFieldEvent(actor, job.id, "job_completed" as never, {
+    await logFieldEvent(actor, job.id, "status_changed" as never, {
       oldValue: job.status,
       newValue: to,
-    }).catch(() => undefined);
+    });
   }
 }
