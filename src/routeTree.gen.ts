@@ -68,6 +68,7 @@ import { Route as ApiWorkspaceJobsJobIdPurgeRouteImport } from './routes/api/wor
 import { Route as ApiWorkspaceJobsJobIdPriorityRouteImport } from './routes/api/workspace/jobs.$jobId.priority'
 import { Route as ApiWorkspaceJobsJobIdInternalNoteRouteImport } from './routes/api/workspace/jobs.$jobId.internal-note'
 import { Route as ApiWorkspaceJobsJobIdHistoryRouteImport } from './routes/api/workspace/jobs.$jobId.history'
+import { Route as ApiWorkspaceJobsJobIdFieldRouteImport } from './routes/api/workspace/jobs.$jobId.field'
 import { Route as ApiWorkspaceJobsJobIdCommentsRouteImport } from './routes/api/workspace/jobs.$jobId.comments'
 import { Route as ApiWorkspaceJobsJobIdClaimRouteImport } from './routes/api/workspace/jobs.$jobId.claim'
 import { Route as ApiWorkspaceJobsJobIdAssignRouteImport } from './routes/api/workspace/jobs.$jobId.assign'
@@ -387,6 +388,12 @@ const ApiWorkspaceJobsJobIdHistoryRoute =
     path: '/history',
     getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
   } as any)
+const ApiWorkspaceJobsJobIdFieldRoute =
+  ApiWorkspaceJobsJobIdFieldRouteImport.update({
+    id: '/field',
+    path: '/field',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdCommentsRoute =
   ApiWorkspaceJobsJobIdCommentsRouteImport.update({
     id: '/comments',
@@ -467,6 +474,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
+  '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
   '/api/workspace/jobs/$jobId/priority': typeof ApiWorkspaceJobsJobIdPriorityRoute
@@ -531,6 +539,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
+  '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
   '/api/workspace/jobs/$jobId/priority': typeof ApiWorkspaceJobsJobIdPriorityRoute
@@ -597,6 +606,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs/$jobId/assign': typeof ApiWorkspaceJobsJobIdAssignRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
+  '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
   '/api/workspace/jobs/$jobId/priority': typeof ApiWorkspaceJobsJobIdPriorityRoute
@@ -664,6 +674,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/assign'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
+    | '/api/workspace/jobs/$jobId/field'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
     | '/api/workspace/jobs/$jobId/priority'
@@ -728,6 +739,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/assign'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
+    | '/api/workspace/jobs/$jobId/field'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
     | '/api/workspace/jobs/$jobId/priority'
@@ -793,6 +805,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/assign'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
+    | '/api/workspace/jobs/$jobId/field'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
     | '/api/workspace/jobs/$jobId/priority'
@@ -1266,6 +1279,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdHistoryRouteImport
       parentRoute: typeof ApiWorkspaceJobsJobIdRoute
     }
+    '/api/workspace/jobs/$jobId/field': {
+      id: '/api/workspace/jobs/$jobId/field'
+      path: '/field'
+      fullPath: '/api/workspace/jobs/$jobId/field'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdFieldRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
     '/api/workspace/jobs/$jobId/comments': {
       id: '/api/workspace/jobs/$jobId/comments'
       path: '/comments'
@@ -1318,6 +1338,7 @@ interface ApiWorkspaceJobsJobIdRouteChildren {
   ApiWorkspaceJobsJobIdAssignRoute: typeof ApiWorkspaceJobsJobIdAssignRoute
   ApiWorkspaceJobsJobIdClaimRoute: typeof ApiWorkspaceJobsJobIdClaimRoute
   ApiWorkspaceJobsJobIdCommentsRoute: typeof ApiWorkspaceJobsJobIdCommentsRoute
+  ApiWorkspaceJobsJobIdFieldRoute: typeof ApiWorkspaceJobsJobIdFieldRoute
   ApiWorkspaceJobsJobIdHistoryRoute: typeof ApiWorkspaceJobsJobIdHistoryRoute
   ApiWorkspaceJobsJobIdInternalNoteRoute: typeof ApiWorkspaceJobsJobIdInternalNoteRoute
   ApiWorkspaceJobsJobIdPriorityRoute: typeof ApiWorkspaceJobsJobIdPriorityRoute
@@ -1334,6 +1355,7 @@ const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
   ApiWorkspaceJobsJobIdAssignRoute: ApiWorkspaceJobsJobIdAssignRoute,
   ApiWorkspaceJobsJobIdClaimRoute: ApiWorkspaceJobsJobIdClaimRoute,
   ApiWorkspaceJobsJobIdCommentsRoute: ApiWorkspaceJobsJobIdCommentsRoute,
+  ApiWorkspaceJobsJobIdFieldRoute: ApiWorkspaceJobsJobIdFieldRoute,
   ApiWorkspaceJobsJobIdHistoryRoute: ApiWorkspaceJobsJobIdHistoryRoute,
   ApiWorkspaceJobsJobIdInternalNoteRoute:
     ApiWorkspaceJobsJobIdInternalNoteRoute,

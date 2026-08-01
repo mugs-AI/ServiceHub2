@@ -147,7 +147,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           async function jobPatch(patch: Record<string, unknown>) {
             const { error } = await supabaseAdmin
               .from("service_jobs")
-              .update(patch)
+              .update(patch as never)
               .eq("tenant_code", actor.tenantCode)
               .eq("id", job.id);
             if (error) throw error;
