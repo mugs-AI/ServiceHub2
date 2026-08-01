@@ -747,6 +747,71 @@ export type Database = {
           },
         ]
       }
+      service_job_attachments: {
+        Row: {
+          attachment_type: string
+          created_at: string
+          deleted_at: string | null
+          deleted_by_name_snapshot: string | null
+          deleted_by_user_id: string | null
+          file_name: string
+          file_size: number
+          id: string
+          is_deleted: boolean
+          mime_type: string
+          service_job_id: string
+          storage_path: string
+          tenant_code: string
+          uploaded_by_name_snapshot: string | null
+          uploaded_by_user_id: string | null
+          visibility: string
+        }
+        Insert: {
+          attachment_type?: string
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by_name_snapshot?: string | null
+          deleted_by_user_id?: string | null
+          file_name: string
+          file_size: number
+          id?: string
+          is_deleted?: boolean
+          mime_type: string
+          service_job_id: string
+          storage_path: string
+          tenant_code: string
+          uploaded_by_name_snapshot?: string | null
+          uploaded_by_user_id?: string | null
+          visibility?: string
+        }
+        Update: {
+          attachment_type?: string
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by_name_snapshot?: string | null
+          deleted_by_user_id?: string | null
+          file_name?: string
+          file_size?: number
+          id?: string
+          is_deleted?: boolean
+          mime_type?: string
+          service_job_id?: string
+          storage_path?: string
+          tenant_code?: string
+          uploaded_by_name_snapshot?: string | null
+          uploaded_by_user_id?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_attachments_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_job_comments: {
         Row: {
           author_name_snapshot: string | null
@@ -784,6 +849,105 @@ export type Database = {
             columns: ["service_job_id"]
             isOneToOne: false
             referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_job_completions: {
+        Row: {
+          ack_at: string | null
+          ack_confirmed: boolean
+          ack_customer_name: string | null
+          ack_customer_role: string | null
+          ack_remark: string | null
+          checklist: Json
+          created_at: string
+          follow_up_date: string | null
+          follow_up_required: boolean
+          id: string
+          is_final: boolean
+          outstanding_issue: string | null
+          resolution_summary: string | null
+          service_job_id: string
+          signature_attachment_id: string | null
+          signature_data_url: string | null
+          signature_signed_at: string | null
+          signature_waived: boolean
+          signature_waived_by_name_snapshot: string | null
+          signature_waived_by_user_id: string | null
+          signature_waiver_reason: string | null
+          tenant_code: string
+          test_result: string | null
+          updated_at: string
+          work_performed: string | null
+        }
+        Insert: {
+          ack_at?: string | null
+          ack_confirmed?: boolean
+          ack_customer_name?: string | null
+          ack_customer_role?: string | null
+          ack_remark?: string | null
+          checklist?: Json
+          created_at?: string
+          follow_up_date?: string | null
+          follow_up_required?: boolean
+          id?: string
+          is_final?: boolean
+          outstanding_issue?: string | null
+          resolution_summary?: string | null
+          service_job_id: string
+          signature_attachment_id?: string | null
+          signature_data_url?: string | null
+          signature_signed_at?: string | null
+          signature_waived?: boolean
+          signature_waived_by_name_snapshot?: string | null
+          signature_waived_by_user_id?: string | null
+          signature_waiver_reason?: string | null
+          tenant_code: string
+          test_result?: string | null
+          updated_at?: string
+          work_performed?: string | null
+        }
+        Update: {
+          ack_at?: string | null
+          ack_confirmed?: boolean
+          ack_customer_name?: string | null
+          ack_customer_role?: string | null
+          ack_remark?: string | null
+          checklist?: Json
+          created_at?: string
+          follow_up_date?: string | null
+          follow_up_required?: boolean
+          id?: string
+          is_final?: boolean
+          outstanding_issue?: string | null
+          resolution_summary?: string | null
+          service_job_id?: string
+          signature_attachment_id?: string | null
+          signature_data_url?: string | null
+          signature_signed_at?: string | null
+          signature_waived?: boolean
+          signature_waived_by_name_snapshot?: string | null
+          signature_waived_by_user_id?: string | null
+          signature_waiver_reason?: string | null
+          tenant_code?: string
+          test_result?: string | null
+          updated_at?: string
+          work_performed?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_completions_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: true
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_job_completions_signature_attachment_id_fkey"
+            columns: ["signature_attachment_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_attachments"
             referencedColumns: ["id"]
           },
         ]
@@ -839,6 +1003,186 @@ export type Database = {
         }
         Relationships: []
       }
+      service_job_waiting_periods: {
+        Row: {
+          contact_method: string | null
+          created_at: string
+          expected_response_date: string | null
+          follow_up_date: string | null
+          id: string
+          reason: string
+          requested_action: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by_name_snapshot: string | null
+          resolved_by_user_id: string | null
+          service_job_id: string
+          started_at: string
+          started_by_name_snapshot: string | null
+          started_by_user_id: string | null
+          tenant_code: string
+          updated_at: string
+          vendor_contact: string | null
+          vendor_name: string | null
+          vendor_reference: string | null
+          visibility: string
+          waiting_type: string
+        }
+        Insert: {
+          contact_method?: string | null
+          created_at?: string
+          expected_response_date?: string | null
+          follow_up_date?: string | null
+          id?: string
+          reason: string
+          requested_action?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by_name_snapshot?: string | null
+          resolved_by_user_id?: string | null
+          service_job_id: string
+          started_at?: string
+          started_by_name_snapshot?: string | null
+          started_by_user_id?: string | null
+          tenant_code: string
+          updated_at?: string
+          vendor_contact?: string | null
+          vendor_name?: string | null
+          vendor_reference?: string | null
+          visibility?: string
+          waiting_type: string
+        }
+        Update: {
+          contact_method?: string | null
+          created_at?: string
+          expected_response_date?: string | null
+          follow_up_date?: string | null
+          id?: string
+          reason?: string
+          requested_action?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by_name_snapshot?: string | null
+          resolved_by_user_id?: string | null
+          service_job_id?: string
+          started_at?: string
+          started_by_name_snapshot?: string | null
+          started_by_user_id?: string | null
+          tenant_code?: string
+          updated_at?: string
+          vendor_contact?: string | null
+          vendor_name?: string | null
+          vendor_reference?: string | null
+          visibility?: string
+          waiting_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_waiting_periods_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_job_work_notes: {
+        Row: {
+          author_name_snapshot: string | null
+          author_user_id: string | null
+          body: string
+          created_at: string
+          id: string
+          note_type: string
+          service_job_id: string
+          tenant_code: string
+          visibility: string
+        }
+        Insert: {
+          author_name_snapshot?: string | null
+          author_user_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          note_type: string
+          service_job_id: string
+          tenant_code: string
+          visibility?: string
+        }
+        Update: {
+          author_name_snapshot?: string | null
+          author_user_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          note_type?: string
+          service_job_id?: string
+          tenant_code?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_work_notes_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_job_work_sessions: {
+        Row: {
+          created_at: string
+          duration_minutes: number | null
+          ended_at: string | null
+          id: string
+          pause_reason: string | null
+          service_job_id: string
+          started_at: string
+          status: string
+          technician_name_snapshot: string | null
+          technician_user_id: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number | null
+          ended_at?: string | null
+          id?: string
+          pause_reason?: string | null
+          service_job_id: string
+          started_at?: string
+          status?: string
+          technician_name_snapshot?: string | null
+          technician_user_id: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number | null
+          ended_at?: string | null
+          id?: string
+          pause_reason?: string | null
+          service_job_id?: string
+          started_at?: string
+          status?: string
+          technician_name_snapshot?: string | null
+          technician_user_id?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_work_sessions_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_jobs: {
         Row: {
           approval_note: string | null
@@ -848,6 +1192,7 @@ export type Database = {
           approved_at: string | null
           approved_by_name_snapshot: string | null
           approved_by_user_id: string | null
+          arrived_on_site_at: string | null
           assigned_at: string | null
           assigned_by_name_snapshot: string | null
           assigned_by_user_id: string | null
@@ -860,6 +1205,7 @@ export type Database = {
           cancelled_by_name_snapshot: string | null
           cancelled_by_user_id: string | null
           completed_at: string | null
+          completion_snapshot: Json | null
           contact_email: string | null
           contact_person: string | null
           contact_phone: string | null
@@ -882,6 +1228,7 @@ export type Database = {
           n3_stock_id_snapshot: string | null
           priority: string
           problem_description: string
+          ready_for_completion_at: string | null
           rejected_at: string | null
           rejected_by_name_snapshot: string | null
           rejected_by_user_id: string | null
@@ -904,6 +1251,8 @@ export type Database = {
           subscription_category_snapshot: string | null
           subscription_snapshot_id: string | null
           tenant_code: string
+          total_work_minutes: number
+          travel_started_at: string | null
           updated_at: string
         }
         Insert: {
@@ -914,6 +1263,7 @@ export type Database = {
           approved_at?: string | null
           approved_by_name_snapshot?: string | null
           approved_by_user_id?: string | null
+          arrived_on_site_at?: string | null
           assigned_at?: string | null
           assigned_by_name_snapshot?: string | null
           assigned_by_user_id?: string | null
@@ -926,6 +1276,7 @@ export type Database = {
           cancelled_by_name_snapshot?: string | null
           cancelled_by_user_id?: string | null
           completed_at?: string | null
+          completion_snapshot?: Json | null
           contact_email?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -948,6 +1299,7 @@ export type Database = {
           n3_stock_id_snapshot?: string | null
           priority?: string
           problem_description: string
+          ready_for_completion_at?: string | null
           rejected_at?: string | null
           rejected_by_name_snapshot?: string | null
           rejected_by_user_id?: string | null
@@ -970,6 +1322,8 @@ export type Database = {
           subscription_category_snapshot?: string | null
           subscription_snapshot_id?: string | null
           tenant_code: string
+          total_work_minutes?: number
+          travel_started_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -980,6 +1334,7 @@ export type Database = {
           approved_at?: string | null
           approved_by_name_snapshot?: string | null
           approved_by_user_id?: string | null
+          arrived_on_site_at?: string | null
           assigned_at?: string | null
           assigned_by_name_snapshot?: string | null
           assigned_by_user_id?: string | null
@@ -992,6 +1347,7 @@ export type Database = {
           cancelled_by_name_snapshot?: string | null
           cancelled_by_user_id?: string | null
           completed_at?: string | null
+          completion_snapshot?: Json | null
           contact_email?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -1014,6 +1370,7 @@ export type Database = {
           n3_stock_id_snapshot?: string | null
           priority?: string
           problem_description?: string
+          ready_for_completion_at?: string | null
           rejected_at?: string | null
           rejected_by_name_snapshot?: string | null
           rejected_by_user_id?: string | null
@@ -1036,6 +1393,8 @@ export type Database = {
           subscription_category_snapshot?: string | null
           subscription_snapshot_id?: string | null
           tenant_code?: string
+          total_work_minutes?: number
+          travel_started_at?: string | null
           updated_at?: string
         }
         Relationships: []
