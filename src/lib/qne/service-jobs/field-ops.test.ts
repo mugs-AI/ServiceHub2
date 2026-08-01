@@ -8,6 +8,8 @@ import {
   validateAttachment,
   validateCompletion,
 } from "./field-ops";
+import type { CompletionDraft } from "./field-ops";
+
 
 describe("field action gating", () => {
   it("blocks approval and terminal statuses", () => {
