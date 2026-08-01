@@ -526,26 +526,42 @@ function ScheduleCard({
 
       {open && !locked && (
         <div className="mt-3 space-y-2 rounded-lg border bg-background p-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <label className="block text-xs font-semibold text-muted-foreground">
-              Start (Malaysia time)
-              <input
-                type="datetime-local"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
-              />
-            </label>
-            <label className="block text-xs font-semibold text-muted-foreground">
-              End (Malaysia time)
-              <input
-                type="datetime-local"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
-              />
-            </label>
+          <p className="text-xs text-muted-foreground">
+            All times are Malaysia time (Asia/Kuala_Lumpur), in 30-minute slots.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <DateField
+              id="appt-start-date"
+              label="Start Date"
+              value={startDate}
+              onChange={(d) => updateStart(d, startTime)}
+            />
+            <TimeField
+              id="appt-start-time"
+              label="Start Time"
+              value={startTime}
+              onChange={(t) => updateStart(startDate, t)}
+            />
+            <DateField
+              id="appt-end-date"
+              label="End Date"
+              value={endDate}
+              onChange={(d) => {
+                setEndTouched(true);
+                setEndDate(d);
+              }}
+            />
+            <TimeField
+              id="appt-end-time"
+              label="End Time"
+              value={endTime}
+              onChange={(t) => {
+                setEndTouched(true);
+                setEndTime(t);
+              }}
+            />
           </div>
+
           <label className="block text-xs font-semibold text-muted-foreground">
             Reason / note (optional)
             <input
