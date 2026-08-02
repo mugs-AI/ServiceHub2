@@ -42,6 +42,7 @@ import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customer
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
 import { Route as ApiSettingsTenantRouteImport } from './routes/api/settings/tenant'
 import { Route as ApiSettingsSubscriptionCategoriesRouteImport } from './routes/api/settings/subscription-categories'
+import { Route as ApiSettingsStorageRouteImport } from './routes/api/settings/storage'
 import { Route as ApiSettingsStockMappingsRouteImport } from './routes/api/settings/stock-mappings'
 import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
 import { Route as ApiDiagnosticsVerifyDocumentRouteImport } from './routes/api/diagnostics/verify-document'
@@ -247,6 +248,11 @@ const ApiSettingsSubscriptionCategoriesRoute =
     path: '/api/settings/subscription-categories',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiSettingsStorageRoute = ApiSettingsStorageRouteImport.update({
+  id: '/api/settings/storage',
+  path: '/api/settings/storage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSettingsStockMappingsRoute =
   ApiSettingsStockMappingsRouteImport.update({
     id: '/api/settings/stock-mappings',
@@ -480,6 +486,7 @@ export interface FileRoutesByFullPath {
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/storage': typeof ApiSettingsStorageRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
@@ -549,6 +556,7 @@ export interface FileRoutesByTo {
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/storage': typeof ApiSettingsStorageRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
@@ -620,6 +628,7 @@ export interface FileRoutesById {
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/storage': typeof ApiSettingsStorageRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
   '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
@@ -692,6 +701,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/storage'
     | '/api/settings/subscription-categories'
     | '/api/settings/tenant'
     | '/api/sync/contracts'
@@ -761,6 +771,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/storage'
     | '/api/settings/subscription-categories'
     | '/api/settings/tenant'
     | '/api/sync/contracts'
@@ -831,6 +842,7 @@ export interface FileRouteTypes {
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/storage'
     | '/api/settings/subscription-categories'
     | '/api/settings/tenant'
     | '/api/sync/contracts'
@@ -899,6 +911,7 @@ export interface RootRouteChildren {
   ApiDiagnosticsVerifyDocumentRoute: typeof ApiDiagnosticsVerifyDocumentRoute
   ApiSessionMeRoute: typeof ApiSessionMeRoute
   ApiSettingsStockMappingsRoute: typeof ApiSettingsStockMappingsRoute
+  ApiSettingsStorageRoute: typeof ApiSettingsStorageRoute
   ApiSettingsSubscriptionCategoriesRoute: typeof ApiSettingsSubscriptionCategoriesRoute
   ApiSettingsTenantRoute: typeof ApiSettingsTenantRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
@@ -1147,6 +1160,13 @@ declare module '@tanstack/react-router' {
       path: '/api/settings/subscription-categories'
       fullPath: '/api/settings/subscription-categories'
       preLoaderRoute: typeof ApiSettingsSubscriptionCategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/settings/storage': {
+      id: '/api/settings/storage'
+      path: '/api/settings/storage'
+      fullPath: '/api/settings/storage'
+      preLoaderRoute: typeof ApiSettingsStorageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/settings/stock-mappings': {
@@ -1506,6 +1526,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDiagnosticsVerifyDocumentRoute: ApiDiagnosticsVerifyDocumentRoute,
   ApiSessionMeRoute: ApiSessionMeRoute,
   ApiSettingsStockMappingsRoute: ApiSettingsStockMappingsRoute,
+  ApiSettingsStorageRoute: ApiSettingsStorageRoute,
   ApiSettingsSubscriptionCategoriesRoute:
     ApiSettingsSubscriptionCategoriesRoute,
   ApiSettingsTenantRoute: ApiSettingsTenantRoute,
