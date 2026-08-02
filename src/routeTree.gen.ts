@@ -40,6 +40,7 @@ import { Route as ApiSyncRecoverStaleRouteImport } from './routes/api/sync/recov
 import { Route as ApiSyncFullRouteImport } from './routes/api/sync/full'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
+import { Route as ApiSettingsTenantRouteImport } from './routes/api/settings/tenant'
 import { Route as ApiSettingsSubscriptionCategoriesRouteImport } from './routes/api/settings/subscription-categories'
 import { Route as ApiSettingsStockMappingsRouteImport } from './routes/api/settings/stock-mappings'
 import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
@@ -233,6 +234,11 @@ const ApiSyncCustomersRoute = ApiSyncCustomersRouteImport.update({
 const ApiSyncContractsRoute = ApiSyncContractsRouteImport.update({
   id: '/api/sync/contracts',
   path: '/api/sync/contracts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSettingsTenantRoute = ApiSettingsTenantRouteImport.update({
+  id: '/api/settings/tenant',
+  path: '/api/settings/tenant',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSettingsSubscriptionCategoriesRoute =
@@ -475,6 +481,7 @@ export interface FileRoutesByFullPath {
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
+  '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/full': typeof ApiSyncFullRoute
@@ -543,6 +550,7 @@ export interface FileRoutesByTo {
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
+  '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/full': typeof ApiSyncFullRoute
@@ -613,6 +621,7 @@ export interface FileRoutesById {
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
+  '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/full': typeof ApiSyncFullRoute
@@ -684,6 +693,7 @@ export interface FileRouteTypes {
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
+    | '/api/settings/tenant'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/full'
@@ -752,6 +762,7 @@ export interface FileRouteTypes {
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
+    | '/api/settings/tenant'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/full'
@@ -821,6 +832,7 @@ export interface FileRouteTypes {
     | '/api/session/me'
     | '/api/settings/stock-mappings'
     | '/api/settings/subscription-categories'
+    | '/api/settings/tenant'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/full'
@@ -888,6 +900,7 @@ export interface RootRouteChildren {
   ApiSessionMeRoute: typeof ApiSessionMeRoute
   ApiSettingsStockMappingsRoute: typeof ApiSettingsStockMappingsRoute
   ApiSettingsSubscriptionCategoriesRoute: typeof ApiSettingsSubscriptionCategoriesRoute
+  ApiSettingsTenantRoute: typeof ApiSettingsTenantRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncFullRoute: typeof ApiSyncFullRoute
@@ -1120,6 +1133,13 @@ declare module '@tanstack/react-router' {
       path: '/api/sync/contracts'
       fullPath: '/api/sync/contracts'
       preLoaderRoute: typeof ApiSyncContractsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/settings/tenant': {
+      id: '/api/settings/tenant'
+      path: '/api/settings/tenant'
+      fullPath: '/api/settings/tenant'
+      preLoaderRoute: typeof ApiSettingsTenantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/settings/subscription-categories': {
@@ -1488,6 +1508,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSettingsStockMappingsRoute: ApiSettingsStockMappingsRoute,
   ApiSettingsSubscriptionCategoriesRoute:
     ApiSettingsSubscriptionCategoriesRoute,
+  ApiSettingsTenantRoute: ApiSettingsTenantRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncFullRoute: ApiSyncFullRoute,
