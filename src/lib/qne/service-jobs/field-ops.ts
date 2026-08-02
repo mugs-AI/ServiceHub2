@@ -7,6 +7,7 @@
 export const FIELD_EVENTS = [
   "travel_started",
   "arrived_on_site",
+  "leave_site",
   "work_started",
   "work_paused",
   "work_resumed",
@@ -22,6 +23,7 @@ export type FieldEvent = (typeof FIELD_EVENTS)[number];
 export const FIELD_EVENT_LABEL: Record<FieldEvent, string> = {
   travel_started: "Start Travel",
   arrived_on_site: "Arrived On Site",
+  leave_site: "Leave Site",
   work_started: "Start Work",
   work_paused: "Pause",
   work_resumed: "Resume",
@@ -67,18 +69,24 @@ export const VISIBILITY_LABEL: Record<Visibility, string> = {
 };
 
 export const ATTACHMENT_TYPES = [
-  "site_photo",
   "error_screenshot",
+  "error_log",
   "document",
+  "configuration_file",
   "customer_file",
+  "site_photo",
+  "other",
 ] as const;
 export type AttachmentType = (typeof ATTACHMENT_TYPES)[number];
 
 export const ATTACHMENT_TYPE_LABEL: Record<AttachmentType, string> = {
+  error_screenshot: "Screenshot",
+  error_log: "Error log",
+  document: "Report / Document",
+  configuration_file: "Configuration file",
+  customer_file: "Customer file",
   site_photo: "Site photo",
-  error_screenshot: "Error screenshot",
-  document: "Document",
-  customer_file: "Customer-provided file",
+  other: "Other",
 };
 
 export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024; // 15 MB
@@ -146,7 +154,7 @@ export function availableFieldActions(state: FieldState): FieldEvent[] {
   const waiting = state.openWaiting ?? { customer: false, vendor: false };
 
   if (!session) {
-    out.push("travel_started", "arrived_on_site", "work_started");
+    out.push("travel_started", "arrived_on_site", "work_started", "leave_site");
   } else if (session.status === "active") {
     out.push("work_paused");
   } else {
@@ -195,12 +203,20 @@ export function defaultChecklist(): ChecklistItem[] {
 
 export interface CompletionDraft {
   checklist: ChecklistItem[];
+  /** Software-service fields (Run 7 Phase O). */
+  diagnosis?: string | null;
+  software_module?: string | null;
+  version_after?: string | null;
+  internal_completion_note?: string | null;
   resolution_summary?: string | null;
+  /** "Action Taken" in the software-service form. */
   work_performed?: string | null;
   test_result?: string | null;
   outstanding_issue?: string | null;
   follow_up_required?: boolean;
   follow_up_date?: string | null;
+  ack_method?: string | null;
+  ack_evidence_reference?: string | null;
   ack_customer_name?: string | null;
   ack_confirmed?: boolean;
   signature_data_url?: string | null;
@@ -208,10 +224,27 @@ export interface CompletionDraft {
   signature_waiver_reason?: string | null;
 }
 
-/** Server-mirrored gate for the final Complete action. */
+/** Tenant-derived acknowledgement rule handed to the completion gate. */
+export interface AckRule {
+  required: boolean;
+  reason: string;
+  allowedMethods: readonly string[];
+  allowWaiver: boolean;
+  /** Only Owner/Admin may waive. */
+  actorCanWaive: boolean;
+}
+
+/**
+ * Server-mirrored gate for the final Complete action.
+ *
+ * Without `ack`, the legacy Run 6 rules apply (name + confirmation +
+ * signature/waiver always required). With `ack`, the tenant's
+ * Completion & Acknowledgement settings decide.
+ */
 export function validateCompletion(
   draft: CompletionDraft,
   state: FieldState,
+  ack?: AckRule,
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   if (state.is_deleted) errors.push("Deleted jobs cannot be completed.");
@@ -230,22 +263,59 @@ export function validateCompletion(
   }
 
   if (!(draft.resolution_summary ?? "").trim()) errors.push("Resolution summary is required.");
-  if (!(draft.work_performed ?? "").trim()) errors.push("Work performed is required.");
+  if (!(draft.work_performed ?? "").trim()) errors.push("Action taken is required.");
   if (!(draft.test_result ?? "").trim()) errors.push("Test result is required.");
+  if (ack && !(draft.diagnosis ?? "").trim()) errors.push("Diagnosis is required.");
   if (draft.follow_up_required && !(draft.follow_up_date ?? "").trim()) {
     errors.push("Follow-up date is required when follow-up is needed.");
   }
 
+  if (!ack) {
+    if (!(draft.ack_customer_name ?? "").trim()) errors.push("Customer name is required.");
+    if (!draft.ack_confirmed) errors.push("Customer acknowledgement is required.");
+    const hasSignature = Boolean((draft.signature_data_url ?? "").trim());
+    if (!hasSignature) {
+      if (!draft.signature_waived) {
+        errors.push("A customer signature or an authorised waiver is required.");
+      } else if (!(draft.signature_waiver_reason ?? "").trim()) {
+        errors.push("Signature waiver reason is required.");
+      }
+    }
+    return { ok: errors.length === 0, errors };
+  }
+
+  const method = (draft.ack_method ?? "").trim();
+  const waiving = method === "admin_waiver" || draft.signature_waived === true;
+
+  if (waiving) {
+    if (!ack.allowWaiver) errors.push("Tenant settings do not allow an acknowledgement waiver.");
+    if (!ack.actorCanWaive) {
+      errors.push("Only an Owner or Administrator may waive acknowledgement.");
+    }
+    if (!(draft.signature_waiver_reason ?? "").trim()) errors.push("Waiver reason is required.");
+    return { ok: errors.length === 0, errors };
+  }
+
+  if (!ack.required && !method) return { ok: errors.length === 0, errors };
+
+  if (ack.required && !method) {
+    errors.push(`Acknowledgement is required (${ack.reason}).`);
+    return { ok: errors.length === 0, errors };
+  }
+
+  if (method && !ack.allowedMethods.includes(method)) {
+    errors.push(`Acknowledgement method "${method}" is not allowed by tenant settings.`);
+  }
   if (!(draft.ack_customer_name ?? "").trim()) errors.push("Customer name is required.");
   if (!draft.ack_confirmed) errors.push("Customer acknowledgement is required.");
-
-  const hasSignature = Boolean((draft.signature_data_url ?? "").trim());
-  if (!hasSignature) {
-    if (!draft.signature_waived) {
-      errors.push("A customer signature or an authorised waiver is required.");
-    } else if (!(draft.signature_waiver_reason ?? "").trim()) {
-      errors.push("Signature waiver reason is required.");
-    }
+  if (method === "signature" && !(draft.signature_data_url ?? "").trim()) {
+    errors.push("A customer signature is required.");
+  }
+  if (
+    (method === "whatsapp" || method === "email") &&
+    !(draft.ack_evidence_reference ?? "").trim()
+  ) {
+    errors.push("A reference or evidence is required for this acknowledgement method.");
   }
 
   return { ok: errors.length === 0, errors };

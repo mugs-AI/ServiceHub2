@@ -66,9 +66,27 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             return n;
           }, 0);
 
+          const { loadTenantSettings } = await import(
+            "@/lib/qne/service-jobs/tenant-settings.server"
+          );
+          const settings = await loadTenantSettings(user.tenantCode);
+
           return Response.json({
             jobStatus: job.status,
             isDeleted: job.is_deleted,
+            job: {
+              support_mode: job.support_mode,
+              travel_started_at: job.travel_started_at,
+              arrived_on_site_at: job.arrived_on_site_at,
+              left_site_at: job.left_site_at,
+              ready_for_completion_at: job.ready_for_completion_at,
+              assigned_user_name_snapshot: job.assigned_user_name_snapshot,
+              scheduled_start_at: job.scheduled_start_at,
+              scheduled_end_at: job.scheduled_end_at,
+              assigned_user_id: job.assigned_user_id,
+            },
+            gps: settings.travelGps,
+            attachmentSettings: settings.attachments,
             state: {
               status: state.status,
               is_deleted: state.is_deleted,
@@ -139,6 +157,33 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           const meta: Record<string, unknown> = {};
           if (location) meta.location = location;
 
+          // Tenant Travel & GPS policy — never silently collect, never block
+          // remote work, and require an exception reason when mandated.
+          const { loadTenantSettings } = await import(
+            "@/lib/qne/service-jobs/tenant-settings.server"
+          );
+          const { gpsRequestFor } = await import("@/lib/qne/service-jobs/tenant-settings");
+          const tenantSettings = await loadTenantSettings(actor.tenantCode);
+          const gpsNeed = gpsRequestFor(tenantSettings.travelGps, action, job.support_mode);
+          const gpsException =
+            typeof body.gps_exception_reason === "string"
+              ? body.gps_exception_reason.trim().slice(0, 500)
+              : "";
+          if (gpsNeed === "required" && !location) {
+            if (!gpsException) {
+              return Response.json(
+                {
+                  error:
+                    "Location is required for this action. Allow location access or provide an exception reason.",
+                  code: "gps_required",
+                },
+                { status: 400 },
+              );
+            }
+            meta.gps_exception_reason = gpsException;
+          }
+          if (tenantSettings.travelGps.mode === "off") delete meta.location;
+
           const tech = {
             technician_user_id: actor.userId ?? "unknown",
             technician_name_snapshot: actor.name,
@@ -155,11 +200,28 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
 
           switch (action) {
             case "travel_started": {
-              await jobPatch({ travel_started_at: now });
+              await jobPatch({ travel_started_at: now, travel_note: note });
               break;
             }
             case "arrived_on_site": {
-              await jobPatch({ arrived_on_site_at: now });
+              await jobPatch({ arrived_on_site_at: now, arrival_note: note });
+              if (job.travel_started_at) {
+                meta.travel_minutes = Math.max(
+                  0,
+                  Math.round((Date.parse(now) - Date.parse(job.travel_started_at)) / 60000),
+                );
+              }
+              break;
+            }
+            case "leave_site": {
+              if (!job.arrived_on_site_at) {
+                throw new FieldOpsError("Record Arrived On Site before leaving.", 409);
+              }
+              await jobPatch({ left_site_at: now, leave_note: note });
+              meta.onsite_minutes = Math.max(
+                0,
+                Math.round((Date.parse(now) - Date.parse(job.arrived_on_site_at)) / 60000),
+              );
               break;
             }
             case "work_started": {
@@ -220,8 +282,13 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               if (type === "customer" && !String(body.requested_action ?? "").trim()) {
                 throw new FieldOpsError("Requested action or information is required.");
               }
-              if (type === "vendor" && !String(body.vendor_name ?? "").trim()) {
-                throw new FieldOpsError("Vendor name is required.");
+              if (type === "vendor") {
+                if (!String(body.vendor_name ?? "").trim()) {
+                  throw new FieldOpsError("Vendor / Principal name is required.");
+                }
+                if (!String(body.vendor_ticket_number ?? "").trim()) {
+                  throw new FieldOpsError("Vendor Ticket Number is required.");
+                }
               }
               const visibility =
                 body.visibility === "visible_to_customer" ? "visible_to_customer" : "internal";
@@ -256,6 +323,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
                 contact_method: str(body.contact_method, 100),
                 follow_up_date: dateOnly(body.follow_up_date),
                 vendor_name: str(body.vendor_name),
+                vendor_ticket_number: str(body.vendor_ticket_number, 120),
                 vendor_contact: str(body.vendor_contact),
                 vendor_reference: str(body.vendor_reference),
                 expected_response_date: dateOnly(body.expected_response_date),
@@ -293,6 +361,14 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
                   resolved_by_user_id: actor.userId,
                   resolved_by_name_snapshot: actor.name,
                   resolution_note: resolution.slice(0, 2000),
+                  ...(type === "vendor"
+                    ? {
+                        vendor_response:
+                          typeof body.vendor_response === "string"
+                            ? body.vendor_response.trim().slice(0, 2000)
+                            : null,
+                      }
+                    : {}),
                 })
                 .eq("tenant_code", actor.tenantCode)
                 .eq("id", open.id);

@@ -18,6 +18,15 @@ export interface JobRow {
   is_deleted: boolean;
   assigned_user_id: string | null;
   job_number: string;
+  support_mode: string | null;
+  travel_started_at: string | null;
+  arrived_on_site_at: string | null;
+  left_site_at: string | null;
+  ready_for_completion_at: string | null;
+  scheduled_start_at: string | null;
+  scheduled_end_at: string | null;
+  assigned_user_name_snapshot: string | null;
+  subscription_category_snapshot: string | null;
 }
 
 export class FieldOpsError extends Error {
@@ -32,7 +41,9 @@ export class FieldOpsError extends Error {
 export async function loadJob(tenantCode: string, jobId: string): Promise<JobRow> {
   const { data, error } = await supabaseAdmin
     .from("service_jobs")
-    .select("id, tenant_code, status, is_deleted, assigned_user_id, job_number")
+    .select(
+      "id, tenant_code, status, is_deleted, assigned_user_id, job_number, support_mode, travel_started_at, arrived_on_site_at, left_site_at, ready_for_completion_at, scheduled_start_at, scheduled_end_at, assigned_user_name_snapshot, subscription_category_snapshot",
+    )
     .eq("tenant_code", tenantCode)
     .eq("id", jobId)
     .maybeSingle();
