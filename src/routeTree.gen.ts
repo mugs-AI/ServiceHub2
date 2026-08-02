@@ -40,7 +40,9 @@ import { Route as ApiSyncRecoverStaleRouteImport } from './routes/api/sync/recov
 import { Route as ApiSyncFullRouteImport } from './routes/api/sync/full'
 import { Route as ApiSyncCustomersRouteImport } from './routes/api/sync/customers'
 import { Route as ApiSyncContractsRouteImport } from './routes/api/sync/contracts'
+import { Route as ApiSettingsTenantRouteImport } from './routes/api/settings/tenant'
 import { Route as ApiSettingsSubscriptionCategoriesRouteImport } from './routes/api/settings/subscription-categories'
+import { Route as ApiSettingsStorageRouteImport } from './routes/api/settings/storage'
 import { Route as ApiSettingsStockMappingsRouteImport } from './routes/api/settings/stock-mappings'
 import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
 import { Route as ApiDiagnosticsVerifyDocumentRouteImport } from './routes/api/diagnostics/verify-document'
@@ -70,6 +72,7 @@ import { Route as ApiWorkspaceJobsJobIdPriorityRouteImport } from './routes/api/
 import { Route as ApiWorkspaceJobsJobIdInternalNoteRouteImport } from './routes/api/workspace/jobs.$jobId.internal-note'
 import { Route as ApiWorkspaceJobsJobIdHistoryRouteImport } from './routes/api/workspace/jobs.$jobId.history'
 import { Route as ApiWorkspaceJobsJobIdFieldRouteImport } from './routes/api/workspace/jobs.$jobId.field'
+import { Route as ApiWorkspaceJobsJobIdCompleteRouteImport } from './routes/api/workspace/jobs.$jobId.complete'
 import { Route as ApiWorkspaceJobsJobIdCommentsRouteImport } from './routes/api/workspace/jobs.$jobId.comments'
 import { Route as ApiWorkspaceJobsJobIdClaimRouteImport } from './routes/api/workspace/jobs.$jobId.claim'
 import { Route as ApiWorkspaceJobsJobIdAttachmentsRouteImport } from './routes/api/workspace/jobs.$jobId.attachments'
@@ -234,12 +237,22 @@ const ApiSyncContractsRoute = ApiSyncContractsRouteImport.update({
   path: '/api/sync/contracts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSettingsTenantRoute = ApiSettingsTenantRouteImport.update({
+  id: '/api/settings/tenant',
+  path: '/api/settings/tenant',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSettingsSubscriptionCategoriesRoute =
   ApiSettingsSubscriptionCategoriesRouteImport.update({
     id: '/api/settings/subscription-categories',
     path: '/api/settings/subscription-categories',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiSettingsStorageRoute = ApiSettingsStorageRouteImport.update({
+  id: '/api/settings/storage',
+  path: '/api/settings/storage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSettingsStockMappingsRoute =
   ApiSettingsStockMappingsRouteImport.update({
     id: '/api/settings/stock-mappings',
@@ -402,6 +415,12 @@ const ApiWorkspaceJobsJobIdFieldRoute =
     path: '/field',
     getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
   } as any)
+const ApiWorkspaceJobsJobIdCompleteRoute =
+  ApiWorkspaceJobsJobIdCompleteRouteImport.update({
+    id: '/complete',
+    path: '/complete',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdCommentsRoute =
   ApiWorkspaceJobsJobIdCommentsRouteImport.update({
     id: '/comments',
@@ -467,7 +486,9 @@ export interface FileRoutesByFullPath {
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/storage': typeof ApiSettingsStorageRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
+  '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/full': typeof ApiSyncFullRoute
@@ -489,6 +510,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs/$jobId/attachments': typeof ApiWorkspaceJobsJobIdAttachmentsRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
+  '/api/workspace/jobs/$jobId/complete': typeof ApiWorkspaceJobsJobIdCompleteRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
@@ -534,7 +556,9 @@ export interface FileRoutesByTo {
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/storage': typeof ApiSettingsStorageRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
+  '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/full': typeof ApiSyncFullRoute
@@ -556,6 +580,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs/$jobId/attachments': typeof ApiWorkspaceJobsJobIdAttachmentsRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
+  '/api/workspace/jobs/$jobId/complete': typeof ApiWorkspaceJobsJobIdCompleteRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
@@ -603,7 +628,9 @@ export interface FileRoutesById {
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/stock-mappings': typeof ApiSettingsStockMappingsRoute
+  '/api/settings/storage': typeof ApiSettingsStorageRoute
   '/api/settings/subscription-categories': typeof ApiSettingsSubscriptionCategoriesRoute
+  '/api/settings/tenant': typeof ApiSettingsTenantRoute
   '/api/sync/contracts': typeof ApiSyncContractsRoute
   '/api/sync/customers': typeof ApiSyncCustomersRoute
   '/api/sync/full': typeof ApiSyncFullRoute
@@ -625,6 +652,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs/$jobId/attachments': typeof ApiWorkspaceJobsJobIdAttachmentsRoute
   '/api/workspace/jobs/$jobId/claim': typeof ApiWorkspaceJobsJobIdClaimRoute
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
+  '/api/workspace/jobs/$jobId/complete': typeof ApiWorkspaceJobsJobIdCompleteRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
@@ -673,7 +701,9 @@ export interface FileRouteTypes {
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/storage'
     | '/api/settings/subscription-categories'
+    | '/api/settings/tenant'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/full'
@@ -695,6 +725,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/attachments'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
+    | '/api/workspace/jobs/$jobId/complete'
     | '/api/workspace/jobs/$jobId/field'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
@@ -740,7 +771,9 @@ export interface FileRouteTypes {
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/storage'
     | '/api/settings/subscription-categories'
+    | '/api/settings/tenant'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/full'
@@ -762,6 +795,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/attachments'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
+    | '/api/workspace/jobs/$jobId/complete'
     | '/api/workspace/jobs/$jobId/field'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
@@ -808,7 +842,9 @@ export interface FileRouteTypes {
     | '/api/diagnostics/verify-document'
     | '/api/session/me'
     | '/api/settings/stock-mappings'
+    | '/api/settings/storage'
     | '/api/settings/subscription-categories'
+    | '/api/settings/tenant'
     | '/api/sync/contracts'
     | '/api/sync/customers'
     | '/api/sync/full'
@@ -830,6 +866,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/attachments'
     | '/api/workspace/jobs/$jobId/claim'
     | '/api/workspace/jobs/$jobId/comments'
+    | '/api/workspace/jobs/$jobId/complete'
     | '/api/workspace/jobs/$jobId/field'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
@@ -874,7 +911,9 @@ export interface RootRouteChildren {
   ApiDiagnosticsVerifyDocumentRoute: typeof ApiDiagnosticsVerifyDocumentRoute
   ApiSessionMeRoute: typeof ApiSessionMeRoute
   ApiSettingsStockMappingsRoute: typeof ApiSettingsStockMappingsRoute
+  ApiSettingsStorageRoute: typeof ApiSettingsStorageRoute
   ApiSettingsSubscriptionCategoriesRoute: typeof ApiSettingsSubscriptionCategoriesRoute
+  ApiSettingsTenantRoute: typeof ApiSettingsTenantRoute
   ApiSyncContractsRoute: typeof ApiSyncContractsRoute
   ApiSyncCustomersRoute: typeof ApiSyncCustomersRoute
   ApiSyncFullRoute: typeof ApiSyncFullRoute
@@ -1109,11 +1148,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSyncContractsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/settings/tenant': {
+      id: '/api/settings/tenant'
+      path: '/api/settings/tenant'
+      fullPath: '/api/settings/tenant'
+      preLoaderRoute: typeof ApiSettingsTenantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/settings/subscription-categories': {
       id: '/api/settings/subscription-categories'
       path: '/api/settings/subscription-categories'
       fullPath: '/api/settings/subscription-categories'
       preLoaderRoute: typeof ApiSettingsSubscriptionCategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/settings/storage': {
+      id: '/api/settings/storage'
+      path: '/api/settings/storage'
+      fullPath: '/api/settings/storage'
+      preLoaderRoute: typeof ApiSettingsStorageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/settings/stock-mappings': {
@@ -1319,6 +1372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdFieldRouteImport
       parentRoute: typeof ApiWorkspaceJobsJobIdRoute
     }
+    '/api/workspace/jobs/$jobId/complete': {
+      id: '/api/workspace/jobs/$jobId/complete'
+      path: '/complete'
+      fullPath: '/api/workspace/jobs/$jobId/complete'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdCompleteRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
     '/api/workspace/jobs/$jobId/comments': {
       id: '/api/workspace/jobs/$jobId/comments'
       path: '/comments'
@@ -1379,6 +1439,7 @@ interface ApiWorkspaceJobsJobIdRouteChildren {
   ApiWorkspaceJobsJobIdAttachmentsRoute: typeof ApiWorkspaceJobsJobIdAttachmentsRoute
   ApiWorkspaceJobsJobIdClaimRoute: typeof ApiWorkspaceJobsJobIdClaimRoute
   ApiWorkspaceJobsJobIdCommentsRoute: typeof ApiWorkspaceJobsJobIdCommentsRoute
+  ApiWorkspaceJobsJobIdCompleteRoute: typeof ApiWorkspaceJobsJobIdCompleteRoute
   ApiWorkspaceJobsJobIdFieldRoute: typeof ApiWorkspaceJobsJobIdFieldRoute
   ApiWorkspaceJobsJobIdHistoryRoute: typeof ApiWorkspaceJobsJobIdHistoryRoute
   ApiWorkspaceJobsJobIdInternalNoteRoute: typeof ApiWorkspaceJobsJobIdInternalNoteRoute
@@ -1398,6 +1459,7 @@ const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
   ApiWorkspaceJobsJobIdAttachmentsRoute: ApiWorkspaceJobsJobIdAttachmentsRoute,
   ApiWorkspaceJobsJobIdClaimRoute: ApiWorkspaceJobsJobIdClaimRoute,
   ApiWorkspaceJobsJobIdCommentsRoute: ApiWorkspaceJobsJobIdCommentsRoute,
+  ApiWorkspaceJobsJobIdCompleteRoute: ApiWorkspaceJobsJobIdCompleteRoute,
   ApiWorkspaceJobsJobIdFieldRoute: ApiWorkspaceJobsJobIdFieldRoute,
   ApiWorkspaceJobsJobIdHistoryRoute: ApiWorkspaceJobsJobIdHistoryRoute,
   ApiWorkspaceJobsJobIdInternalNoteRoute:
@@ -1464,8 +1526,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDiagnosticsVerifyDocumentRoute: ApiDiagnosticsVerifyDocumentRoute,
   ApiSessionMeRoute: ApiSessionMeRoute,
   ApiSettingsStockMappingsRoute: ApiSettingsStockMappingsRoute,
+  ApiSettingsStorageRoute: ApiSettingsStorageRoute,
   ApiSettingsSubscriptionCategoriesRoute:
     ApiSettingsSubscriptionCategoriesRoute,
+  ApiSettingsTenantRoute: ApiSettingsTenantRoute,
   ApiSyncContractsRoute: ApiSyncContractsRoute,
   ApiSyncCustomersRoute: ApiSyncCustomersRoute,
   ApiSyncFullRoute: ApiSyncFullRoute,

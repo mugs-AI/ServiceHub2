@@ -506,6 +506,57 @@ export type Database = {
         }
         Relationships: []
       }
+      report_role_permissions: {
+        Row: {
+          can_export_csv: boolean
+          can_export_excel: boolean
+          can_print: boolean
+          can_view: boolean
+          created_at: string
+          data_scope: string
+          id: string
+          report_code: string
+          role: string
+          tenant_code: string
+          updated_at: string
+          view_financial: boolean
+          view_gps: boolean
+          view_private_notes: boolean
+        }
+        Insert: {
+          can_export_csv?: boolean
+          can_export_excel?: boolean
+          can_print?: boolean
+          can_view?: boolean
+          created_at?: string
+          data_scope?: string
+          id?: string
+          report_code: string
+          role: string
+          tenant_code: string
+          updated_at?: string
+          view_financial?: boolean
+          view_gps?: boolean
+          view_private_notes?: boolean
+        }
+        Update: {
+          can_export_csv?: boolean
+          can_export_excel?: boolean
+          can_print?: boolean
+          can_view?: boolean
+          created_at?: string
+          data_scope?: string
+          id?: string
+          report_code?: string
+          role?: string
+          tenant_code?: string
+          updated_at?: string
+          view_financial?: boolean
+          view_gps?: boolean
+          view_private_notes?: boolean
+        }
+        Relationships: []
+      }
       sales_invoice_line_snapshots: {
         Row: {
           created_at: string
@@ -750,17 +801,23 @@ export type Database = {
       service_job_attachments: {
         Row: {
           attachment_type: string
+          availability_status: string
+          checksum: string | null
           created_at: string
           deleted_at: string | null
           deleted_by_name_snapshot: string | null
           deleted_by_user_id: string | null
+          external_file_id: string | null
           file_name: string
           file_size: number
           id: string
           is_deleted: boolean
           mime_type: string
           service_job_id: string
+          storage_connection_id: string | null
+          storage_container: string | null
           storage_path: string
+          storage_provider: string
           tenant_code: string
           uploaded_by_name_snapshot: string | null
           uploaded_by_user_id: string | null
@@ -768,17 +825,23 @@ export type Database = {
         }
         Insert: {
           attachment_type?: string
+          availability_status?: string
+          checksum?: string | null
           created_at?: string
           deleted_at?: string | null
           deleted_by_name_snapshot?: string | null
           deleted_by_user_id?: string | null
+          external_file_id?: string | null
           file_name: string
           file_size: number
           id?: string
           is_deleted?: boolean
           mime_type: string
           service_job_id: string
+          storage_connection_id?: string | null
+          storage_container?: string | null
           storage_path: string
+          storage_provider?: string
           tenant_code: string
           uploaded_by_name_snapshot?: string | null
           uploaded_by_user_id?: string | null
@@ -786,17 +849,23 @@ export type Database = {
         }
         Update: {
           attachment_type?: string
+          availability_status?: string
+          checksum?: string | null
           created_at?: string
           deleted_at?: string | null
           deleted_by_name_snapshot?: string | null
           deleted_by_user_id?: string | null
+          external_file_id?: string | null
           file_name?: string
           file_size?: number
           id?: string
           is_deleted?: boolean
           mime_type?: string
           service_job_id?: string
+          storage_connection_id?: string | null
+          storage_container?: string | null
           storage_path?: string
+          storage_provider?: string
           tenant_code?: string
           uploaded_by_name_snapshot?: string | null
           uploaded_by_user_id?: string | null
@@ -859,12 +928,17 @@ export type Database = {
           ack_confirmed: boolean
           ack_customer_name: string | null
           ack_customer_role: string | null
+          ack_evidence_reference: string | null
+          ack_method: string | null
           ack_remark: string | null
+          action_taken: string | null
           checklist: Json
           created_at: string
+          diagnosis: string | null
           follow_up_date: string | null
           follow_up_required: boolean
           id: string
+          internal_completion_note: string | null
           is_final: boolean
           outstanding_issue: string | null
           resolution_summary: string | null
@@ -876,9 +950,11 @@ export type Database = {
           signature_waived_by_name_snapshot: string | null
           signature_waived_by_user_id: string | null
           signature_waiver_reason: string | null
+          software_module: string | null
           tenant_code: string
           test_result: string | null
           updated_at: string
+          version_after: string | null
           work_performed: string | null
         }
         Insert: {
@@ -886,12 +962,17 @@ export type Database = {
           ack_confirmed?: boolean
           ack_customer_name?: string | null
           ack_customer_role?: string | null
+          ack_evidence_reference?: string | null
+          ack_method?: string | null
           ack_remark?: string | null
+          action_taken?: string | null
           checklist?: Json
           created_at?: string
+          diagnosis?: string | null
           follow_up_date?: string | null
           follow_up_required?: boolean
           id?: string
+          internal_completion_note?: string | null
           is_final?: boolean
           outstanding_issue?: string | null
           resolution_summary?: string | null
@@ -903,9 +984,11 @@ export type Database = {
           signature_waived_by_name_snapshot?: string | null
           signature_waived_by_user_id?: string | null
           signature_waiver_reason?: string | null
+          software_module?: string | null
           tenant_code: string
           test_result?: string | null
           updated_at?: string
+          version_after?: string | null
           work_performed?: string | null
         }
         Update: {
@@ -913,12 +996,17 @@ export type Database = {
           ack_confirmed?: boolean
           ack_customer_name?: string | null
           ack_customer_role?: string | null
+          ack_evidence_reference?: string | null
+          ack_method?: string | null
           ack_remark?: string | null
+          action_taken?: string | null
           checklist?: Json
           created_at?: string
+          diagnosis?: string | null
           follow_up_date?: string | null
           follow_up_required?: boolean
           id?: string
+          internal_completion_note?: string | null
           is_final?: boolean
           outstanding_issue?: string | null
           resolution_summary?: string | null
@@ -930,9 +1018,11 @@ export type Database = {
           signature_waived_by_name_snapshot?: string | null
           signature_waived_by_user_id?: string | null
           signature_waiver_reason?: string | null
+          software_module?: string | null
           tenant_code?: string
           test_result?: string | null
           updated_at?: string
+          version_after?: string | null
           work_performed?: string | null
         }
         Relationships: [
@@ -1025,6 +1115,8 @@ export type Database = {
           vendor_contact: string | null
           vendor_name: string | null
           vendor_reference: string | null
+          vendor_response: string | null
+          vendor_ticket_number: string | null
           visibility: string
           waiting_type: string
         }
@@ -1049,6 +1141,8 @@ export type Database = {
           vendor_contact?: string | null
           vendor_name?: string | null
           vendor_reference?: string | null
+          vendor_response?: string | null
+          vendor_ticket_number?: string | null
           visibility?: string
           waiting_type: string
         }
@@ -1073,6 +1167,8 @@ export type Database = {
           vendor_contact?: string | null
           vendor_name?: string | null
           vendor_reference?: string | null
+          vendor_response?: string | null
+          vendor_ticket_number?: string | null
           visibility?: string
           waiting_type?: string
         }
@@ -1192,6 +1288,7 @@ export type Database = {
           approved_at: string | null
           approved_by_name_snapshot: string | null
           approved_by_user_id: string | null
+          arrival_note: string | null
           arrived_on_site_at: string | null
           assigned_at: string | null
           assigned_by_name_snapshot: string | null
@@ -1224,6 +1321,8 @@ export type Database = {
           internal_note: string | null
           is_deleted: boolean
           job_number: string
+          leave_note: string | null
+          left_site_at: string | null
           n3_customer_id: string | null
           n3_stock_id_snapshot: string | null
           priority: string
@@ -1250,8 +1349,10 @@ export type Database = {
           subject: string
           subscription_category_snapshot: string | null
           subscription_snapshot_id: string | null
+          support_mode: string | null
           tenant_code: string
           total_work_minutes: number
+          travel_note: string | null
           travel_started_at: string | null
           updated_at: string
         }
@@ -1263,6 +1364,7 @@ export type Database = {
           approved_at?: string | null
           approved_by_name_snapshot?: string | null
           approved_by_user_id?: string | null
+          arrival_note?: string | null
           arrived_on_site_at?: string | null
           assigned_at?: string | null
           assigned_by_name_snapshot?: string | null
@@ -1295,6 +1397,8 @@ export type Database = {
           internal_note?: string | null
           is_deleted?: boolean
           job_number: string
+          leave_note?: string | null
+          left_site_at?: string | null
           n3_customer_id?: string | null
           n3_stock_id_snapshot?: string | null
           priority?: string
@@ -1321,8 +1425,10 @@ export type Database = {
           subject: string
           subscription_category_snapshot?: string | null
           subscription_snapshot_id?: string | null
+          support_mode?: string | null
           tenant_code: string
           total_work_minutes?: number
+          travel_note?: string | null
           travel_started_at?: string | null
           updated_at?: string
         }
@@ -1334,6 +1440,7 @@ export type Database = {
           approved_at?: string | null
           approved_by_name_snapshot?: string | null
           approved_by_user_id?: string | null
+          arrival_note?: string | null
           arrived_on_site_at?: string | null
           assigned_at?: string | null
           assigned_by_name_snapshot?: string | null
@@ -1366,6 +1473,8 @@ export type Database = {
           internal_note?: string | null
           is_deleted?: boolean
           job_number?: string
+          leave_note?: string | null
+          left_site_at?: string | null
           n3_customer_id?: string | null
           n3_stock_id_snapshot?: string | null
           priority?: string
@@ -1392,10 +1501,48 @@ export type Database = {
           subject?: string
           subscription_category_snapshot?: string | null
           subscription_snapshot_id?: string | null
+          support_mode?: string | null
           tenant_code?: string
           total_work_minutes?: number
+          travel_note?: string | null
           travel_started_at?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      settings_audit_log: {
+        Row: {
+          action: string
+          area: string
+          created_at: string
+          id: string
+          new_value: Json | null
+          old_value: Json | null
+          performed_by_name: string | null
+          performed_by_user_id: string | null
+          tenant_code: string
+        }
+        Insert: {
+          action: string
+          area: string
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          performed_by_name?: string | null
+          performed_by_user_id?: string | null
+          tenant_code: string
+        }
+        Update: {
+          action?: string
+          area?: string
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          performed_by_name?: string | null
+          performed_by_user_id?: string | null
+          tenant_code?: string
         }
         Relationships: []
       }
@@ -1594,6 +1741,42 @@ export type Database = {
           stock_name?: string | null
           tenant_code?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      storage_change_log: {
+        Row: {
+          confirmation_text: string
+          confirmation_text_version: string
+          confirmed_by_name: string | null
+          confirmed_by_user_id: string | null
+          created_at: string
+          id: string
+          new_provider: string | null
+          old_provider: string | null
+          tenant_code: string
+        }
+        Insert: {
+          confirmation_text: string
+          confirmation_text_version?: string
+          confirmed_by_name?: string | null
+          confirmed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_provider?: string | null
+          old_provider?: string | null
+          tenant_code: string
+        }
+        Update: {
+          confirmation_text?: string
+          confirmation_text_version?: string
+          confirmed_by_name?: string | null
+          confirmed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_provider?: string | null
+          old_provider?: string | null
+          tenant_code?: string
         }
         Relationships: []
       }
@@ -1888,6 +2071,60 @@ export type Database = {
           summary?: Json | null
           tenant_code?: string
           total_stages?: number
+        }
+        Relationships: []
+      }
+      tenant_storage_connections: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string | null
+          display_name: string | null
+          id: string
+          is_active: boolean
+          last_test_result: string | null
+          last_tested_at: string | null
+          provider: string
+          root_folder_id: string | null
+          root_folder_name: string | null
+          secret_ciphertext: string | null
+          status: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          last_test_result?: string | null
+          last_tested_at?: string | null
+          provider: string
+          root_folder_id?: string | null
+          root_folder_name?: string | null
+          secret_ciphertext?: string | null
+          status?: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          last_test_result?: string | null
+          last_tested_at?: string | null
+          provider?: string
+          root_folder_id?: string | null
+          root_folder_name?: string | null
+          secret_ciphertext?: string | null
+          status?: string
+          tenant_code?: string
+          updated_at?: string
         }
         Relationships: []
       }
