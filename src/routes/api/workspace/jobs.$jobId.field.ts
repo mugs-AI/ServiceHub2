@@ -344,6 +344,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               const type = action === "waiting_customer_resolved" ? "customer" : "vendor";
               const resolution = String(body.resolution_note ?? "").trim();
               if (!resolution) throw new FieldOpsError("Resolution note is required.");
+              if (type === "vendor" && !String(body.vendor_response ?? "").trim()) {
+                throw new FieldOpsError("Vendor response is required.");
+              }
               const { data: open, error: findErr } = await supabaseAdmin
                 .from("service_job_waiting_periods")
                 .select("id")
