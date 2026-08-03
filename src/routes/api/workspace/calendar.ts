@@ -44,63 +44,55 @@ export const Route = createFileRoute("/api/workspace/calendar")({
           const supportMode = sp.get("support_mode") ?? "";
           const pic = sp.get("pic") ?? "";
 
-          function applyFilters<T extends { eq: (c: string, v: string) => T; or: (f: string) => T }>(
-            builder: T,
-          ): T {
-            let b = builder;
-            if (scope === "me") b = b.eq("assigned_user_id", me ?? "__none__");
-            if (pic) b = b.eq("assigned_user_id", pic);
-            if (status) b = b.eq("status", status);
-            if (priority) b = b.eq("priority", priority);
-            if (supportMode) b = b.eq("support_mode", supportMode);
-            if (q) {
-              const safe = q.replace(/[%,()]/g, " ");
-              b = b.or(
-                [
-                  `job_number.ilike.%${safe}%`,
-                  `subject.ilike.%${safe}%`,
-                  `customer_name_snapshot.ilike.%${safe}%`,
-                  `customer_code_snapshot.ilike.%${safe}%`,
-                  `assigned_user_name_snapshot.ilike.%${safe}%`,
-                ].join(","),
-              );
-            }
-            return b;
-          }
+          const orFilter = q
+            ? [
+                `job_number.ilike.%${q.replace(/[%,()]/g, " ")}%`,
+                `subject.ilike.%${q.replace(/[%,()]/g, " ")}%`,
+                `customer_name_snapshot.ilike.%${q.replace(/[%,()]/g, " ")}%`,
+                `customer_code_snapshot.ilike.%${q.replace(/[%,()]/g, " ")}%`,
+                `assigned_user_name_snapshot.ilike.%${q.replace(/[%,()]/g, " ")}%`,
+              ].join(",")
+            : null;
 
-          const scheduled = applyFilters(
-            supabaseAdmin
+          let query = supabaseAdmin
+            .from("service_jobs")
+            .select(SELECT)
+            .eq("tenant_code", user.tenantCode)
+            .eq("is_deleted", false)
+            .gte("scheduled_start_at", fromIso)
+            .lt("scheduled_start_at", toIso)
+            .order("scheduled_start_at", { ascending: true });
+          if (scope === "me") query = query.eq("assigned_user_id", me ?? "__none__");
+          if (pic) query = query.eq("assigned_user_id", pic);
+          if (status) query = query.eq("status", status);
+          if (priority) query = query.eq("priority", priority);
+          if (supportMode) query = query.eq("support_mode", supportMode);
+          if (orFilter) query = query.or(orFilter);
+
+          const { data, error } = await query;
+          if (error) throw error;
+
+          let unscheduled: typeof data = [];
+          if (sp.get("include_unscheduled") === "1") {
+            let pending = supabaseAdmin
               .from("service_jobs")
               .select(SELECT)
               .eq("tenant_code", user.tenantCode)
               .eq("is_deleted", false)
-              .gte("scheduled_start_at", fromIso)
-              .lt("scheduled_start_at", toIso)
-              .order("scheduled_start_at", { ascending: true }) as never,
-          ) as never as { data: unknown[] | null; error: unknown };
-
-          const { data, error } = await (scheduled as unknown as PromiseLike<{
-            data: unknown[] | null;
-            error: { message: string } | null;
-          }>);
-          if (error) throw error;
-
-          let unscheduled: unknown[] = [];
-          if (sp.get("include_unscheduled") === "1") {
-            const pending = applyFilters(
-              supabaseAdmin
-                .from("service_jobs")
-                .select(SELECT)
-                .eq("tenant_code", user.tenantCode)
-                .eq("is_deleted", false)
-                .is("scheduled_start_at", null)
-                .in("status", ["Open", "Assigned", "In Progress", "Draft"])
-                .order("created_at", { ascending: false })
-                .limit(50) as never,
-            ) as never as PromiseLike<{ data: unknown[] | null; error: unknown }>;
+              .is("scheduled_start_at", null)
+              .in("status", ["Open", "Assigned", "In Progress", "Draft"])
+              .order("created_at", { ascending: false })
+              .limit(50);
+            if (scope === "me") pending = pending.eq("assigned_user_id", me ?? "__none__");
+            if (pic) pending = pending.eq("assigned_user_id", pic);
+            if (status) pending = pending.eq("status", status);
+            if (priority) pending = pending.eq("priority", priority);
+            if (supportMode) pending = pending.eq("support_mode", supportMode);
+            if (orFilter) pending = pending.or(orFilter);
             const res = await pending;
             unscheduled = res.data ?? [];
           }
+
 
           return Response.json({
             date: day,
