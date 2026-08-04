@@ -10,6 +10,32 @@
 
 ---
 
+## 0. WP0A-R baseline reconciliation (Correction R1)
+
+**WP0A-R reconciliation input:** `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` (current canonical `main` HEAD)  
+**Prior audited recovery head:** `76a40bfe30a67c46b7bf48826e7b9dfa984896d5` — `Added Job Detail panels` (its rejected Job Detail-panel finding is preserved in full)  
+**Inherited generated-file commit:** `27d243ce37f38117f518769f651971ec16642998`
+
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is the WP0A-R reconciliation input.
+- It is **not** an accepted production baseline and ServiceHub2 is **not** production-complete.
+- Its only tree difference from `76a40bfe30a67c46b7bf48826e7b9dfa984896d5` is the inherited 10-line generated TanStack Start registration block in `src/routeTree.gen.ts` (10 additions, 0 deletions, no route added or removed).
+- The resulting WP0A-R SHA may become the first controlled engineering baseline **only** after all WP0A-R gates pass and the project owner formally accepts it.
+
+### Recovery-input exception (Correction R2)
+
+> Because no formally accepted engineering baseline existed before WP0A-R, `main@9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is authorised as a one-time reconciliation input. This authorisation does not accept its Software ServiceHub product implementation. Only the resulting WP0A-R SHA may be proposed for formal controlled-baseline acceptance after every WP0A-R gate passes.
+
+### Rejected predecessor run record (Correction R5)
+
+- The predecessor WP0A run detected an input-SHA/branch mismatch.
+- `27d243ce37f38117f518769f651971ec16642998` contained the inherited generated registration block.
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` added no file delta.
+- The safety stop was correct.
+- That run remains formally `REJECTED`.
+- No WP0A deliverable was completed by it.
+
+---
+
 ## 1. Project purpose
 
 ServiceHub2 is the **Software ServiceHub** for N3/QNE AI Cloud Accounting. Its production purpose is to support software-service operations around:
@@ -97,6 +123,8 @@ Other important partial handoffs include:
 - no reproducible CI, typecheck, test, production-build or live acceptance evidence for the audited head.
 
 The latest Lovable run is therefore formally classified **REJECTED** for production acceptance. See `VERIFIED_BASELINE_CURRENT.md`.
+
+The subsequent WP0A run was also formally `REJECTED` on an input-SHA/branch mismatch; it completed no WP0A deliverable and produced no file delta (see section 0).
 
 ---
 

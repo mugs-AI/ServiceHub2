@@ -4,11 +4,38 @@
 
 **Repository:** `mugs-AI/ServiceHub2`  
 **Branch:** `main`  
-**Audited head:** `76a40bfe30a67c46b7bf48826e7b9dfa984896d5`  
+**WP0A-R reconciliation input:** `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` (current canonical `main` HEAD; not an accepted production baseline)  
+**Audited head (prior audited recovery head):** `76a40bfe30a67c46b7bf48826e7b9dfa984896d5`  
 **Head message:** `Added Job Detail panels`  
 **Audit date:** 2026-08-04 (Asia/Kuala_Lumpur)  
 **Baseline decision:** **NOT ACCEPTED FOR PRODUCTION**  
 **Latest Lovable run result:** **REJECTED**
+
+---
+
+## 0. WP0A-R baseline reconciliation (Correction R1)
+
+**WP0A-R reconciliation input:** `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` (current canonical `main` HEAD)  
+**Prior audited recovery head:** `76a40bfe30a67c46b7bf48826e7b9dfa984896d5` — `Added Job Detail panels` (its rejected Job Detail-panel finding is preserved in full)  
+**Inherited generated-file commit:** `27d243ce37f38117f518769f651971ec16642998`
+
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is the WP0A-R reconciliation input.
+- It is **not** an accepted production baseline and ServiceHub2 is **not** production-complete.
+- Its only tree difference from `76a40bfe30a67c46b7bf48826e7b9dfa984896d5` is the inherited 10-line generated TanStack Start registration block in `src/routeTree.gen.ts` (10 additions, 0 deletions, no route added or removed).
+- The resulting WP0A-R SHA may become the first controlled engineering baseline **only** after all WP0A-R gates pass and the project owner formally accepts it.
+
+### Recovery-input exception (Correction R2)
+
+> Because no formally accepted engineering baseline existed before WP0A-R, `main@9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is authorised as a one-time reconciliation input. This authorisation does not accept its Software ServiceHub product implementation. Only the resulting WP0A-R SHA may be proposed for formal controlled-baseline acceptance after every WP0A-R gate passes.
+
+### Rejected predecessor run record (Correction R5)
+
+- The predecessor WP0A run detected an input-SHA/branch mismatch.
+- `27d243ce37f38117f518769f651971ec16642998` contained the inherited generated registration block.
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` added no file delta.
+- The safety stop was correct.
+- That run remains formally `REJECTED`.
+- No WP0A deliverable was completed by it.
 
 ---
 
@@ -276,7 +303,7 @@ This does not close tenant isolation or secrets. Those gates remain not live ver
 | P1-005 | Report permission settings have no mounted UI. | API/registry/table exist; no settings panel. | Mount and verify report permission administration. |
 | P1-006 | Reports workspace vertical is missing. | No `/reports` route; no complete report runner/export path. | Implement approved Software ServiceHub reports end to end. |
 | P1-007 | External storage is not end to end. | Attachment API always uses Supabase bucket; settings advertise other modes. | Either complete provider adapters or explicitly defer/disable unsupported modes. |
-| P1-008 | Completion write is not atomic. | completion insert, job update and log are separate; unique job completion constraint can block retry after a partial failure. | Move completion to transaction/RPC or add recoverable idempotency. |
+| P1-008 (Correction R4: the Completion panel must not become an operational production completion path while completion remains non-atomic — deliver atomicity and panel mounting as one separately approved vertical slice, or verify atomicity first) | Completion write is not atomic. | completion insert, job update and log are separate; unique job completion constraint can block retry after a partial failure. | Move completion to transaction/RPC or add recoverable idempotency. |
 | P1-009 | Quality-gate commands/evidence are incomplete. | no `typecheck` or `test` script; no CI/status/workflow evidence. | Add explicit scripts and reproducible command evidence. |
 | P1-010 | Live acceptance cannot be reproduced. | no deployed URL/session tied to head. | Establish deployment and role/tenant acceptance evidence. |
 | P1-011 | Latest Lovable run is a partial handoff. | commit claims Job Detail panels, but panels are unmounted. | Reject run as baseline; repair only after scope approval. |
@@ -370,7 +397,18 @@ The changed component code may be retained as implementation evidence, but `76a4
 
 **None established by this audit.**
 
-For planning purposes, `76a40bfe` is the **current recovery head**, not an accepted production baseline.
+For planning purposes, `76a40bfe` is the **prior audited recovery head** and `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is the **WP0A-R reconciliation input** — neither is an accepted production baseline. Only the resulting WP0A-R SHA may be proposed for formal controlled-baseline acceptance after every WP0A-R gate passes and the project owner formally accepts it.
+
+---
+
+## 10a. Subsequent WP0A run record (Correction R5)
+
+- Input mismatch was detected.
+- `27d243ce37f38117f518769f651971ec16642998` contained the inherited generated registration block.
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` added no file delta.
+- The safety stop was correct.
+- The run remained formally `REJECTED`.
+- No WP0A deliverable was completed.
 
 ---
 

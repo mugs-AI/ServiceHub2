@@ -3,9 +3,36 @@
 ## Software Support Production Completion
 
 **Repository:** `mugs-AI/ServiceHub2`  
-**Recovery head:** `76a40bfe30a67c46b7bf48826e7b9dfa984896d5`  
+**WP0A-R reconciliation input:** `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f`  
+**Prior audited recovery head:** `76a40bfe30a67c46b7bf48826e7b9dfa984896d5`  
 **Plan date:** 2026-08-04  
 **Plan status:** **FOR OWNER REVIEW — NOT AN AUTHORISED BUILD PROMPT**
+
+---
+
+## 0. WP0A-R baseline reconciliation (Correction R1)
+
+**WP0A-R reconciliation input:** `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` (current canonical `main` HEAD)  
+**Prior audited recovery head:** `76a40bfe30a67c46b7bf48826e7b9dfa984896d5` — `Added Job Detail panels` (its rejected Job Detail-panel finding is preserved in full)  
+**Inherited generated-file commit:** `27d243ce37f38117f518769f651971ec16642998`
+
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is the WP0A-R reconciliation input.
+- It is **not** an accepted production baseline and ServiceHub2 is **not** production-complete.
+- Its only tree difference from `76a40bfe30a67c46b7bf48826e7b9dfa984896d5` is the inherited 10-line generated TanStack Start registration block in `src/routeTree.gen.ts` (10 additions, 0 deletions, no route added or removed).
+- The resulting WP0A-R SHA may become the first controlled engineering baseline **only** after all WP0A-R gates pass and the project owner formally accepts it.
+
+### Recovery-input exception (Correction R2)
+
+> Because no formally accepted engineering baseline existed before WP0A-R, `main@9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is authorised as a one-time reconciliation input. This authorisation does not accept its Software ServiceHub product implementation. Only the resulting WP0A-R SHA may be proposed for formal controlled-baseline acceptance after every WP0A-R gate passes.
+
+### Rejected predecessor run record (Correction R5)
+
+- The predecessor WP0A run detected an input-SHA/branch mismatch.
+- `27d243ce37f38117f518769f651971ec16642998` contained the inherited generated registration block.
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` added no file delta.
+- The safety stop was correct.
+- That run remains formally `REJECTED`.
+- No WP0A deliverable was completed by it.
 
 ---
 
@@ -222,6 +249,8 @@ All three panels are visible and functional on Job Detail. No P1 remains in this
 ---
 
 ## Work Package 2 — Completion atomicity and data integrity
+
+**Correction R4 — safe completion sequencing.** The Completion panel must not become an operational production completion path while completion remains non-atomic. The completion-atomicity correction and Completion-panel mounting must either be delivered together as one separately approved complete vertical slice, or atomicity must be completed and verified before the Completion panel is mounted. Work Package 1 therefore may not mount the Completion panel on its own.
 
 ### Goal
 
@@ -535,6 +564,18 @@ For every scenario capture:
 ### Exit gate
 
 No P0 or P1; only approved P2; release SHA formally accepted.
+
+---
+
+## 5a. Requirement-reconciliation order (Correction R3)
+
+Requirement decisions needed by a work package must occur before that work package:
+
+- external-storage release scope must be decided before Work Package 4;
+- the exact report catalogue and report-role decisions must be taken before Work Package 5;
+- Work Package 6 must not be interpreted as occurring only after Work Packages 4 and 5.
+
+These requirement decisions are not taken by WP0A-R.
 
 ---
 

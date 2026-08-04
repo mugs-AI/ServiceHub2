@@ -3,8 +3,34 @@
 ## ServiceHub2 — Software Support Production
 
 **Applies to:** every Lovable investigation, build, repair and verification run  
-**Current audited baseline candidate:** `main@76a40bfe`  
+**Current audited baseline candidate:** `main@9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` (WP0A-R reconciliation input; prior audited recovery head `main@76a40bfe`)  
 **Current prompt state:** **FROZEN — no build prompt approved**
+
+---
+
+## 0. WP0A-R baseline reconciliation (Correction R1)
+
+**WP0A-R reconciliation input:** `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` (current canonical `main` HEAD)  
+**Prior audited recovery head:** `76a40bfe30a67c46b7bf48826e7b9dfa984896d5` — `Added Job Detail panels` (its rejected Job Detail-panel finding is preserved in full)  
+**Inherited generated-file commit:** `27d243ce37f38117f518769f651971ec16642998`
+
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is the WP0A-R reconciliation input.
+- It is **not** an accepted production baseline and ServiceHub2 is **not** production-complete.
+- Its only tree difference from `76a40bfe30a67c46b7bf48826e7b9dfa984896d5` is the inherited 10-line generated TanStack Start registration block in `src/routeTree.gen.ts` (10 additions, 0 deletions, no route added or removed).
+- The resulting WP0A-R SHA may become the first controlled engineering baseline **only** after all WP0A-R gates pass and the project owner formally accepts it.
+
+### Recovery-input exception (Correction R2)
+
+> Because no formally accepted engineering baseline existed before WP0A-R, `main@9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` is authorised as a one-time reconciliation input. This authorisation does not accept its Software ServiceHub product implementation. Only the resulting WP0A-R SHA may be proposed for formal controlled-baseline acceptance after every WP0A-R gate passes.
+
+### Rejected predecessor run record (Correction R5)
+
+- The predecessor WP0A run detected an input-SHA/branch mismatch.
+- `27d243ce37f38117f518769f651971ec16642998` contained the inherited generated registration block.
+- `9cdd6f93ca85c0d0d57bfddbdca2f54da166d93f` added no file delta.
+- The safety stop was correct.
+- That run remains formally `REJECTED`.
+- No WP0A deliverable was completed by it.
 
 ---
 
@@ -251,7 +277,7 @@ Only a formally accepted SHA may become the next build baseline.
 6. Service-role credentials must never be imported into client bundles.
 7. Storage signed URLs must be short-lived and tenant/job authorised.
 8. Reports must enforce capability and data scope server-side.
-9. Completion must be atomic or recoverably idempotent.
+9. Completion must be atomic or recoverably idempotent. (Correction R4) The Completion panel must not become an operational production completion path while completion remains non-atomic: the completion-atomicity correction and Completion-panel mounting are either delivered together as one separately approved complete vertical slice, or atomicity is completed and verified before the Completion panel is mounted.
 10. Migration uniqueness and conflict keys must match API upsert keys.
 
 ---
@@ -296,6 +322,10 @@ Lovable reports must not use these statements as substitutes for evidence:
 
 `main@76a40bfe` — `Added Job Detail panels`
 
+### Subsequent WP0A run (Correction R5)
+
+`main@9cdd6f9` — WP0A was formally `REJECTED` on an input-SHA/branch mismatch. `27d243c` carried the inherited generated registration block, `9cdd6f9` added no file delta, the safety stop was correct and no WP0A deliverable was completed.
+
 ### Independent result
 
 **REJECTED**
@@ -303,6 +333,16 @@ Lovable reports must not use these statements as substitutes for evidence:
 ### Reason
 
 The three claimed Job Detail panels exist as files but are not imported or rendered by `src/routes/jobs.$jobId.tsx`. Settings/report work is also not a complete mounted vertical slice. This violates the zero-tolerance partial-handoff rule and leaves P1 production blockers.
+
+---
+
+## 11a. Requirement-reconciliation order (Correction R3)
+
+Requirement decisions needed by a work package must be taken **before** that work package:
+
+- external-storage release scope must be decided before Work Package 4;
+- the exact report catalogue and report-role decisions must be taken before Work Package 5;
+- Work Package 6 must not be interpreted as occurring only after Work Packages 4 and 5; it is performed as needed ahead of every affected scope.
 
 ---
 
