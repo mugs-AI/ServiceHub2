@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "format": "prettier --write ."
+
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -70,7 +71,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
-    "@lovable.dev/vite-tanstack-config": "2.9.0",
+    "@lovable.dev/vite-tanstack-config": "2.8.5",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
