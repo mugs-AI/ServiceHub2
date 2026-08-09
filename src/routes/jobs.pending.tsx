@@ -125,7 +125,18 @@ function PendingQueuePage() {
           {technicianFilter && (
             <p className="mt-1 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
               Technician: {technicianName ?? technicianFilter}
-              <Link to="/jobs/pending" className="text-primary/70 hover:text-primary">clear</Link>
+              <Link
+                to="/jobs/pending"
+                search={{
+                  scope: undefined,
+                  queueType: undefined,
+                  technician: undefined,
+                  technicianName: undefined,
+                }}
+                className="text-primary/70 hover:text-primary"
+              >
+                clear
+              </Link>
             </p>
           )}
         </div>

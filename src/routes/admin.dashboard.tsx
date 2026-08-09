@@ -211,7 +211,12 @@ function AdminDashboard() {
                     onClick={() =>
                       navigate({
                         to: "/jobs/pending",
-                        search: { technician: w.user_id, technicianName: w.name },
+                        search: {
+                          scope: undefined,
+                          queueType: undefined,
+                          technician: w.user_id,
+                          technicianName: w.name,
+                        },
                       })
                     }
                   >
