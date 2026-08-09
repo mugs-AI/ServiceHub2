@@ -273,12 +273,26 @@ function UserDashboard() {
           <MiniStat label="Completed by Me Today" value={summary.completedByMeToday} tone="green" />
         </div>
         <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <Link to="/jobs/pending" className="font-medium text-primary hover:underline">
+          <Link
+            to="/jobs/pending"
+            search={{
+              scope: undefined,
+              queueType: undefined,
+              technician: undefined,
+              technicianName: undefined,
+            }}
+            className="font-medium text-primary hover:underline"
+          >
             View Office-Wide Assigned Queue →
           </Link>
           <Link
             to="/jobs/pending"
-            search={{ scope: "team" as const }}
+            search={{
+              scope: "team" as const,
+              queueType: undefined,
+              technician: undefined,
+              technicianName: undefined,
+            }}
             className="font-medium text-primary hover:underline"
           >
             Pending from My Team →
