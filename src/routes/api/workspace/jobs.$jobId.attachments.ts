@@ -12,7 +12,7 @@ const BUCKET = "job-attachments";
 const SIGNED_URL_TTL = 300; // seconds
 
 function safeName(name: string): string {
-  return name.replace(/[^\w.\-]+/g, "_").slice(-120);
+  return name.replace(/[^\w.-]+/g, "_").slice(-120);
 }
 
 export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({

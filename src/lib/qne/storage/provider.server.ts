@@ -39,7 +39,7 @@ export interface StorageAdapter {
 }
 
 function safeName(name: string): string {
-  return name.replace(/[^\w.\-]+/g, "_").slice(-120);
+  return name.replace(/[^\w.-]+/g, "_").slice(-120);
 }
 
 const disabledAdapter: StorageAdapter = {
