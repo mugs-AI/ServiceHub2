@@ -5,6 +5,7 @@ import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
 import { allowedTransitionsClient } from "@/lib/qne/service-jobs/workflow";
+import { canCancelJob, isTakeoverEligibleStatus } from "@/lib/qne/service-jobs/permissions";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { DateField, TimeField } from "@/components/qne/DateTimeFields";
 import {
@@ -192,6 +193,13 @@ function JobDetailPage() {
 
   const pendingLock = job.status === "Pending Approval" && !isAdmin;
 
+  // WP0E — mirror of the server-side cancellation rule so the UI never offers
+  // an action the API would deny.
+  const canCancel = canCancelJob(
+    { isAdministrator: isAdmin, actorUserId: currentUserId },
+    { createdByUserId: job.created_by_user_id ?? null, assignedUserId: job.assigned_user_id ?? null },
+  );
+
   return (
     <div className="space-y-6">
       <header className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
@@ -268,7 +276,7 @@ function JobDetailPage() {
         <JobInfoCard job={job} />
         <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
           {!job.is_deleted ? (
-            <WorkflowActions job={job} onDone={reloadAll} />
+            <WorkflowActions job={job} onDone={reloadAll} canCancel={canCancel} />
           ) : (
             <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -304,7 +312,9 @@ function JobDetailPage() {
       <ScheduleCard
         job={job}
         locked={pendingLock || job.is_deleted}
-        canEdit={isAdmin || currentUserId === job.assigned_user_id}
+        /* SME collaborative scheduling — any authenticated teammate may schedule
+           an eligible approved Job; the Primary PIC is never changed. */
+        canEdit={!job.is_deleted}
         onDone={reloadAll}
       />
 
@@ -960,12 +970,16 @@ function statusTone(status: string): string {
 function WorkflowActions({
   job,
   onDone,
+  canCancel,
 }: {
   job: JobDetail;
   onDone: () => Promise<void>;
+  canCancel: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const transitions = useMemo(() => {
     let t = allowedTransitionsClient(job.status);
@@ -980,18 +994,14 @@ function WorkflowActions({
     }
     // Pending Approval handled by ApprovalPanel.
     if (job.status === "Pending Approval") t = t.filter((x) => x !== "Cancelled");
+    // Cancellation is responsibility-controlled (creator / Primary PIC / Admin).
+    if (!canCancel) t = t.filter((x) => x !== "Cancelled");
     return t;
-  }, [job.status, job.requires_approval, job.assigned_user_id]);
+  }, [job.status, job.requires_approval, job.assigned_user_id, canCancel]);
 
   if (transitions.length === 0) return null;
 
-  async function transition(to: string) {
-    let reason: string | null = null;
-    if (to === "Cancelled") {
-      const r = window.prompt("Cancellation reason (required):");
-      if (!r || !r.trim()) return;
-      reason = r.trim();
-    }
+  async function transition(to: string, reason: string | null = null) {
     setBusy(to);
     setErr(null);
     try {
@@ -1020,7 +1030,7 @@ function WorkflowActions({
           <button
             key={to}
             type="button"
-            onClick={() => transition(to)}
+            onClick={() => (to === "Cancelled" ? setCancelOpen(true) : transition(to))}
             disabled={!!busy}
             className={`min-h-10 rounded-lg px-3 text-sm font-semibold shadow-sm disabled:opacity-50 ${
               to === "Cancelled"
@@ -1042,7 +1052,75 @@ function WorkflowActions({
           {err}
         </div>
       )}
+
+      {cancelOpen && (
+        <ModalShell title="Cancel Service Job" onClose={() => setCancelOpen(false)}>
+          <p className="text-sm text-muted-foreground">This will stop normal work on this Job.</p>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Reason *
+          </label>
+          <textarea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            rows={3}
+            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
+            placeholder="Why is this Job being cancelled?"
+          />
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelOpen(false)}
+              disabled={!!busy}
+              className="min-h-10 rounded-lg border px-4 text-sm font-semibold hover:bg-accent disabled:opacity-50"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              disabled={!cancelReason.trim() || !!busy}
+              onClick={async () => {
+                await transition("Cancelled", cancelReason.trim());
+                setCancelOpen(false);
+                setCancelReason("");
+              }}
+              className="min-h-10 rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground shadow-sm disabled:opacity-50"
+            >
+              {busy === "Cancelled" ? "Cancelling…" : "Cancel Job"}
+            </button>
+          </div>
+        </ModalShell>
+      )}
     </section>
+  );
+}
+
+/* ---------------- shared modal shell ---------------- */
+
+function ModalShell({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border bg-card p-4 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <div className="mt-2">{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -1204,12 +1282,14 @@ function AssignmentSection({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const [takeoverOpen, setTakeoverOpen] = useState(false);
+  const [takeoverReason, setTakeoverReason] = useState("");
+
   const assigned = !!job.assigned_user_id;
-  const CLAIMABLE = new Set(["Open", "Assigned", "Waiting Customer", "Waiting Vendor"]);
   const canClaim =
     !!currentUserId &&
     !job.is_deleted &&
-    CLAIMABLE.has(job.status) &&
+    isTakeoverEligibleStatus(job.status) &&
     job.assigned_user_id !== currentUserId;
 
   async function handleUnassign() {
@@ -1233,19 +1313,14 @@ function AssignmentSection({
     }
   }
 
-  async function handleClaim() {
-    const currentName = job.assigned_user_name_snapshot ?? "(Unassigned)";
-    const meName = currentDisplayName || "you";
-    const msg = job.assigned_user_id
-      ? `Reassign ${job.job_number} from ${currentName} to ${meName}?\n\nThe previous technician stays in the assignment history.`
-      : `Assign ${job.job_number} to ${meName}?`;
-    if (!confirm(msg)) return;
+  async function handleClaim(reason?: string) {
     setBusy(true);
     setErr(null);
     try {
       const res = await fetch(`/api/workspace/jobs/${job.id}/claim`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(reason ? { reason } : {}),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? "Unable to claim job.");
@@ -1260,7 +1335,7 @@ function AssignmentSection({
   return (
     <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Assigned technician
+        Primary PIC
       </h2>
       {assigned ? (
         <div className="text-base font-semibold text-foreground">
@@ -1274,16 +1349,19 @@ function AssignmentSection({
       ) : (
         <div className="text-sm font-medium text-muted-foreground">Unassigned</div>
       )}
+      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+        Primary PIC keeps responsibility; teammates may help without taking over.
+      </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
         {canClaim && (
           <button
             type="button"
-            onClick={handleClaim}
+            onClick={() => (assigned ? setTakeoverOpen(true) : void handleClaim())}
             disabled={busy}
             className="min-h-[44px] rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
           >
-            {assigned ? "Reassign to Me" : "Assign to Me"}
+            {assigned ? "Take Over as Primary PIC" : "Assign to Me"}
           </button>
         )}
         {canAssign && (
@@ -1313,6 +1391,51 @@ function AssignmentSection({
         <div className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {err}
         </div>
+      )}
+
+      {takeoverOpen && (
+        <ModalShell title="Take Over as Primary PIC" onClose={() => setTakeoverOpen(false)}>
+          <p className="text-sm text-foreground">
+            Current Primary PIC:{" "}
+            <strong>{job.assigned_user_name_snapshot ?? "(Unassigned)"}</strong>
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            You are about to take over this Job as Primary PIC
+            {currentDisplayName ? ` (${currentDisplayName})` : ""}.
+          </p>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Takeover reason *
+          </label>
+          <textarea
+            value={takeoverReason}
+            onChange={(e) => setTakeoverReason(e.target.value)}
+            rows={3}
+            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
+            placeholder="Why are you taking over as Primary PIC?"
+          />
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setTakeoverOpen(false)}
+              disabled={busy}
+              className="min-h-10 rounded-lg border px-4 text-sm font-semibold hover:bg-accent disabled:opacity-50"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              disabled={!takeoverReason.trim() || busy}
+              onClick={async () => {
+                await handleClaim(takeoverReason.trim());
+                setTakeoverOpen(false);
+                setTakeoverReason("");
+              }}
+              className="min-h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
+            >
+              {busy ? "Working…" : "Take Over"}
+            </button>
+          </div>
+        </ModalShell>
       )}
     </section>
   );

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 
 import { DaySchedule, useDaySchedule } from "@/components/qne/DaySchedule";
 import { myDayKey, shiftDayKey } from "@/lib/qne/service-jobs/scheduling";
-import { useSession } from "@/lib/qne/session-context";
 
 export const Route = createFileRoute("/calendar")({
   head: () => ({
@@ -34,8 +33,6 @@ function initialDate(): string {
 }
 
 function CalendarPage() {
-  const session = useSession();
-  const isAdmin = !!session.currentUser?.isAdministrator;
   const [date, setDate] = useState(initialDate);
   const [scope, setScope] = useState<"me" | "team">("me");
   const { items, loading, error, reload } = useDaySchedule(date, scope);
@@ -44,7 +41,6 @@ function CalendarPage() {
   useEffect(() => {
     window.sessionStorage.setItem(DATE_KEY, date);
   }, [date]);
-
 
   return (
     <div className="space-y-4">
@@ -94,24 +90,22 @@ function CalendarPage() {
           Today
         </button>
 
-        {isAdmin && (
-          <div className="ml-auto flex gap-1 rounded-md border p-1">
-            {(["me", "team"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setScope(s)}
-                className={`min-h-9 rounded px-3 text-xs font-semibold ${
-                  scope === s
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent"
-                }`}
-              >
-                {s === "me" ? "My schedule" : "All technicians"}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="ml-auto flex gap-1 rounded-md border p-1">
+          {(["me", "team"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setScope(s)}
+              className={`min-h-9 rounded px-3 text-xs font-semibold ${
+                scope === s
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {s === "me" ? "My Schedule" : "Team Schedule"}
+            </button>
+          ))}
+        </div>
       </div>
 
       <DaySchedule
