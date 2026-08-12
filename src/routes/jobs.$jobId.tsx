@@ -1055,9 +1055,7 @@ function WorkflowActions({
 
       {cancelOpen && (
         <ModalShell title="Cancel Service Job" onClose={() => setCancelOpen(false)}>
-          <p className="text-sm text-muted-foreground">
-            This will stop normal work on this Job.
-          </p>
+          <p className="text-sm text-muted-foreground">This will stop normal work on this Job.</p>
           <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Reason *
           </label>
