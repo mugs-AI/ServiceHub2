@@ -76,7 +76,6 @@ const USER_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
   Cancelled: [],
 };
 
-
 export function canTransition(from: string, to: string): boolean {
   const allow = USER_TRANSITIONS[from as JobStatus];
   return !!allow && allow.includes(to as JobStatus);

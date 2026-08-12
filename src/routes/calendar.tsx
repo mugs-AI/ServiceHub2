@@ -42,7 +42,6 @@ function CalendarPage() {
     window.sessionStorage.setItem(DATE_KEY, date);
   }, [date]);
 
-
   return (
     <div className="space-y-4">
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
@@ -107,7 +106,6 @@ function CalendarPage() {
             </button>
           ))}
         </div>
-
       </div>
 
       <DaySchedule

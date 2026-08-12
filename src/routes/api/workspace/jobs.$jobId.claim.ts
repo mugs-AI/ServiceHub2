@@ -27,12 +27,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/claim")({
   server: {
     handlers: {
       POST: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         try {
           const user = await requireAuthenticatedN3User(request);
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
