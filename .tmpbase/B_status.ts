@@ -21,9 +21,6 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
         const { canTransition, ALL_STATUSES } = await import(
           "@/lib/qne/service-jobs/workflow.server"
         );
-        const { canCancelJob, isGenericCompleteBlocked } = await import(
-          "@/lib/qne/service-jobs/permissions"
-        );
         try {
           const user = await requireAuthenticatedN3User(request);
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -33,24 +30,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
           if (!ALL_STATUSES.includes(to as (typeof ALL_STATUSES)[number])) {
             return Response.json({ error: "Invalid target status." }, { status: 400 });
           }
-          // WP0E — no generic Complete bypass. Completion returns only via its
-          // dedicated completion vertical.
-          if (isGenericCompleteBlocked(to)) {
-            return Response.json(
-              {
-                error:
-                  "Completing a Job is not available through the generic workflow.",
-              },
-              { status: 400 },
-            );
-          }
-
 
           const { data: job, error: jobErr } = await supabaseAdmin
             .from("service_jobs")
-            .select(
-              "id, tenant_code, status, is_deleted, requires_approval, assigned_user_id, created_by_user_id",
-            )
+            .select("id, tenant_code, status, is_deleted, requires_approval, assigned_user_id")
             .eq("tenant_code", user.tenantCode)
             .eq("id", params.jobId)
             .maybeSingle();
@@ -99,30 +82,6 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
               { status: 400 },
             );
           }
-          // WP0E — cancellation is responsibility-controlled. Ordinary
-          // collaborative transitions stay open to any same-tenant teammate,
-          // but cancelling requires Owner/Admin, the creator, or the Primary PIC.
-          if (effectiveTo === "Cancelled") {
-            const actorUserId =
-              user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
-            const allowedToCancel = canCancelJob(
-              { isAdministrator: !!user.isAdministrator, actorUserId },
-              {
-                createdByUserId: job.created_by_user_id ?? null,
-                assignedUserId: job.assigned_user_id ?? null,
-              },
-            );
-            if (!allowedToCancel) {
-              return Response.json(
-                {
-                  error:
-                    "Only the Job creator, the current Primary PIC, or an Administrator can cancel this Job.",
-                },
-                { status: 403 },
-              );
-            }
-          }
-
 
           const now = new Date().toISOString();
           const performer = {

@@ -162,7 +162,7 @@ export function DaySchedule({
                     </div>
                     {showTechnician && (
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        Primary PIC: {a.assigned_user_name_snapshot ?? "Unassigned"}
+                        Technician: {a.assigned_user_name_snapshot ?? "Unassigned"}
                       </div>
                     )}
                   </div>

@@ -13,13 +13,12 @@ export type JobStatus =
   | "Completed"
   | "Cancelled";
 
-// WP0E: `Completed` is intentionally NOT a generic user transition.
 const USER_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
   Draft: ["Open", "Assigned", "Cancelled"],
   "Pending Approval": ["Cancelled"],
   Open: ["In Progress", "Cancelled"],
   Assigned: ["In Progress", "Cancelled"],
-  "In Progress": ["Waiting Customer", "Waiting Vendor", "Cancelled"],
+  "In Progress": ["Waiting Customer", "Waiting Vendor", "Completed", "Cancelled"],
   "Waiting Customer": ["In Progress", "Cancelled"],
   "Waiting Vendor": ["In Progress", "Cancelled"],
   Completed: [],
