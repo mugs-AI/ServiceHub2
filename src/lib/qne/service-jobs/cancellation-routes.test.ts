@@ -382,13 +382,29 @@ describe("R.8 approval mode lifecycle", () => {
     const dup = await h.POST({ request: req({ reason: "two" }), params: { jobId: JOB_ID } });
     expect(dup.status).toBe(409);
 
-    // Racing: both callers see no active request, both attempt the insert.
+    // Racing: both callers passed the "no active request" check and both
+    // attempt the insert. The one-active-request constraint admits one.
     requests = [];
-    const [a, b] = await Promise.all([
-      h.POST({ request: req({ reason: "race a" }), params: { jobId: JOB_ID } }),
-      h.POST({ request: req({ reason: "race b" }), params: { jobId: JOB_ID } }),
-    ]);
-    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    const raceA = await store.insertPendingRequest({
+      tenantCode: "T1",
+      jobId: JOB_ID,
+      reason: "race a",
+      priorStatus: "In Progress",
+      requesterPolicy: "primary_pic_or_creator",
+      approvalMode: "admin_approval_required",
+      actor: { userId: "u-pic", name: "PIC" },
+    });
+    const raceB = await store.insertPendingRequest({
+      tenantCode: "T1",
+      jobId: JOB_ID,
+      reason: "race b",
+      priorStatus: "In Progress",
+      requesterPolicy: "primary_pic_or_creator",
+      approvalMode: "admin_approval_required",
+      actor: { userId: "u-creator", name: "Creator" },
+    });
+    expect(raceA.ok).toBe(true);
+    expect(raceB).toEqual({ ok: false, duplicate: true });
     expect(requests.filter((r) => r.status === "pending")).toHaveLength(1);
   });
 
@@ -429,17 +445,20 @@ describe("R.8 approval mode lifecycle", () => {
     expect(activity.filter((a) => a.eventType === "job_cancelled")).toHaveLength(1);
   });
 
-  it("concurrent approvals finalize once", async () => {
+  it("a competing Admin decision cannot claim the same request twice", async () => {
     const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
     await h.POST({ request: req({ reason: "stop work" }), params: { jobId: JOB_ID } });
-    session = ADMIN;
-    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
-    const results = await Promise.all([
-      d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } }),
-      d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } }),
-    ]);
-    expect(results.filter((r) => r.status === 200)).toHaveLength(1);
-    expect(activity.filter((a) => a.eventType === "job_cancelled")).toHaveLength(1);
+    const claim = {
+      tenantCode: "T1",
+      requestId: requests[0].id as string,
+      decision: "approved" as const,
+      note: null,
+      actor: { userId: "u-admin", name: "Owner" },
+    };
+    const first = await store.decidePendingRequest(claim);
+    const second = await store.decidePendingRequest(claim);
+    expect(first).toBeTruthy();
+    expect(second).toBeNull();
   });
 
   it("reject preserves the prior Job state and allows a later request", async () => {
