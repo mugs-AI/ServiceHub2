@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 
 import { AdminOnly } from "@/components/qne/AdminOnly";
+import { CancellationSettingsCard } from "@/components/qne/CancellationSettingsCard";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 
