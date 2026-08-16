@@ -38,6 +38,19 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
               { status: 400 },
             );
           }
+          // WP0E-R — no generic Cancel bypass either. Cancellation policy and
+          // approval mode are enforced only by the dedicated cancellation
+          // process, so this route must never finalize a cancellation.
+          if (to === "Cancelled") {
+            return Response.json(
+              {
+                error:
+                  "Cancelling a Job is not available through the generic workflow. Use the Cancellation action on the Job.",
+              },
+              { status: 400 },
+            );
+          }
+
 
           const { data: job, error: jobErr } = await supabaseAdmin
             .from("service_jobs")
