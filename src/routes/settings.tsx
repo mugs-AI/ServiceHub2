@@ -158,6 +158,8 @@ function Settings() {
         onError={(msg) => notify("err", msg)}
       />
 
+      <CancellationSettingsCard onNotify={notify} />
+
       <div className="flex gap-1 border-b">
         {(["renewal", "adhoc"] as TabKey[]).map((k) => (
           <button
