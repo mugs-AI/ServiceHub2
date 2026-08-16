@@ -5,7 +5,8 @@ import { getStoredToken } from "@/lib/qne/tokens";
 import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
 import { allowedTransitionsClient } from "@/lib/qne/service-jobs/workflow";
-import { canCancelJob, isTakeoverEligibleStatus } from "@/lib/qne/service-jobs/permissions";
+import { CancellationPanel } from "@/components/qne/CancellationPanel";
+import { isTakeoverEligibleStatus } from "@/lib/qne/service-jobs/permissions";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { DateField, TimeField } from "@/components/qne/DateTimeFields";
 import {
@@ -193,13 +194,6 @@ function JobDetailPage() {
 
   const pendingLock = job.status === "Pending Approval" && !isAdmin;
 
-  // WP0E — mirror of the server-side cancellation rule so the UI never offers
-  // an action the API would deny.
-  const canCancel = canCancelJob(
-    { isAdministrator: isAdmin, actorUserId: currentUserId },
-    { createdByUserId: job.created_by_user_id ?? null, assignedUserId: job.assigned_user_id ?? null },
-  );
-
   return (
     <div className="space-y-6">
       <header className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
@@ -276,7 +270,7 @@ function JobDetailPage() {
         <JobInfoCard job={job} />
         <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
           {!job.is_deleted ? (
-            <WorkflowActions job={job} onDone={reloadAll} canCancel={canCancel} />
+            <WorkflowActions job={job} onDone={reloadAll} />
           ) : (
             <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -298,6 +292,15 @@ function JobDetailPage() {
             onReload={reloadAll}
           />
         </div>
+      </div>
+
+      <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
+        <CancellationPanel
+          jobId={job.id}
+          jobStatus={job.status}
+          isDeleted={job.is_deleted}
+          onDone={reloadAll}
+        />
       </div>
 
       {(job.subscription_category_snapshot ||
@@ -970,16 +973,12 @@ function statusTone(status: string): string {
 function WorkflowActions({
   job,
   onDone,
-  canCancel,
 }: {
   job: JobDetail;
   onDone: () => Promise<void>;
-  canCancel: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
 
   const transitions = useMemo(() => {
     let t = allowedTransitionsClient(job.status);
@@ -992,12 +991,9 @@ function WorkflowActions({
       if (job.assigned_user_id) t = t.filter((x) => x !== "Open");
       else t = t.filter((x) => x !== "Assigned");
     }
-    // Pending Approval handled by ApprovalPanel.
-    if (job.status === "Pending Approval") t = t.filter((x) => x !== "Cancelled");
-    // Cancellation is responsibility-controlled (creator / Primary PIC / Admin).
-    if (!canCancel) t = t.filter((x) => x !== "Cancelled");
+    // WP0E-R — cancellation lives in the dedicated CancellationPanel.
     return t;
-  }, [job.status, job.requires_approval, job.assigned_user_id, canCancel]);
+  }, [job.status, job.requires_approval, job.assigned_user_id]);
 
   if (transitions.length === 0) return null;
 
@@ -1030,7 +1026,7 @@ function WorkflowActions({
           <button
             key={to}
             type="button"
-            onClick={() => (to === "Cancelled" ? setCancelOpen(true) : transition(to))}
+            onClick={() => transition(to)}
             disabled={!!busy}
             className={`min-h-10 rounded-lg px-3 text-sm font-semibold shadow-sm disabled:opacity-50 ${
               to === "Cancelled"
@@ -1053,43 +1049,6 @@ function WorkflowActions({
         </div>
       )}
 
-      {cancelOpen && (
-        <ModalShell title="Cancel Service Job" onClose={() => setCancelOpen(false)}>
-          <p className="text-sm text-muted-foreground">This will stop normal work on this Job.</p>
-          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Reason *
-          </label>
-          <textarea
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-            rows={3}
-            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
-            placeholder="Why is this Job being cancelled?"
-          />
-          <div className="mt-4 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setCancelOpen(false)}
-              disabled={!!busy}
-              className="min-h-10 rounded-lg border px-4 text-sm font-semibold hover:bg-accent disabled:opacity-50"
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              disabled={!cancelReason.trim() || !!busy}
-              onClick={async () => {
-                await transition("Cancelled", cancelReason.trim());
-                setCancelOpen(false);
-                setCancelReason("");
-              }}
-              className="min-h-10 rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground shadow-sm disabled:opacity-50"
-            >
-              {busy === "Cancelled" ? "Cancelling…" : "Cancel Job"}
-            </button>
-          </div>
-        </ModalShell>
-      )}
     </section>
   );
 }
