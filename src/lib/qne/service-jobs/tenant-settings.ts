@@ -2,6 +2,13 @@
 // and Completion & Acknowledgement. Persisted inside general_settings.extra.
 
 import { usesTravel } from "./support-mode";
+import {
+  DEFAULT_CANCELLATION_SETTINGS,
+  mergeCancellationSettings,
+  type CancellationSettings,
+} from "./cancellation";
+
+export type { CancellationSettings };
 
 export const GPS_MODES = ["off", "optional", "required_onsite"] as const;
 export type GpsMode = (typeof GPS_MODES)[number];
@@ -155,6 +162,7 @@ export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
     ],
     allowAdminWaiver: true,
   },
+  cancellation: DEFAULT_CANCELLATION_SETTINGS,
 };
 
 /** Merge stored partials over defaults so old tenants keep working. */
@@ -169,6 +177,7 @@ export function mergeTenantSettings(raw: unknown): TenantSettings {
     },
     attachments: { ...d.attachments, ...(src.attachments ?? {}) },
     completion: { ...d.completion, ...(src.completion ?? {}) },
+    cancellation: mergeCancellationSettings(src.cancellation),
   };
 }
 
