@@ -881,6 +881,77 @@ export type Database = {
           },
         ]
       }
+      service_job_cancellation_requests: {
+        Row: {
+          approval_mode_at_request: string
+          created_at: string
+          decided_at: string | null
+          decided_by_name_snapshot: string | null
+          decided_by_user_id: string | null
+          decision: string | null
+          decision_note: string | null
+          id: string
+          prior_status: string
+          reason: string
+          requested_at: string
+          requested_by_name_snapshot: string | null
+          requested_by_user_id: string | null
+          requester_policy_at_request: string
+          service_job_id: string
+          status: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          approval_mode_at_request: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by_name_snapshot?: string | null
+          decided_by_user_id?: string | null
+          decision?: string | null
+          decision_note?: string | null
+          id?: string
+          prior_status: string
+          reason: string
+          requested_at?: string
+          requested_by_name_snapshot?: string | null
+          requested_by_user_id?: string | null
+          requester_policy_at_request: string
+          service_job_id: string
+          status?: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          approval_mode_at_request?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by_name_snapshot?: string | null
+          decided_by_user_id?: string | null
+          decision?: string | null
+          decision_note?: string | null
+          id?: string
+          prior_status?: string
+          reason?: string
+          requested_at?: string
+          requested_by_name_snapshot?: string | null
+          requested_by_user_id?: string | null
+          requester_policy_at_request?: string
+          service_job_id?: string
+          status?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_cancellation_requests_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_job_comments: {
         Row: {
           author_name_snapshot: string | null
