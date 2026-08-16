@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { canTransition, ALL_STATUSES } =
           await import("@/lib/qne/service-jobs/workflow.server");
-        const { canCancelJob, isGenericCompleteBlocked } =
+        const { isGenericCompleteBlocked } =
           await import("@/lib/qne/service-jobs/permissions");
         try {
           const user = await requireAuthenticatedN3User(request);
@@ -96,32 +96,6 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
               { status: 400 },
             );
           }
-          if (effectiveTo === "Cancelled" && !reason) {
-            return Response.json({ error: "Cancellation reason is required." }, { status: 400 });
-          }
-          // WP0E — cancellation is responsibility-controlled. Ordinary
-          // collaborative transitions stay open to any same-tenant teammate,
-          // but cancelling requires Owner/Admin, the creator, or the Primary PIC.
-          if (effectiveTo === "Cancelled") {
-            const actorUserId = user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
-            const allowedToCancel = canCancelJob(
-              { isAdministrator: !!user.isAdministrator, actorUserId },
-              {
-                createdByUserId: job.created_by_user_id ?? null,
-                assignedUserId: job.assigned_user_id ?? null,
-              },
-            );
-            if (!allowedToCancel) {
-              return Response.json(
-                {
-                  error:
-                    "Only the Job creator, the current Primary PIC, or an Administrator can cancel this Job.",
-                },
-                { status: 403 },
-              );
-            }
-          }
-
           const now = new Date().toISOString();
           const performer = {
             performed_by_user_id: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
@@ -132,19 +106,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
             status: string;
             started_at?: string;
             completed_at?: string;
-            cancelled_at?: string;
-            cancellation_reason?: string;
-            cancelled_by_user_id?: string | null;
-            cancelled_by_name_snapshot?: string | null;
           } = { status: effectiveTo };
           if (effectiveTo === "In Progress") patch.started_at = now;
           if (effectiveTo === "Completed") patch.completed_at = now;
-          if (effectiveTo === "Cancelled") {
-            patch.cancelled_at = now;
-            patch.cancellation_reason = reason ?? undefined;
-            patch.cancelled_by_user_id = performer.performed_by_user_id;
-            patch.cancelled_by_name_snapshot = performer.performed_by_name_snapshot;
-          }
 
           const { data: updated, error: upErr } = await supabaseAdmin
             .from("service_jobs")
@@ -158,7 +122,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
           await supabaseAdmin.from("service_job_activity_log").insert({
             tenant_code: user.tenantCode,
             service_job_id: params.jobId,
-            event_type: effectiveTo === "Cancelled" ? "job_cancelled" : "status_changed",
+            event_type: "status_changed",
             old_value: job.status,
             new_value: effectiveTo,
             note: reason ?? note,

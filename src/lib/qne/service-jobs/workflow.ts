@@ -14,14 +14,16 @@ export type JobStatus =
   | "Cancelled";
 
 // WP0E: `Completed` is intentionally NOT a generic user transition.
+// WP0E-R: `Cancelled` is likewise removed — cancellation runs only through
+// the dedicated cancellation process (policy + optional Admin approval).
 const USER_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
-  Draft: ["Open", "Assigned", "Cancelled"],
-  "Pending Approval": ["Cancelled"],
-  Open: ["In Progress", "Cancelled"],
-  Assigned: ["In Progress", "Cancelled"],
-  "In Progress": ["Waiting Customer", "Waiting Vendor", "Cancelled"],
-  "Waiting Customer": ["In Progress", "Cancelled"],
-  "Waiting Vendor": ["In Progress", "Cancelled"],
+  Draft: ["Open", "Assigned"],
+  "Pending Approval": [],
+  Open: ["In Progress"],
+  Assigned: ["In Progress"],
+  "In Progress": ["Waiting Customer", "Waiting Vendor"],
+  "Waiting Customer": ["In Progress"],
+  "Waiting Vendor": ["In Progress"],
   Completed: [],
   Cancelled: [],
 };

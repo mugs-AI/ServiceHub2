@@ -61,17 +61,19 @@ export const ACTIVE_STATUSES: readonly JobStatus[] = [
 
 // User-driven transitions via POST /status. Approve/Reject are separate.
 //
-// WP0E: `Completed` is intentionally NOT a generic user transition. Completion
+// WP0E: `Completed` is intentionally NOT a generic user transition.
+// WP0E-R: `Cancelled` is likewise removed — cancellation runs only through
+// the dedicated cancellation process (policy + optional Admin approval). Completion
 // returns only through its dedicated completion vertical; the generic /status
 // route must reject it so there is no hidden API bypass.
 const USER_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
-  Draft: ["Open", "Assigned", "Cancelled"],
-  "Pending Approval": ["Cancelled"], // approve handled separately
-  Open: ["In Progress", "Cancelled"],
-  Assigned: ["In Progress", "Cancelled"],
-  "In Progress": ["Waiting Customer", "Waiting Vendor", "Cancelled"],
-  "Waiting Customer": ["In Progress", "Cancelled"],
-  "Waiting Vendor": ["In Progress", "Cancelled"],
+  Draft: ["Open", "Assigned"],
+  "Pending Approval": [], // approve/reject handled separately
+  Open: ["In Progress"],
+  Assigned: ["In Progress"],
+  "In Progress": ["Waiting Customer", "Waiting Vendor"],
+  "Waiting Customer": ["In Progress"],
+  "Waiting Vendor": ["In Progress"],
   Completed: [],
   Cancelled: [],
 };
