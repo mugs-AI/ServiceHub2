@@ -41,7 +41,7 @@ type Row = Record<string, unknown>;
 const db: Record<string, Row[]> = {};
 
 interface Filter {
-  kind: "eq" | "neq" | "notIn" | "gte" | "lte";
+  kind: "eq" | "neq" | "notIn" | "notNull" | "gte" | "gt" | "lte" | "lt";
   col: string;
   value: unknown;
 }
@@ -52,8 +52,12 @@ function matches(row: Row, filters: Filter[]): boolean {
     if (f.kind === "eq") return v === f.value;
     if (f.kind === "neq") return v !== f.value;
     if (f.kind === "notIn") return !(f.value as unknown[]).includes(v);
-    if (f.kind === "gte") return String(v ?? "") >= String(f.value);
-    return String(v ?? "") <= String(f.value);
+    if (f.kind === "notNull") return v !== null && v !== undefined;
+    if (v === null || v === undefined) return false;
+    if (f.kind === "gte") return String(v) >= String(f.value);
+    if (f.kind === "gt") return String(v) > String(f.value);
+    if (f.kind === "lte") return String(v) <= String(f.value);
+    return String(v) < String(f.value);
   });
 }
 
@@ -80,8 +84,14 @@ function query(table: string, op: "select" | "update" | "insert" | "delete", pay
     neq: (col: string, value: unknown) => (filters.push({ kind: "neq", col, value }), builder),
     gte: (col: string, value: unknown) => (filters.push({ kind: "gte", col, value }), builder),
     lte: (col: string, value: unknown) => (filters.push({ kind: "lte", col, value }), builder),
+    gt: (col: string, value: unknown) => (filters.push({ kind: "gt", col, value }), builder),
+    lt: (col: string, value: unknown) => (filters.push({ kind: "lt", col, value }), builder),
     or: () => builder,
-    not: (col: string, _op: string, list: string) => {
+    not: (col: string, op: string, list: string | null) => {
+      if (op === "is" || list === null) {
+        filters.push({ kind: "notNull", col, value: null });
+        return builder;
+      }
       const values = list.replace(/[()"]/g, "").split(",");
       filters.push({ kind: "notIn", col, value: values });
       return builder;
