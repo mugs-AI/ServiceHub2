@@ -67,7 +67,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
           }
 
           // Pending Approval cannot advance except via approve/reject.
-          if (job.status === "Pending Approval" && to !== "Cancelled") {
+          if (job.status === "Pending Approval") {
             return Response.json(
               { error: "Pending Approval jobs must be approved or rejected." },
               { status: 400 },
