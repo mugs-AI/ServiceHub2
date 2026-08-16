@@ -110,7 +110,10 @@ export interface TenantSettings {
   travelGps: TravelGpsSettings;
   attachments: AttachmentSettings;
   completion: CompletionSettings;
+  /** WP0E-R — tenant-configurable Service Job cancellation policy. */
+  cancellation: CancellationSettings;
 }
+
 
 export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
   travelGps: {
