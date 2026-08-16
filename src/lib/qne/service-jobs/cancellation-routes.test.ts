@@ -9,6 +9,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CancellationSettings } from "./cancellation";
+// Bind the mocked module registry before any route handler dynamically imports it.
+import * as sessionModule from "@/lib/qne/session/current-user.server";
 
 /* ---------------- session double ---------------- */
 
@@ -251,6 +253,7 @@ const HELPER: FakeUser = {
 };
 
 beforeEach(() => {
+  expect(typeof sessionModule.requireAuthenticatedN3User).toBe("function");
   jobs.clear();
   requests = [];
   activity = [];
@@ -385,7 +388,6 @@ describe("R.8 approval mode lifecycle", () => {
       h.POST({ request: req({ reason: "race a" }), params: { jobId: JOB_ID } }),
       h.POST({ request: req({ reason: "race b" }), params: { jobId: JOB_ID } }),
     ]);
-    console.log("race", a.status, await a.clone().json(), b.status, await b.clone().json());
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     expect(requests.filter((r) => r.status === "pending")).toHaveLength(1);
   });
