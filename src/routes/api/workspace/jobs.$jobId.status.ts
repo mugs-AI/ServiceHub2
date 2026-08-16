@@ -1,7 +1,7 @@
 // POST /api/workspace/jobs/$jobId/status — transition workflow status.
 // Body: { to: JobStatus, note?: string, reason?: string }
 // - Validates transition against workflow.server rules.
-// - Cancellation requires `reason`.
+// - Cancellation is NOT available here (dedicated cancellation process).
 // - Records service_job_activity_log entry.
 // - Deleted jobs cannot be transitioned.
 // - Approve/Reject use dedicated endpoints (not /status).
