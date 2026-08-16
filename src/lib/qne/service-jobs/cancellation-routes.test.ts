@@ -385,6 +385,9 @@ describe("R.8 approval mode lifecycle", () => {
       h.POST({ request: req({ reason: "race a" }), params: { jobId: JOB_ID } }),
       h.POST({ request: req({ reason: "race b" }), params: { jobId: JOB_ID } }),
     ]);
+    if (a.status !== 200 && b.status !== 200) {
+      console.log("race bodies", await a.json(), await b.json());
+    }
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     expect(requests.filter((r) => r.status === "pending")).toHaveLength(1);
   });
