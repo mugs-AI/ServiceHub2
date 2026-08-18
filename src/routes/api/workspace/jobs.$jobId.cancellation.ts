@@ -71,9 +71,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/cancellation")(
         const {
           fetchJobForCancellation,
           fetchActiveRequest,
-          insertPendingRequest,
-          finalizeJobCancellation,
-          appendCancellationActivity,
+          createCancellationRequestAtomic,
+          cancelJobDirectAtomic,
         } = await import("@/lib/qne/service-jobs/cancellation.server");
         const { evaluateCancellationRequest, normalizeReason } = await import(
           "@/lib/qne/service-jobs/cancellation"
@@ -110,60 +109,61 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/cancellation")(
             return Response.json({ error: decision.error }, { status: decision.status });
           }
 
+          // From here the database routine owns the whole effect: state row and
+          // audit row commit together, or nothing commits at all.
           if (decision.effect === "cancel_now") {
-            const result = await finalizeJobCancellation({
+            const result = await cancelJobDirectAtomic({
               tenantCode: user.tenantCode,
               jobId: params.jobId,
               reason: reason as string,
               actor,
             });
-            if (!result.finalized) {
+            if (result.outcome === "job_not_found") {
+              return Response.json({ error: "Job not found." }, { status: 404 });
+            }
+            if (result.outcome === "reason_required") {
+              return Response.json({ error: "A cancellation reason is required." }, { status: 400 });
+            }
+            if (result.outcome !== "cancelled") {
               return Response.json(
                 { error: "This Job is no longer in a cancellable state." },
                 { status: 409 },
               );
             }
-            await appendCancellationActivity({
-              tenantCode: user.tenantCode,
-              jobId: params.jobId,
-              eventType: "job_cancelled",
-              oldValue: job.status,
-              newValue: "Cancelled",
-              note: reason,
-              actor,
-            });
             return Response.json({ ok: true, mode: "direct", cancelled: true, job: result.job });
           }
 
-          const inserted = await insertPendingRequest({
+          const created = await createCancellationRequestAtomic({
             tenantCode: user.tenantCode,
             jobId: params.jobId,
             reason: reason as string,
-            priorStatus: job.status,
             requesterPolicy: settings.requesterPolicy,
             approvalMode: settings.approvalMode,
             actor,
           });
-          if (!inserted.ok) {
+          if (created.outcome === "job_not_found") {
+            return Response.json({ error: "Job not found." }, { status: 404 });
+          }
+          if (created.outcome === "reason_required") {
+            return Response.json({ error: "A cancellation reason is required." }, { status: 400 });
+          }
+          if (created.outcome === "duplicate_active_request") {
             return Response.json(
               { error: "A cancellation request is already awaiting an Owner/Admin decision." },
               { status: 409 },
             );
           }
-          await appendCancellationActivity({
-            tenantCode: user.tenantCode,
-            jobId: params.jobId,
-            eventType: "cancellation_requested",
-            oldValue: job.status,
-            newValue: null,
-            note: reason,
-            actor,
-          });
+          if (created.outcome !== "created") {
+            return Response.json(
+              { error: "This Job is no longer in a cancellable state." },
+              { status: 409 },
+            );
+          }
           return Response.json({
             ok: true,
             mode: "admin_approval_required",
             cancelled: false,
-            request: inserted.row,
+            request: created.request,
           });
         } catch (err) {
           const resp = guardResponse(err);
@@ -175,6 +175,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/cancellation")(
           );
         }
       },
+
     },
   },
 });
