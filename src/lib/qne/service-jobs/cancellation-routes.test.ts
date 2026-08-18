@@ -457,29 +457,28 @@ describe("R.8 approval mode lifecycle", () => {
     expect(dup.status).toBe(409);
 
     // Racing: both callers passed the "no active request" check and both
-    // attempt the insert. The one-active-request constraint admits one.
+    // attempt the atomic create. The one-active-request constraint admits one.
     requests = [];
-    const raceA = await store.insertPendingRequest({
+    const raceInput = {
       tenantCode: "T1",
       jobId: JOB_ID,
-      reason: "race a",
-      priorStatus: "In Progress",
       requesterPolicy: "primary_pic_or_creator",
       approvalMode: "admin_approval_required",
+    };
+    const raceA = await store.createCancellationRequestAtomic({
+      ...raceInput,
+      reason: "race a",
       actor: { userId: "u-pic", name: "PIC" },
     });
-    const raceB = await store.insertPendingRequest({
-      tenantCode: "T1",
-      jobId: JOB_ID,
+    const raceB = await store.createCancellationRequestAtomic({
+      ...raceInput,
       reason: "race b",
-      priorStatus: "In Progress",
-      requesterPolicy: "primary_pic_or_creator",
-      approvalMode: "admin_approval_required",
       actor: { userId: "u-creator", name: "Creator" },
     });
-    expect(raceA.ok).toBe(true);
-    expect(raceB).toEqual({ ok: false, duplicate: true });
+    expect(raceA.outcome).toBe("created");
+    expect(raceB.outcome).toBe("duplicate_active_request");
     expect(requests.filter((r) => r.status === "pending")).toHaveLength(1);
+
   });
 
   it("a Normal User cannot decide", async () => {
