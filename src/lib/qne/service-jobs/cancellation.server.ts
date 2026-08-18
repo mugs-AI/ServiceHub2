@@ -122,6 +122,14 @@ export async function listRequests(
 
 /* ---------------- atomic state changes ---------------- */
 
+/**
+ * The generated RPC argument types are non-nullable; actor identity and notes
+ * are legitimately absent for system-initiated actions.
+ */
+function nullable(value: string | null): string {
+  return value as unknown as string;
+}
+
 function asResult(data: unknown): AtomicCancellationResult {
   const row = (data ?? {}) as Record<string, unknown>;
   return {
@@ -150,8 +158,8 @@ export async function createCancellationRequestAtomic(input: {
     p_reason: input.reason,
     p_requester_policy: input.requesterPolicy,
     p_approval_mode: input.approvalMode,
-    p_actor_user_id: input.actor.userId,
-    p_actor_name: input.actor.name,
+    p_actor_user_id: nullable(input.actor.userId),
+    p_actor_name: nullable(input.actor.name),
   });
   if (error) throw error;
   return asResult(data);
@@ -171,8 +179,8 @@ export async function cancelJobDirectAtomic(input: {
     p_tenant_code: input.tenantCode,
     p_job_id: input.jobId,
     p_reason: input.reason,
-    p_actor_user_id: input.actor.userId,
-    p_actor_name: input.actor.name,
+    p_actor_user_id: nullable(input.actor.userId),
+    p_actor_name: nullable(input.actor.name),
   });
   if (error) throw error;
   return asResult(data);
@@ -195,9 +203,9 @@ export async function decideCancellationAtomic(input: {
     p_tenant_code: input.tenantCode,
     p_request_id: input.requestId,
     p_decision: input.decision,
-    p_note: input.note,
-    p_actor_user_id: input.actor.userId,
-    p_actor_name: input.actor.name,
+    p_note: nullable(input.note),
+    p_actor_user_id: nullable(input.actor.userId),
+    p_actor_name: nullable(input.actor.name),
   });
   if (error) throw error;
   return asResult(data);
