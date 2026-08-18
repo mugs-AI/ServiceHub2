@@ -528,10 +528,11 @@ describe("R.8 approval mode lifecycle", () => {
       note: null,
       actor: { userId: "u-admin", name: "Owner" },
     };
-    const first = await store.decidePendingRequest(claim);
-    const second = await store.decidePendingRequest(claim);
-    expect(first).toBeTruthy();
-    expect(second).toBeNull();
+    const first = await store.decideCancellationAtomic(claim);
+    const second = await store.decideCancellationAtomic(claim);
+    expect(first.outcome).toBe("approved");
+    expect(second.outcome).toBe("already_decided");
+
   });
 
   it("reject preserves the prior Job state and allows a later request", async () => {
