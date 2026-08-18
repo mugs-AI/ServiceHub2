@@ -15,13 +15,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/cancellation/de
         const { requireAdministrator, guardResponse } = await import(
           "@/lib/qne/session/current-user.server"
         );
-        const {
-          fetchJobForCancellation,
-          fetchActiveRequest,
-          decidePendingRequest,
-          finalizeJobCancellation,
-          appendCancellationActivity,
-        } = await import("@/lib/qne/service-jobs/cancellation.server");
+        const { fetchJobForCancellation, fetchActiveRequest, decideCancellationAtomic } =
+          await import("@/lib/qne/service-jobs/cancellation.server");
         const { normalizeReason } = await import("@/lib/qne/service-jobs/cancellation");
         try {
           const user = await requireAdministrator(request);
@@ -48,62 +43,42 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/cancellation/de
             name: user.displayName || user.email || null,
           };
 
-          const claimed = await decidePendingRequest({
+          // One transaction: claim the request, cancel the Job when approved,
+          // and append audit. Partial outcomes cannot be committed.
+          const result = await decideCancellationAtomic({
             tenantCode: user.tenantCode,
             requestId: active.id,
             decision: decision === "approve" ? "approved" : "rejected",
             note,
             actor,
           });
-          if (!claimed) {
+
+          if (result.outcome === "already_decided" || result.outcome === "request_not_found") {
             return Response.json(
               { error: "This cancellation request has already been decided." },
               { status: 409 },
             );
           }
-
-          if (decision === "reject") {
-            await appendCancellationActivity({
-              tenantCode: user.tenantCode,
-              jobId: params.jobId,
-              eventType: "cancellation_rejected",
-              oldValue: active.prior_status,
-              newValue: job.status,
-              note,
-              actor,
-            });
-            return Response.json({ ok: true, decision: "rejected", request: claimed, job });
+          if (result.outcome === "job_not_found") {
+            return Response.json({ error: "Job not found." }, { status: 404 });
           }
-
-          const result = await finalizeJobCancellation({
-            tenantCode: user.tenantCode,
-            jobId: params.jobId,
-            reason: active.reason,
-            actor,
-          });
-          if (!result.finalized) {
+          if (result.outcome === "job_not_cancellable") {
             return Response.json(
               { error: "This Job is no longer in a cancellable state." },
               { status: 409 },
             );
           }
-          await appendCancellationActivity({
-            tenantCode: user.tenantCode,
-            jobId: params.jobId,
-            eventType: "job_cancelled",
-            oldValue: active.prior_status,
-            newValue: "Cancelled",
-            note: `Approved cancellation requested by ${
-              active.requested_by_name_snapshot ?? "a support user"
-            }: ${active.reason}`,
-            actor,
-          });
+          if (result.outcome !== "approved" && result.outcome !== "rejected") {
+            return Response.json({ error: "Invalid decision." }, { status: 400 });
+          }
+
           return Response.json({
             ok: true,
-            decision: "approved",
-            request: claimed,
-            job: result.job,
+            decision: result.outcome,
+            request: result.request,
+            job: result.job ?? job,
           });
+
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;

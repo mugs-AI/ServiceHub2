@@ -88,6 +88,44 @@ let requests: Record<string, unknown>[] = [];
 let activity: Record<string, unknown>[] = [];
 let seq = 0;
 
+/**
+ * Transactional double. The three state changes are single indivisible calls,
+ * exactly as the database routines behave: a failure at any checkpoint rolls
+ * the whole effect back, so a Job can never be cancelled without audit and an
+ * approved request can never survive without a cancelled Job.
+ */
+let failAt: string | null = null;
+
+function checkpoint(name: string) {
+  if (failAt === name) throw new Error(`injected failure at ${name}`);
+}
+
+function tx<T>(work: () => T): T {
+  const jobsSnapshot = new Map(
+    [...jobs.entries()].map(([k, v]) => [k, { ...v }] as [string, JobRow]),
+  );
+  const requestsSnapshot = requests.map((r) => ({ ...r }));
+  const activitySnapshot = activity.map((a) => ({ ...a }));
+  try {
+    return work();
+  } catch (err) {
+    jobs.clear();
+    for (const [k, v] of jobsSnapshot) jobs.set(k, v);
+    requests = requestsSnapshot;
+    activity = activitySnapshot;
+    throw err;
+  }
+}
+
+function cancellableJob(tenant: string, jobId: string): JobRow | { outcome: string } {
+  const job = jobs.get(jobId);
+  if (!job || job.tenant_code !== tenant) return { outcome: "job_not_found" };
+  if (job.is_deleted || job.status === "Cancelled" || job.status === "Completed") {
+    return { outcome: "job_not_cancellable", status: job.status } as { outcome: string };
+  }
+  return job;
+}
+
 const store = {
   fetchJobForCancellation: async (tenant: string, jobId: string) => {
     const job = jobs.get(jobId);
@@ -99,97 +137,133 @@ const store = {
     ) ?? null,
   listRequests: async (tenant: string, jobId: string) =>
     requests.filter((r) => r.tenant_code === tenant && r.service_job_id === jobId),
-  insertPendingRequest: async (input: {
+
+  createCancellationRequestAtomic: async (input: {
     tenantCode: string;
     jobId: string;
     reason: string;
-    priorStatus: string;
     requesterPolicy: string;
     approvalMode: string;
     actor: { userId: string | null; name: string | null };
-  }) => {
-    // Reproduces the partial unique index (tenant, job) WHERE status='pending'.
-    const dup = requests.some(
-      (r) =>
-        r.tenant_code === input.tenantCode &&
-        r.service_job_id === input.jobId &&
-        r.status === "pending",
-    );
-    if (dup) return { ok: false as const, duplicate: true as const };
-    const row = {
-      id: `req-${++seq}`,
-      tenant_code: input.tenantCode,
-      service_job_id: input.jobId,
-      status: "pending",
-      reason: input.reason,
-      prior_status: input.priorStatus,
-      requester_policy_at_request: input.requesterPolicy,
-      approval_mode_at_request: input.approvalMode,
-      requested_by_user_id: input.actor.userId,
-      requested_by_name_snapshot: input.actor.name,
-      requested_at: new Date().toISOString(),
-      decision: null,
-      decided_by_user_id: null,
-      decided_by_name_snapshot: null,
-      decided_at: null,
-      decision_note: null,
-    };
-    requests.push(row);
-    return { ok: true as const, row };
-  },
-  decidePendingRequest: async (input: {
+  }) =>
+    tx(() => {
+      if (!input.reason || !input.reason.trim()) return { outcome: "reason_required" };
+      const job = cancellableJob(input.tenantCode, input.jobId);
+      if ("outcome" in job) return job;
+      // Reproduces the partial unique index (tenant, job) WHERE status='pending'.
+      const dup = requests.some(
+        (r) =>
+          r.tenant_code === input.tenantCode &&
+          r.service_job_id === input.jobId &&
+          r.status === "pending",
+      );
+      if (dup) return { outcome: "duplicate_active_request" };
+      const row = {
+        id: `req-${++seq}`,
+        tenant_code: input.tenantCode,
+        service_job_id: input.jobId,
+        status: "pending",
+        reason: input.reason,
+        prior_status: job.status,
+        requester_policy_at_request: input.requesterPolicy,
+        approval_mode_at_request: input.approvalMode,
+        requested_by_user_id: input.actor.userId,
+        requested_by_name_snapshot: input.actor.name,
+        requested_at: new Date().toISOString(),
+        decision: null,
+        decided_by_user_id: null,
+        decided_by_name_snapshot: null,
+        decided_at: null,
+        decision_note: null,
+      };
+      requests.push(row);
+      checkpoint("request_audit");
+      activity.push({
+        eventType: "cancellation_requested",
+        jobId: input.jobId,
+        note: input.reason,
+      });
+      return { outcome: "created", request: row };
+    }),
+
+  cancelJobDirectAtomic: async (input: {
+    tenantCode: string;
+    jobId: string;
+    reason: string;
+    actor: { userId: string | null; name: string | null };
+  }) =>
+    tx(() => {
+      if (!input.reason || !input.reason.trim()) return { outcome: "reason_required" };
+      const job = cancellableJob(input.tenantCode, input.jobId);
+      if ("outcome" in job) return job;
+      const prior = job.status;
+      job.status = "Cancelled";
+      job.cancelled_at = new Date().toISOString();
+      job.cancellation_reason = input.reason;
+      job.cancelled_by_name_snapshot = input.actor.name;
+      checkpoint("direct_audit");
+      activity.push({
+        eventType: "job_cancelled",
+        jobId: input.jobId,
+        oldValue: prior,
+        note: input.reason,
+      });
+      return { outcome: "cancelled", job: { ...job } };
+    }),
+
+  decideCancellationAtomic: async (input: {
     tenantCode: string;
     requestId: string;
     decision: "approved" | "rejected";
     note: string | null;
     actor: { userId: string | null; name: string | null };
-  }) => {
-    // Conditional UPDATE ... WHERE status='pending' — claims at most once.
-    const row = requests.find(
-      (r) =>
-        r.id === input.requestId &&
-        r.tenant_code === input.tenantCode &&
-        r.status === "pending",
-    );
-    if (!row) return null;
-    row.status = input.decision;
-    row.decision = input.decision;
-    row.decision_note = input.note;
-    row.decided_by_user_id = input.actor.userId;
-    row.decided_by_name_snapshot = input.actor.name;
-    row.decided_at = new Date().toISOString();
-    return { ...row };
-  },
-  finalizeJobCancellation: async (input: {
-    tenantCode: string;
-    jobId: string;
-    reason: string;
-    actor: { userId: string | null; name: string | null };
-  }) => {
-    const job = jobs.get(input.jobId);
-    if (
-      !job ||
-      job.tenant_code !== input.tenantCode ||
-      job.is_deleted ||
-      job.status === "Cancelled" ||
-      job.status === "Completed"
-    ) {
-      return { finalized: false, job: null };
-    }
-    job.status = "Cancelled";
-    job.cancelled_at = new Date().toISOString();
-    job.cancellation_reason = input.reason;
-    job.cancelled_by_name_snapshot = input.actor.name;
-    return { finalized: true, job: { ...job } };
-  },
-  appendCancellationActivity: async (input: Record<string, unknown>) => {
-    activity.push(input);
-  },
+  }) =>
+    tx(() => {
+      const row = requests.find(
+        (r) => r.id === input.requestId && r.tenant_code === input.tenantCode,
+      );
+      if (!row) return { outcome: "request_not_found" };
+      if (row.status !== "pending") return { outcome: "already_decided", status: row.status };
+
+      const job = jobs.get(row.service_job_id as string);
+      if (!job || job.tenant_code !== input.tenantCode) return { outcome: "job_not_found" };
+      // The Job is validated before the request is claimed.
+      if (
+        input.decision === "approved" &&
+        (job.is_deleted || job.status === "Cancelled" || job.status === "Completed")
+      ) {
+        return { outcome: "job_not_cancellable", status: job.status };
+      }
+
+      row.status = input.decision;
+      row.decision = input.decision;
+      row.decision_note = input.note;
+      row.decided_by_user_id = input.actor.userId;
+      row.decided_by_name_snapshot = input.actor.name;
+      row.decided_at = new Date().toISOString();
+
+      if (input.decision === "rejected") {
+        checkpoint("reject_audit");
+        activity.push({ eventType: "cancellation_rejected", jobId: job.id, note: input.note });
+        return { outcome: "rejected", request: { ...row }, job: { ...job } };
+      }
+
+      checkpoint("approve_job");
+      const prior = row.prior_status as string;
+      job.status = "Cancelled";
+      job.cancelled_at = new Date().toISOString();
+      job.cancellation_reason = row.reason as string;
+      job.cancelled_by_name_snapshot = input.actor.name;
+      checkpoint("approve_audit");
+      activity.push({ eventType: "job_cancelled", jobId: job.id, oldValue: prior });
+      return { outcome: "approved", request: { ...row }, job: { ...job } };
+    }),
 };
 
 vi.mock("./cancellation.server", () => store);
 vi.mock("@/lib/qne/service-jobs/cancellation.server", () => store);
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
+
 
 /* ---------------- helpers ---------------- */
 
@@ -258,6 +332,7 @@ beforeEach(() => {
   requests = [];
   activity = [];
   seq = 0;
+  failAt = null;
   session = PIC;
   settings = { requesterPolicy: "primary_pic_or_creator", approvalMode: "admin_approval_required" };
   seedJob();
@@ -383,29 +458,28 @@ describe("R.8 approval mode lifecycle", () => {
     expect(dup.status).toBe(409);
 
     // Racing: both callers passed the "no active request" check and both
-    // attempt the insert. The one-active-request constraint admits one.
+    // attempt the atomic create. The one-active-request constraint admits one.
     requests = [];
-    const raceA = await store.insertPendingRequest({
+    const raceInput = {
       tenantCode: "T1",
       jobId: JOB_ID,
-      reason: "race a",
-      priorStatus: "In Progress",
       requesterPolicy: "primary_pic_or_creator",
       approvalMode: "admin_approval_required",
+    };
+    const raceA = await store.createCancellationRequestAtomic({
+      ...raceInput,
+      reason: "race a",
       actor: { userId: "u-pic", name: "PIC" },
     });
-    const raceB = await store.insertPendingRequest({
-      tenantCode: "T1",
-      jobId: JOB_ID,
+    const raceB = await store.createCancellationRequestAtomic({
+      ...raceInput,
       reason: "race b",
-      priorStatus: "In Progress",
-      requesterPolicy: "primary_pic_or_creator",
-      approvalMode: "admin_approval_required",
       actor: { userId: "u-creator", name: "Creator" },
     });
-    expect(raceA.ok).toBe(true);
-    expect(raceB).toEqual({ ok: false, duplicate: true });
+    expect(raceA.outcome).toBe("created");
+    expect(raceB.outcome).toBe("duplicate_active_request");
     expect(requests.filter((r) => r.status === "pending")).toHaveLength(1);
+
   });
 
   it("a Normal User cannot decide", async () => {
@@ -455,10 +529,11 @@ describe("R.8 approval mode lifecycle", () => {
       note: null,
       actor: { userId: "u-admin", name: "Owner" },
     };
-    const first = await store.decidePendingRequest(claim);
-    const second = await store.decidePendingRequest(claim);
-    expect(first).toBeTruthy();
-    expect(second).toBeNull();
+    const first = await store.decideCancellationAtomic(claim);
+    const second = await store.decideCancellationAtomic(claim);
+    expect(first.outcome).toBe("approved");
+    expect(second.outcome).toBe("already_decided");
+
   });
 
   it("reject preserves the prior Job state and allows a later request", async () => {
@@ -525,5 +600,104 @@ describe("R.9 GET cancellation state", () => {
       params: { jobId: JOB_ID },
     });
     expect((await res.json()).canRequest).toBe(false);
+  });
+});
+
+/* ---------------- R.10 atomicity ---------------- */
+
+describe("R.10 cancellation state changes are all-or-nothing", () => {
+  it("a failure while auditing a direct cancellation leaves the Job untouched", async () => {
+    settings = { requesterPolicy: "primary_pic_or_creator", approvalMode: "direct" };
+    failAt = "direct_audit";
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    const res = await h.POST({ request: req({ reason: "boom" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(jobs.get(JOB_ID)!.status).toBe("In Progress");
+    expect(jobs.get(JOB_ID)!.cancelled_at).toBeNull();
+    expect(activity).toHaveLength(0);
+
+    // The Job is still cancellable once the fault clears.
+    failAt = null;
+    const retry = await h.POST({ request: req({ reason: "for real" }), params: { jobId: JOB_ID } });
+    expect(retry.status).toBe(200);
+    expect(jobs.get(JOB_ID)!.status).toBe("Cancelled");
+    expect(activity.filter((a) => a.eventType === "job_cancelled")).toHaveLength(1);
+  });
+
+  it("a failure while auditing a request leaves no orphan pending request", async () => {
+    failAt = "request_audit";
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    const res = await h.POST({ request: req({ reason: "boom" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(requests).toHaveLength(0);
+    expect(activity).toHaveLength(0);
+
+    failAt = null;
+    const retry = await h.POST({ request: req({ reason: "please cancel" }), params: { jobId: JOB_ID } });
+    expect(retry.status).toBe(200);
+    expect(requests.filter((r) => r.status === "pending")).toHaveLength(1);
+  });
+
+  it("a failure while cancelling on approval leaves the request pending", async () => {
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    await h.POST({ request: req({ reason: "close it" }), params: { jobId: JOB_ID } });
+
+    session = ADMIN;
+    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
+    failAt = "approve_job";
+    const res = await d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(requests[0].status).toBe("pending");
+    expect(requests[0].decided_at).toBeNull();
+    expect(jobs.get(JOB_ID)!.status).toBe("In Progress");
+    expect(activity.filter((a) => a.eventType === "job_cancelled")).toHaveLength(0);
+
+    failAt = null;
+    const retry = await d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } });
+    expect(retry.status).toBe(200);
+    expect(requests[0].status).toBe("approved");
+    expect(jobs.get(JOB_ID)!.status).toBe("Cancelled");
+  });
+
+  it("a failure while auditing an approval rolls back both the claim and the cancellation", async () => {
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    await h.POST({ request: req({ reason: "close it" }), params: { jobId: JOB_ID } });
+
+    session = ADMIN;
+    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
+    failAt = "approve_audit";
+    const res = await d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(requests[0].status).toBe("pending");
+    expect(jobs.get(JOB_ID)!.status).toBe("In Progress");
+    expect(jobs.get(JOB_ID)!.cancellation_reason).toBeNull();
+  });
+
+  it("a failure while auditing a rejection leaves the request pending", async () => {
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    await h.POST({ request: req({ reason: "maybe" }), params: { jobId: JOB_ID } });
+
+    session = ADMIN;
+    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
+    failAt = "reject_audit";
+    const res = await d.POST({ request: req({ decision: "reject" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(requests[0].status).toBe("pending");
+    expect(activity.filter((a) => a.eventType === "cancellation_rejected")).toHaveLength(0);
+  });
+
+  it("approving against a Job that became terminal decides nothing", async () => {
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    await h.POST({ request: req({ reason: "close it" }), params: { jobId: JOB_ID } });
+    // Another path completes the Job before the Admin decides.
+    jobs.get(JOB_ID)!.status = "Completed";
+
+    session = ADMIN;
+    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
+    const res = await d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(409);
+    expect(requests[0].status).toBe("pending");
+    expect(jobs.get(JOB_ID)!.status).toBe("Completed");
+    expect(activity.filter((a) => a.eventType === "job_cancelled")).toHaveLength(0);
   });
 });
