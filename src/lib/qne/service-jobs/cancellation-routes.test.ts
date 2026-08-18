@@ -332,6 +332,7 @@ beforeEach(() => {
   requests = [];
   activity = [];
   seq = 0;
+  failAt = null;
   session = PIC;
   settings = { requesterPolicy: "primary_pic_or_creator", approvalMode: "admin_approval_required" };
   seedJob();
@@ -599,5 +600,104 @@ describe("R.9 GET cancellation state", () => {
       params: { jobId: JOB_ID },
     });
     expect((await res.json()).canRequest).toBe(false);
+  });
+});
+
+/* ---------------- R.10 atomicity ---------------- */
+
+describe("R.10 cancellation state changes are all-or-nothing", () => {
+  it("a failure while auditing a direct cancellation leaves the Job untouched", async () => {
+    settings = { requesterPolicy: "primary_pic_or_creator", approvalMode: "direct" };
+    failAt = "direct_audit";
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    const res = await h.POST({ request: req({ reason: "boom" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(jobs.get(JOB_ID)!.status).toBe("In Progress");
+    expect(jobs.get(JOB_ID)!.cancelled_at).toBeNull();
+    expect(activity).toHaveLength(0);
+
+    // The Job is still cancellable once the fault clears.
+    failAt = null;
+    const retry = await h.POST({ request: req({ reason: "for real" }), params: { jobId: JOB_ID } });
+    expect(retry.status).toBe(200);
+    expect(jobs.get(JOB_ID)!.status).toBe("Cancelled");
+    expect(activity.filter((a) => a.eventType === "job_cancelled")).toHaveLength(1);
+  });
+
+  it("a failure while auditing a request leaves no orphan pending request", async () => {
+    failAt = "request_audit";
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    const res = await h.POST({ request: req({ reason: "boom" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(requests).toHaveLength(0);
+    expect(activity).toHaveLength(0);
+
+    failAt = null;
+    const retry = await h.POST({ request: req({ reason: "please cancel" }), params: { jobId: JOB_ID } });
+    expect(retry.status).toBe(200);
+    expect(requests.filter((r) => r.status === "pending")).toHaveLength(1);
+  });
+
+  it("a failure while cancelling on approval leaves the request pending", async () => {
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    await h.POST({ request: req({ reason: "close it" }), params: { jobId: JOB_ID } });
+
+    session = ADMIN;
+    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
+    failAt = "approve_job";
+    const res = await d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(requests[0].status).toBe("pending");
+    expect(requests[0].decided_at).toBeNull();
+    expect(jobs.get(JOB_ID)!.status).toBe("In Progress");
+    expect(activity.filter((a) => a.eventType === "job_cancelled")).toHaveLength(0);
+
+    failAt = null;
+    const retry = await d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } });
+    expect(retry.status).toBe(200);
+    expect(requests[0].status).toBe("approved");
+    expect(jobs.get(JOB_ID)!.status).toBe("Cancelled");
+  });
+
+  it("a failure while auditing an approval rolls back both the claim and the cancellation", async () => {
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    await h.POST({ request: req({ reason: "close it" }), params: { jobId: JOB_ID } });
+
+    session = ADMIN;
+    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
+    failAt = "approve_audit";
+    const res = await d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(requests[0].status).toBe("pending");
+    expect(jobs.get(JOB_ID)!.status).toBe("In Progress");
+    expect(jobs.get(JOB_ID)!.cancellation_reason).toBeNull();
+  });
+
+  it("a failure while auditing a rejection leaves the request pending", async () => {
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    await h.POST({ request: req({ reason: "maybe" }), params: { jobId: JOB_ID } });
+
+    session = ADMIN;
+    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
+    failAt = "reject_audit";
+    const res = await d.POST({ request: req({ decision: "reject" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(500);
+    expect(requests[0].status).toBe("pending");
+    expect(activity.filter((a) => a.eventType === "cancellation_rejected")).toHaveLength(0);
+  });
+
+  it("approving against a Job that became terminal decides nothing", async () => {
+    const h = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation");
+    await h.POST({ request: req({ reason: "close it" }), params: { jobId: JOB_ID } });
+    // Another path completes the Job before the Admin decides.
+    jobs.get(JOB_ID)!.status = "Completed";
+
+    session = ADMIN;
+    const d = await handlers("@/routes/api/workspace/jobs.$jobId.cancellation.decision");
+    const res = await d.POST({ request: req({ decision: "approve" }), params: { jobId: JOB_ID } });
+    expect(res.status).toBe(409);
+    expect(requests[0].status).toBe("pending");
+    expect(jobs.get(JOB_ID)!.status).toBe("Completed");
+    expect(activity.filter((a) => a.eventType === "job_cancelled")).toHaveLength(0);
   });
 });
