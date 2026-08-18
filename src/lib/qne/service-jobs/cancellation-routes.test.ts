@@ -88,6 +88,44 @@ let requests: Record<string, unknown>[] = [];
 let activity: Record<string, unknown>[] = [];
 let seq = 0;
 
+/**
+ * Transactional double. The three state changes are single indivisible calls,
+ * exactly as the database routines behave: a failure at any checkpoint rolls
+ * the whole effect back, so a Job can never be cancelled without audit and an
+ * approved request can never survive without a cancelled Job.
+ */
+let failAt: string | null = null;
+
+function checkpoint(name: string) {
+  if (failAt === name) throw new Error(`injected failure at ${name}`);
+}
+
+function tx<T>(work: () => T): T {
+  const jobsSnapshot = new Map(
+    [...jobs.entries()].map(([k, v]) => [k, { ...v }] as [string, JobRow]),
+  );
+  const requestsSnapshot = requests.map((r) => ({ ...r }));
+  const activitySnapshot = activity.map((a) => ({ ...a }));
+  try {
+    return work();
+  } catch (err) {
+    jobs.clear();
+    for (const [k, v] of jobsSnapshot) jobs.set(k, v);
+    requests = requestsSnapshot;
+    activity = activitySnapshot;
+    throw err;
+  }
+}
+
+function cancellableJob(tenant: string, jobId: string): JobRow | { outcome: string } {
+  const job = jobs.get(jobId);
+  if (!job || job.tenant_code !== tenant) return { outcome: "job_not_found" };
+  if (job.is_deleted || job.status === "Cancelled" || job.status === "Completed") {
+    return { outcome: "job_not_cancellable", status: job.status } as { outcome: string };
+  }
+  return job;
+}
+
 const store = {
   fetchJobForCancellation: async (tenant: string, jobId: string) => {
     const job = jobs.get(jobId);
@@ -99,97 +137,133 @@ const store = {
     ) ?? null,
   listRequests: async (tenant: string, jobId: string) =>
     requests.filter((r) => r.tenant_code === tenant && r.service_job_id === jobId),
-  insertPendingRequest: async (input: {
+
+  createCancellationRequestAtomic: async (input: {
     tenantCode: string;
     jobId: string;
     reason: string;
-    priorStatus: string;
     requesterPolicy: string;
     approvalMode: string;
     actor: { userId: string | null; name: string | null };
-  }) => {
-    // Reproduces the partial unique index (tenant, job) WHERE status='pending'.
-    const dup = requests.some(
-      (r) =>
-        r.tenant_code === input.tenantCode &&
-        r.service_job_id === input.jobId &&
-        r.status === "pending",
-    );
-    if (dup) return { ok: false as const, duplicate: true as const };
-    const row = {
-      id: `req-${++seq}`,
-      tenant_code: input.tenantCode,
-      service_job_id: input.jobId,
-      status: "pending",
-      reason: input.reason,
-      prior_status: input.priorStatus,
-      requester_policy_at_request: input.requesterPolicy,
-      approval_mode_at_request: input.approvalMode,
-      requested_by_user_id: input.actor.userId,
-      requested_by_name_snapshot: input.actor.name,
-      requested_at: new Date().toISOString(),
-      decision: null,
-      decided_by_user_id: null,
-      decided_by_name_snapshot: null,
-      decided_at: null,
-      decision_note: null,
-    };
-    requests.push(row);
-    return { ok: true as const, row };
-  },
-  decidePendingRequest: async (input: {
+  }) =>
+    tx(() => {
+      if (!input.reason || !input.reason.trim()) return { outcome: "reason_required" };
+      const job = cancellableJob(input.tenantCode, input.jobId);
+      if ("outcome" in job) return job;
+      // Reproduces the partial unique index (tenant, job) WHERE status='pending'.
+      const dup = requests.some(
+        (r) =>
+          r.tenant_code === input.tenantCode &&
+          r.service_job_id === input.jobId &&
+          r.status === "pending",
+      );
+      if (dup) return { outcome: "duplicate_active_request" };
+      const row = {
+        id: `req-${++seq}`,
+        tenant_code: input.tenantCode,
+        service_job_id: input.jobId,
+        status: "pending",
+        reason: input.reason,
+        prior_status: job.status,
+        requester_policy_at_request: input.requesterPolicy,
+        approval_mode_at_request: input.approvalMode,
+        requested_by_user_id: input.actor.userId,
+        requested_by_name_snapshot: input.actor.name,
+        requested_at: new Date().toISOString(),
+        decision: null,
+        decided_by_user_id: null,
+        decided_by_name_snapshot: null,
+        decided_at: null,
+        decision_note: null,
+      };
+      requests.push(row);
+      checkpoint("request_audit");
+      activity.push({
+        eventType: "cancellation_requested",
+        jobId: input.jobId,
+        note: input.reason,
+      });
+      return { outcome: "created", request: row };
+    }),
+
+  cancelJobDirectAtomic: async (input: {
+    tenantCode: string;
+    jobId: string;
+    reason: string;
+    actor: { userId: string | null; name: string | null };
+  }) =>
+    tx(() => {
+      if (!input.reason || !input.reason.trim()) return { outcome: "reason_required" };
+      const job = cancellableJob(input.tenantCode, input.jobId);
+      if ("outcome" in job) return job;
+      const prior = job.status;
+      job.status = "Cancelled";
+      job.cancelled_at = new Date().toISOString();
+      job.cancellation_reason = input.reason;
+      job.cancelled_by_name_snapshot = input.actor.name;
+      checkpoint("direct_audit");
+      activity.push({
+        eventType: "job_cancelled",
+        jobId: input.jobId,
+        oldValue: prior,
+        note: input.reason,
+      });
+      return { outcome: "cancelled", job: { ...job } };
+    }),
+
+  decideCancellationAtomic: async (input: {
     tenantCode: string;
     requestId: string;
     decision: "approved" | "rejected";
     note: string | null;
     actor: { userId: string | null; name: string | null };
-  }) => {
-    // Conditional UPDATE ... WHERE status='pending' — claims at most once.
-    const row = requests.find(
-      (r) =>
-        r.id === input.requestId &&
-        r.tenant_code === input.tenantCode &&
-        r.status === "pending",
-    );
-    if (!row) return null;
-    row.status = input.decision;
-    row.decision = input.decision;
-    row.decision_note = input.note;
-    row.decided_by_user_id = input.actor.userId;
-    row.decided_by_name_snapshot = input.actor.name;
-    row.decided_at = new Date().toISOString();
-    return { ...row };
-  },
-  finalizeJobCancellation: async (input: {
-    tenantCode: string;
-    jobId: string;
-    reason: string;
-    actor: { userId: string | null; name: string | null };
-  }) => {
-    const job = jobs.get(input.jobId);
-    if (
-      !job ||
-      job.tenant_code !== input.tenantCode ||
-      job.is_deleted ||
-      job.status === "Cancelled" ||
-      job.status === "Completed"
-    ) {
-      return { finalized: false, job: null };
-    }
-    job.status = "Cancelled";
-    job.cancelled_at = new Date().toISOString();
-    job.cancellation_reason = input.reason;
-    job.cancelled_by_name_snapshot = input.actor.name;
-    return { finalized: true, job: { ...job } };
-  },
-  appendCancellationActivity: async (input: Record<string, unknown>) => {
-    activity.push(input);
-  },
+  }) =>
+    tx(() => {
+      const row = requests.find(
+        (r) => r.id === input.requestId && r.tenant_code === input.tenantCode,
+      );
+      if (!row) return { outcome: "request_not_found" };
+      if (row.status !== "pending") return { outcome: "already_decided", status: row.status };
+
+      const job = jobs.get(row.service_job_id as string);
+      if (!job || job.tenant_code !== input.tenantCode) return { outcome: "job_not_found" };
+      // The Job is validated before the request is claimed.
+      if (
+        input.decision === "approved" &&
+        (job.is_deleted || job.status === "Cancelled" || job.status === "Completed")
+      ) {
+        return { outcome: "job_not_cancellable", status: job.status };
+      }
+
+      row.status = input.decision;
+      row.decision = input.decision;
+      row.decision_note = input.note;
+      row.decided_by_user_id = input.actor.userId;
+      row.decided_by_name_snapshot = input.actor.name;
+      row.decided_at = new Date().toISOString();
+
+      if (input.decision === "rejected") {
+        checkpoint("reject_audit");
+        activity.push({ eventType: "cancellation_rejected", jobId: job.id, note: input.note });
+        return { outcome: "rejected", request: { ...row }, job: { ...job } };
+      }
+
+      checkpoint("approve_job");
+      const prior = row.prior_status as string;
+      job.status = "Cancelled";
+      job.cancelled_at = new Date().toISOString();
+      job.cancellation_reason = row.reason as string;
+      job.cancelled_by_name_snapshot = input.actor.name;
+      checkpoint("approve_audit");
+      activity.push({ eventType: "job_cancelled", jobId: job.id, oldValue: prior });
+      return { outcome: "approved", request: { ...row }, job: { ...job } };
+    }),
 };
 
 vi.mock("./cancellation.server", () => store);
 vi.mock("@/lib/qne/service-jobs/cancellation.server", () => store);
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
+
 
 /* ---------------- helpers ---------------- */
 
