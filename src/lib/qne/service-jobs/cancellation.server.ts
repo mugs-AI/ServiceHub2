@@ -1,9 +1,16 @@
-// WP0E-R — durable cancellation request repository (server-only).
+// WP0E-R — durable cancellation repository (server-only).
 //
-// Every function is tenant-scoped: the tenant code is always the
-// server-resolved one from the validated N3 session, never the browser's.
-// State changes use conditional UPDATEs so that double-click, retry and
-// competing Admin decisions cannot produce two final effects.
+// Integrity correction: every state change is now performed by a single
+// database routine that owns the whole effect — validation, the state row and
+// its audit row — inside one transaction. The application no longer issues a
+// sequence of independent writes, so a failure part-way can never leave a
+// cancelled Job without audit, an approved request without a cancelled Job, or
+// a pending request without its "cancellation_requested" entry.
+//
+// Every call is tenant-scoped with the server-resolved tenant code, never the
+// browser's. Concurrency is settled inside the routine (row locks plus the
+// one-active-request partial unique index), so double-clicks, retries and
+// competing Admin decisions collapse to at most one final effect.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
@@ -42,8 +49,31 @@ export interface ActorSnapshot {
   name: string | null;
 }
 
+/** Outcome vocabulary shared by the three atomic routines. */
+export type CancellationOutcome =
+  | "created"
+  | "cancelled"
+  | "approved"
+  | "rejected"
+  | "reason_required"
+  | "job_not_found"
+  | "job_not_cancellable"
+  | "duplicate_active_request"
+  | "request_not_found"
+  | "already_decided"
+  | "invalid_decision";
+
+export interface AtomicCancellationResult {
+  outcome: CancellationOutcome;
+  request?: CancellationRequestRow;
+  job?: Record<string, unknown>;
+  status?: string;
+}
+
 const JOB_COLUMNS =
   "id, status, is_deleted, created_by_user_id, assigned_user_id, cancelled_at, cancellation_reason, cancelled_by_name_snapshot";
+
+/* ---------------- reads ---------------- */
 
 /** Tenant + job id lookup. Cross-tenant ids simply do not resolve. */
 export async function fetchJobForCancellation(
@@ -90,122 +120,85 @@ export async function listRequests(
   return (data ?? []) as CancellationRequestRow[];
 }
 
-/**
- * Insert a pending request. The partial unique index
- * (tenant_code, service_job_id) WHERE status='pending' makes racing duplicate
- * requests fail at the database, not in application code.
- */
-export async function insertPendingRequest(input: {
-  tenantCode: string;
-  jobId: string;
-  reason: string;
-  priorStatus: string;
-  requesterPolicy: string;
-  approvalMode: string;
-  actor: ActorSnapshot;
-}): Promise<{ ok: true; row: CancellationRequestRow } | { ok: false; duplicate: true }> {
-  const { data, error } = await supabaseAdmin
-    .from("service_job_cancellation_requests")
-    .insert({
-      tenant_code: input.tenantCode,
-      service_job_id: input.jobId,
-      status: "pending",
-      reason: input.reason,
-      prior_status: input.priorStatus,
-      requester_policy_at_request: input.requesterPolicy,
-      approval_mode_at_request: input.approvalMode,
-      requested_by_user_id: input.actor.userId,
-      requested_by_name_snapshot: input.actor.name,
-    })
-    .select("*")
-    .single();
-  if (error) {
-    // 23505 = unique_violation on the one-active-request index.
-    if ((error as { code?: string }).code === "23505") return { ok: false, duplicate: true };
-    throw error;
-  }
-  return { ok: true, row: data as CancellationRequestRow };
+/* ---------------- atomic state changes ---------------- */
+
+function asResult(data: unknown): AtomicCancellationResult {
+  const row = (data ?? {}) as Record<string, unknown>;
+  return {
+    outcome: String(row.outcome ?? "job_not_found") as CancellationOutcome,
+    request: (row.request as CancellationRequestRow | undefined) ?? undefined,
+    job: (row.job as Record<string, unknown> | undefined) ?? undefined,
+    status: (row.status as string | undefined) ?? undefined,
+  };
 }
 
 /**
- * Atomically claim a pending request for a decision. Returns null when another
- * Admin (or a retry of the same click) already decided it.
+ * Creates the pending request together with its audit entry in one
+ * transaction. Duplicate active requests are refused by the database.
  */
-export async function decidePendingRequest(input: {
+export async function createCancellationRequestAtomic(input: {
+  tenantCode: string;
+  jobId: string;
+  reason: string;
+  requesterPolicy: string;
+  approvalMode: string;
+  actor: ActorSnapshot;
+}): Promise<AtomicCancellationResult> {
+  const { data, error } = await supabaseAdmin.rpc("sh_cancellation_request_create", {
+    p_tenant_code: input.tenantCode,
+    p_job_id: input.jobId,
+    p_reason: input.reason,
+    p_requester_policy: input.requesterPolicy,
+    p_approval_mode: input.approvalMode,
+    p_actor_user_id: input.actor.userId,
+    p_actor_name: input.actor.name,
+  });
+  if (error) throw error;
+  return asResult(data);
+}
+
+/**
+ * Direct-mode cancellation: the Job transition and its audit entry are one
+ * indivisible effect. A retry finds the Job terminal and changes nothing.
+ */
+export async function cancelJobDirectAtomic(input: {
+  tenantCode: string;
+  jobId: string;
+  reason: string;
+  actor: ActorSnapshot;
+}): Promise<AtomicCancellationResult> {
+  const { data, error } = await supabaseAdmin.rpc("sh_cancellation_cancel_direct", {
+    p_tenant_code: input.tenantCode,
+    p_job_id: input.jobId,
+    p_reason: input.reason,
+    p_actor_user_id: input.actor.userId,
+    p_actor_name: input.actor.name,
+  });
+  if (error) throw error;
+  return asResult(data);
+}
+
+/**
+ * Owner/Admin decision. On approval the request claim, the Job cancellation
+ * and the audit entry commit together or not at all; the Job is validated and
+ * locked before the request is claimed, so a non-cancellable Job can never
+ * leave a committed "approved" request behind.
+ */
+export async function decideCancellationAtomic(input: {
   tenantCode: string;
   requestId: string;
   decision: "approved" | "rejected";
   note: string | null;
   actor: ActorSnapshot;
-}): Promise<CancellationRequestRow | null> {
-  const { data, error } = await supabaseAdmin
-    .from("service_job_cancellation_requests")
-    .update({
-      status: input.decision,
-      decision: input.decision,
-      decision_note: input.note,
-      decided_by_user_id: input.actor.userId,
-      decided_by_name_snapshot: input.actor.name,
-      decided_at: new Date().toISOString(),
-    })
-    .eq("tenant_code", input.tenantCode)
-    .eq("id", input.requestId)
-    .eq("status", "pending")
-    .select("*")
-    .maybeSingle();
-  if (error) throw error;
-  return (data as CancellationRequestRow | null) ?? null;
-}
-
-/**
- * Conditional finalization: only a Job that is not already terminal is moved
- * to Cancelled. A second call is a no-op and reports `alreadyFinal`.
- */
-export async function finalizeJobCancellation(input: {
-  tenantCode: string;
-  jobId: string;
-  reason: string;
-  actor: ActorSnapshot;
-}): Promise<{ finalized: boolean; job: Record<string, unknown> | null }> {
-  const now = new Date().toISOString();
-  const { data, error } = await supabaseAdmin
-    .from("service_jobs")
-    .update({
-      status: "Cancelled",
-      cancelled_at: now,
-      cancellation_reason: input.reason,
-      cancelled_by_user_id: input.actor.userId,
-      cancelled_by_name_snapshot: input.actor.name,
-    })
-    .eq("tenant_code", input.tenantCode)
-    .eq("id", input.jobId)
-    .eq("is_deleted", false)
-    .not("status", "in", '("Cancelled","Completed")')
-    .select("*")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return { finalized: false, job: null };
-  return { finalized: true, job: data as Record<string, unknown> };
-}
-
-export async function appendCancellationActivity(input: {
-  tenantCode: string;
-  jobId: string;
-  eventType: string;
-  oldValue: string | null;
-  newValue: string | null;
-  note: string | null;
-  actor: ActorSnapshot;
-}): Promise<void> {
-  const { error } = await supabaseAdmin.from("service_job_activity_log").insert({
-    tenant_code: input.tenantCode,
-    service_job_id: input.jobId,
-    event_type: input.eventType,
-    old_value: input.oldValue,
-    new_value: input.newValue,
-    note: input.note,
-    performed_by_user_id: input.actor.userId,
-    performed_by_name_snapshot: input.actor.name,
+}): Promise<AtomicCancellationResult> {
+  const { data, error } = await supabaseAdmin.rpc("sh_cancellation_decide", {
+    p_tenant_code: input.tenantCode,
+    p_request_id: input.requestId,
+    p_decision: input.decision,
+    p_note: input.note,
+    p_actor_user_id: input.actor.userId,
+    p_actor_name: input.actor.name,
   });
   if (error) throw error;
+  return asResult(data);
 }
