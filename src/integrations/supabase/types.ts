@@ -2204,6 +2204,39 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      sh_cancellation_cancel_direct: {
+        Args: {
+          p_actor_name: string
+          p_actor_user_id: string
+          p_job_id: string
+          p_reason: string
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
+      sh_cancellation_decide: {
+        Args: {
+          p_actor_name: string
+          p_actor_user_id: string
+          p_decision: string
+          p_note: string
+          p_request_id: string
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
+      sh_cancellation_request_create: {
+        Args: {
+          p_actor_name: string
+          p_actor_user_id: string
+          p_approval_mode: string
+          p_job_id: string
+          p_reason: string
+          p_requester_policy: string
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
       sh_next_job_number: {
         Args: { p_date_key: string; p_tenant_code: string }
         Returns: number
