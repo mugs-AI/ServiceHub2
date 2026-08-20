@@ -6,6 +6,7 @@ import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
 import { formatMY } from "@/lib/format-date";
 import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
+import { CustomerSubscriptionsPanel } from "@/components/qne/CustomerSubscriptionsPanel";
 
 
 
@@ -307,6 +308,15 @@ function SupportWorkspace() {
             if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
         />
+      )}
+
+      {customer && (
+        <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+          <CustomerSubscriptionsPanel
+            key={customer.customer_code}
+            customerCode={customer.customer_code}
+          />
+        </section>
       )}
 
       <section id="workspace-jobs" className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
