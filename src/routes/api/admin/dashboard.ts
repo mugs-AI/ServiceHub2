@@ -60,13 +60,21 @@ export const Route = createFileRoute("/api/admin/dashboard")({
           // Distinct customer counts by entitlement status — SHARED read model,
           // the same module that powers the Due Soon / Overdue list pages, so a
           // KPI can never disagree with the page it links to.
+          // Status is derived from expiry_date against today's Malaysia date
+          // (never from the cached snapshot status), so a KPI can never
+          // disagree with the list page it links to.
           const ent = await import("@/lib/qne/entitlements/query.server");
-          const [dueSoonRecords, overdueRecords] = await Promise.all([
-            ent.loadEntitlementRecords(user.tenantCode, "due_soon"),
-            ent.loadEntitlementRecords(user.tenantCode, "overdue"),
-          ]);
-          const dueSoonCustomers = ent.totalsFromRecords(dueSoonRecords).customers;
-          const overdueCustomers = ent.totalsFromRecords(overdueRecords).customers;
+          const clock = await ent.entitlementClock(user.tenantCode);
+          const candidates = ent.deriveRows(
+            await ent.loadCandidateRecords(user.tenantCode),
+            clock,
+          );
+          const dueSoonCustomers = ent.totalsFromRecords(
+            candidates.filter((r) => r.subscription_status === "Due Soon"),
+          ).customers;
+          const overdueCustomers = ent.totalsFromRecords(
+            candidates.filter((r) => r.subscription_status === "Overdue"),
+          ).customers;
 
 
           // User workload — group by assignee for active jobs.
