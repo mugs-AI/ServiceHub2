@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  calendarDayDiff,
-  classifyEntitlement,
-  toCalendarDate,
-} from "./temporal";
+import { calendarDayDiff, classifyEntitlement, toCalendarDate } from "./temporal";
 
 const D = 30;
 function c(expiry: string | null | undefined, today = "2026-08-20", dueSoonDays = D) {

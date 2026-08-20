@@ -84,8 +84,7 @@ describe("approval matrix over derived status", () => {
   ): { status: string; reason: string | null } {
     if (selected !== null) {
       const s = derive(selected).toLowerCase();
-      if (s === "overdue")
-        return { status: "Pending Approval", reason: "Overdue Entitlement" };
+      if (s === "overdue") return { status: "Pending Approval", reason: "Overdue Entitlement" };
       if (s !== "active" && s !== "due soon")
         return { status: "Pending Approval", reason: "No Active Entitlement" };
       return { status: "Draft", reason: null };
@@ -94,8 +93,7 @@ describe("approval matrix over derived status", () => {
     const hasActiveish = derived.some((s) => s === "Active" || s === "Due Soon");
     const hasOverdue = derived.some((s) => s === "Overdue");
     if (hasActiveish) return { status: "Draft", reason: null };
-    if (hasOverdue)
-      return { status: "Pending Approval", reason: "Overdue Entitlement" };
+    if (hasOverdue) return { status: "Pending Approval", reason: "Overdue Entitlement" };
     return { status: "Pending Approval", reason: "No Active Entitlement" };
   }
 
@@ -174,9 +172,7 @@ describe("derived lists and KPI agreement", () => {
     const totals = totalsFromRecords(overdue);
     const groups = groupByCustomer(overdue, "expiry_desc");
     expect(totals.customers).toBe(groups.length);
-    expect(totals.entitlements).toBe(
-      groups.reduce((n, g) => n + g.entitlement_count, 0),
-    );
+    expect(totals.entitlements).toBe(groups.reduce((n, g) => n + g.entitlement_count, 0));
   });
 
   it("filtering still works over derived rows", () => {

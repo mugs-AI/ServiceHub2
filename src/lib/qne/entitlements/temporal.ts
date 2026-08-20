@@ -23,11 +23,7 @@ export function toCalendarDate(input: string | null | undefined): string | null 
   const [y, m, d] = s.split("-").map(Number);
   if (m < 1 || m > 12 || d < 1 || d > 31) return null;
   const dt = new Date(Date.UTC(y, m - 1, d));
-  if (
-    dt.getUTCFullYear() !== y ||
-    dt.getUTCMonth() !== m - 1 ||
-    dt.getUTCDate() !== d
-  ) {
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
     return null;
   }
   return s;
@@ -68,16 +64,12 @@ export interface EntitlementTemporalResult {
  * The expiry day itself is 0 days remaining (Due Soon); the next Malaysia day
  * is -1 (Overdue).
  */
-export function classifyEntitlement(
-  input: EntitlementTemporalInput,
-): EntitlementTemporalResult {
+export function classifyEntitlement(input: EntitlementTemporalInput): EntitlementTemporalResult {
   const expiry = toCalendarDate(input.expiryDate);
   const today = toCalendarDate(input.todayMalaysiaDate);
   if (!expiry || !today) return { remainingDays: null, status: "Unknown" };
   const threshold =
-    Number.isFinite(input.dueSoonDays) && input.dueSoonDays > 0
-      ? Math.floor(input.dueSoonDays)
-      : 0;
+    Number.isFinite(input.dueSoonDays) && input.dueSoonDays > 0 ? Math.floor(input.dueSoonDays) : 0;
   const remainingDays = calendarDayDiff(today, expiry);
   if (remainingDays < 0) return { remainingDays, status: "Overdue" };
   if (remainingDays <= threshold) return { remainingDays, status: "Due Soon" };

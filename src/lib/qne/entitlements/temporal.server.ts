@@ -5,10 +5,7 @@
 //   * the tenant's due_soon_days policy (default 30)
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  classifyEntitlement,
-  type EntitlementTemporalStatus,
-} from "./temporal";
+import { classifyEntitlement, type EntitlementTemporalStatus } from "./temporal";
 
 export * from "./temporal";
 
@@ -63,10 +60,7 @@ export function deriveRow<T extends DerivableRow>(row: T, clock: EntitlementCloc
   return { ...row, remaining_days: remainingDays, subscription_status: status };
 }
 
-export function deriveRows<T extends DerivableRow>(
-  rows: T[],
-  clock: EntitlementClock,
-): T[] {
+export function deriveRows<T extends DerivableRow>(rows: T[], clock: EntitlementClock): T[] {
   return rows.map((r) => deriveRow(r, clock));
 }
 
