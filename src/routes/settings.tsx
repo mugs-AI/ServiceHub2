@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { AdminOnly } from "@/components/qne/AdminOnly";
 import { CancellationSettingsCard } from "@/components/qne/CancellationSettingsCard";
+import { RoleDiagnostics } from "@/components/qne/RoleDiagnostics";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 
@@ -14,12 +15,13 @@ export const Route = createFileRoute("/settings")({
   ),
 });
 
-type TabKey = "renewal" | "adhoc";
+type TabKey = "renewal" | "adhoc" | "diagnostics";
 type CycleUnit = "day" | "month" | "year";
 
 const TAB_LABEL: Record<TabKey, string> = {
   renewal: "Renewal Stock Mapping",
   adhoc: "Ad Hoc Stock Mapping",
+  diagnostics: "Role Diagnostics",
 };
 
 interface MappingSummary {
@@ -161,7 +163,7 @@ function Settings() {
       <CancellationSettingsCard onNotify={notify} />
 
       <div className="flex gap-1 border-b">
-        {(["renewal", "adhoc"] as TabKey[]).map((k) => (
+        {(["renewal", "adhoc", "diagnostics"] as TabKey[]).map((k) => (
           <button
             key={k}
             onClick={() => setTab(k)}
@@ -188,28 +190,42 @@ function Settings() {
         </div>
       )}
 
-      <MappingTab
-        key={tab}
-        tab={tab}
-        categories={activeCategories}
-        reloadKey={reloadKey}
-        onSaved={(msg) => {
-          notify("ok", msg);
-          bumpReload();
-        }}
-        onError={(msg) => notify("err", msg)}
-      />
+      {tab === "diagnostics" ? (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-foreground">Role Diagnostics</h2>
+          <p className="text-xs text-muted-foreground">
+            Read-only view of how this signed-in session resolved its N3 identity
+            and Administrator authority. Values come from the authenticated
+            session only.
+          </p>
+          <RoleDiagnostics />
+        </section>
+      ) : (
+        <>
+          <MappingTab
+            key={tab}
+            tab={tab}
+            categories={activeCategories}
+            reloadKey={reloadKey}
+            onSaved={(msg) => {
+              notify("ok", msg);
+              bumpReload();
+            }}
+            onError={(msg) => notify("err", msg)}
+          />
 
-      <ConfiguredMappings
-        tab={tab}
-        categories={activeCategories}
-        reloadKey={reloadKey}
-        onChange={(msg) => {
-          notify("ok", msg);
-          bumpReload();
-        }}
-        onError={(msg) => notify("err", msg)}
-      />
+          <ConfiguredMappings
+            tab={tab}
+            categories={activeCategories}
+            reloadKey={reloadKey}
+            onChange={(msg) => {
+              notify("ok", msg);
+              bumpReload();
+            }}
+            onError={(msg) => notify("err", msg)}
+          />
+        </>
+      )}
 
       <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3 text-sm">
         <span className="text-muted-foreground">
