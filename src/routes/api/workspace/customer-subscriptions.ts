@@ -36,6 +36,16 @@ export const Route = createFileRoute("/api/workspace/customer-subscriptions")({
             .in("subscription_status", ["Active", "Due Soon", "Overdue"]);
           if (error) throw error;
 
+          // Current-time truth: stored subscription_status / remaining_days
+          // are caches written by the last sync. Re-derive both from
+          // expiry_date against today's Malaysia calendar date and the
+          // tenant due_soon_days policy (server-resolved) before returning.
+          const { entitlementClock, deriveRows } = await import(
+            "@/lib/qne/entitlements/temporal.server"
+          );
+          const clock = await entitlementClock(user.tenantCode);
+          const derived = deriveRows(data ?? [], clock);
+
           // Maintenance first, then alphabetical by category. Within a
           // category: Active, Due Soon, Overdue, Unknown; then earliest
           // expiry first; then stock_code A–Z.
@@ -45,7 +55,7 @@ export const Route = createFileRoute("/api/workspace/customer-subscriptions")({
             overdue: 2,
             unknown: 3,
           };
-          const rows = (data ?? []).sort((a, b) => {
+          const rows = derived.sort((a, b) => {
             const aM = (a.subscription_category ?? "").toLowerCase() === "maintenance" ? 0 : 1;
             const bM = (b.subscription_category ?? "").toLowerCase() === "maintenance" ? 0 : 1;
             if (aM !== bM) return aM - bM;
