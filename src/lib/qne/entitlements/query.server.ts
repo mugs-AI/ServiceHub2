@@ -11,9 +11,16 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadAllPaginated } from "@/lib/qne/sync/pagination.server";
 import type { EntitlementRecord, EntitlementStatusKey } from "./types";
+import {
+  CANDIDATE_SNAPSHOT_STATUSES,
+  deriveRows,
+  entitlementClock,
+  type EntitlementClock,
+} from "./temporal.server";
 
 export type { EntitlementRecord, EntitlementStatusKey } from "./types";
 export * from "./grouping";
+export * from "./temporal.server";
 import { totalsFromRecords, type EntitlementTotals } from "./grouping";
 
 export const STATUS_LABEL: Record<EntitlementStatusKey, string> = {
