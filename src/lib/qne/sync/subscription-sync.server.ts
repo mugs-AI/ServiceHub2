@@ -27,6 +27,8 @@ import {
   N3HttpError,
   type N3TenantContext,
 } from "./n3.server";
+import { classifyEntitlement } from "@/lib/qne/entitlements/temporal";
+import { malaysiaToday } from "@/lib/qne/entitlements/temporal.server";
 import { runWithSyncLog, SyncNotReadyError, type SyncResult } from "./log.server";
 import { loadAllPaginated } from "./pagination.server";
 
