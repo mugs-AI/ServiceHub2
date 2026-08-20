@@ -166,6 +166,10 @@ export const Route = createFileRoute("/api/workspace/jobs")({
               status = "Pending Approval";
               requiresApproval = true;
               approvalReason = "Overdue Entitlement";
+            } else if (s !== "active" && s !== "due soon") {
+              status = "Pending Approval";
+              requiresApproval = true;
+              approvalReason = "No Active Entitlement";
             }
           } else {
             const hasActiveish = (subs ?? []).some((s) =>
