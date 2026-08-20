@@ -441,10 +441,23 @@ export function resolveEffectiveQuantity(qty: number | null | undefined): Quanti
   return { effective: qty, fractional: !Number.isInteger(qty) };
 }
 
-function computeStatus(daysLeft: number, dueSoonDays: number): SubscriptionStatus {
-  if (daysLeft < 0) return "Overdue";
-  if (daysLeft <= dueSoonDays) return "Due Soon";
-  return "Active";
+// Temporal classification is delegated to the ONE shared classifier so a
+// sync-time status can never diverge from a read-time status. Expiry-date
+// calculation, quantity handling and source reconciliation are unchanged.
+function computeTemporal(
+  expiryDate: string | null | undefined,
+  todayMalaysia: string,
+  dueSoonDays: number,
+): { daysLeft: number; status: SubscriptionStatus } {
+  const r = classifyEntitlement({
+    expiryDate,
+    todayMalaysiaDate: todayMalaysia,
+    dueSoonDays,
+  });
+  return {
+    daysLeft: r.remainingDays ?? 0,
+    status: (r.status === "Unknown" ? "Overdue" : r.status) as SubscriptionStatus,
+  };
 }
 
 function normalizeStockKey(v: string | null | undefined): string {
@@ -1610,16 +1623,18 @@ async function rebuildCurrentSnapshots(
     else existingByLegacy.set(lk, [r]);
   }
 
-  const now = Date.now();
+  const todayMalaysia = malaysiaToday();
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
   const consumedIds = new Set<string>();
 
   for (const [, ev] of latestByKey) {
-    const expiryMs = new Date(ev.expiry_date ?? 0).getTime();
-    const daysLeft = Math.ceil((expiryMs - now) / 86400000);
-    const status = computeStatus(daysLeft, dueSoonDays);
+    const { daysLeft, status } = computeTemporal(
+      ev.expiry_date,
+      todayMalaysia,
+      dueSoonDays,
+    );
     const row: Record<string, unknown> = {
       tenant_code: tenantCode,
       customer_code: ev.customer_code,
