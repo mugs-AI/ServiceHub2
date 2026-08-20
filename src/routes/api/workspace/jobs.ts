@@ -107,7 +107,7 @@ export const Route = createFileRoute("/api/workspace/jobs")({
           //    entitlement we route to Pending Approval; Active/Due Soon
           //    routes to Draft. When no entitlement is selected, we fall
           //    back to inventory-based classification.
-          const { data: subs, error: subsErr } = await supabaseAdmin
+          const { data: subsRaw, error: subsErr } = await supabaseAdmin
             .from("customer_subscription_snapshots")
             .select(
               "id, subscription_category, stock_code, n3_stock_id, expiry_date, subscription_status",
@@ -116,6 +116,16 @@ export const Route = createFileRoute("/api/workspace/jobs")({
             .eq("customer_code", customerCode)
             .in("subscription_status", ACTIVE_STATUSES);
           if (subsErr) throw subsErr;
+
+          // Current-time authority: the persisted status is only a cache. The
+          // server re-derives Active / Due Soon / Overdue from expiry_date
+          // against today's Malaysia calendar date and the tenant
+          // due_soon_days policy. The browser cannot forge this.
+          const { entitlementClock, deriveRows } = await import(
+            "@/lib/qne/entitlements/temporal.server"
+          );
+          const entClock = await entitlementClock(user.tenantCode);
+          const subs = deriveRows(subsRaw ?? [], entClock);
 
           // 3) Optional selected entitlement — verify it belongs to this
           //    tenant/customer before we snapshot it onto the job.
