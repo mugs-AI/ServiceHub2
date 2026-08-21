@@ -32,6 +32,7 @@ interface HealthResponse {
 interface AdminSummary {
   jobsToday: number;
   pendingApproval: number;
+  cancellationRequests: number;
   waitingCustomer: number;
   waitingVendor: number;
   dueSoonCustomers: number;
@@ -176,9 +177,10 @@ function AdminDashboard() {
             {opsErr}
           </p>
         )}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-7">
           <StatLink to="/support"><StatCard label="Jobs Today" value={s?.jobsToday ?? "—"} tone="blue" /></StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "pending_approval" }}><StatCard label="Pending Approval" value={s?.pendingApproval ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "pending_approval" }}><StatCard label="Job Approvals" value={s?.pendingApproval ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "cancellation_requests" }}><StatCard label="Cancellation Requests" value={s?.cancellationRequests ?? "—"} tone="red" /></StatLink>
           <StatLink to="/jobs/pending" search={{ queueType: "waiting_customer" }}><StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" /></StatLink>
           <StatLink to="/jobs/pending" search={{ queueType: "waiting_vendor" }}><StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" /></StatLink>
           <StatLink to="/customers/due-soon"><StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" /></StatLink>

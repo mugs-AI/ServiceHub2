@@ -123,8 +123,27 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           });
           const paged = rows.slice((page - 1) * pageSize, page * pageSize);
 
+          // Owner/Admin only: flag Jobs that carry an active cancellation
+          // request. The Job keeps its truthful operational status and appears
+          // exactly once; Normal Users receive no tenant-wide cancellation
+          // metadata. One extra query per page, never per row.
+          let jobs = paged as Array<Record<string, unknown>>;
+          if (user.isAdministrator && paged.length > 0) {
+            const { pendingCancellationJobIds } = await import(
+              "@/lib/qne/service-jobs/cancellation.server"
+            );
+            const flagged = await pendingCancellationJobIds(
+              user.tenantCode,
+              paged.map((r) => r.id),
+            );
+            jobs = paged.map((r) => ({
+              ...r,
+              has_active_cancellation_request: flagged.has(r.id),
+            }));
+          }
+
           return Response.json({
-            jobs: paged,
+            jobs,
             total: count ?? rows.length,
             page,
             pageSize,

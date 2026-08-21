@@ -113,10 +113,22 @@ export const Route = createFileRoute("/api/admin/dashboard")({
             (a, b) => b.total - a.total,
           );
 
+          // Cancellation decisions are NOT Job approvals: the Job keeps its
+          // operational status while a separate request awaits an Owner/Admin
+          // decision. Counted through the shared read model so the KPI, the
+          // decision queue and the Pending Queue flag always agree.
+          const { countPendingCancellationRequests } = await import(
+            "@/lib/qne/service-jobs/cancellation.server"
+          );
+          const cancellationRequests = await countPendingCancellationRequests(
+            user.tenantCode,
+          );
+
           return Response.json({
             summary: {
               jobsToday: rToday.count ?? 0,
               pendingApproval: rApproval.count ?? 0,
+              cancellationRequests,
               waitingCustomer: rWaitCust.count ?? 0,
               waitingVendor: rWaitVend.count ?? 0,
               dueSoonCustomers,
