@@ -13,7 +13,8 @@ type QueueType =
   | "open_unassigned"
   | "assigned_not_started"
   | "waiting_customer"
-  | "waiting_vendor";
+  | "waiting_vendor"
+  | "cancellation_requested";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
@@ -116,39 +117,56 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
 
           // Sort in memory: priority weight then oldest waiting.
           const weight: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
-          const rows = (data ?? []).slice().sort((a, b) => {
+          let rows = (data ?? []).slice().sort((a, b) => {
             const pw = (weight[a.priority] ?? 3) - (weight[b.priority] ?? 3);
             if (pw !== 0) return pw;
             return a.created_at.localeCompare(b.created_at);
           });
-          const paged = rows.slice((page - 1) * pageSize, page * pageSize);
 
-          // Owner/Admin only: flag Jobs that carry an active cancellation
-          // request. The Job keeps its truthful operational status and appears
-          // exactly once; Normal Users receive no tenant-wide cancellation
-          // metadata. One extra query per page, never per row.
-          let jobs = paged as Array<Record<string, unknown>>;
-          if (user.isAdministrator && paged.length > 0) {
-            const { pendingCancellationJobIds } = await import(
-              "@/lib/qne/service-jobs/cancellation.server"
+          // Shared cancellation-state awareness. Every authenticated
+          // same-tenant user may know that a Job they can already see carries
+          // an active cancellation request; no request detail is ever exposed
+          // here. One query per result set, never per row.
+          const { pendingCancellationJobIds } = await import(
+            "@/lib/qne/service-jobs/cancellation.server"
+          );
+          const cancellationOnly = queueType === "cancellation_requested";
+          let flagged: Set<string>;
+          let total: number;
+          if (cancellationOnly) {
+            // Filter before pagination and count so `total` means "matching
+            // cancellation-requested Jobs".
+            flagged = await pendingCancellationJobIds(
+              user.tenantCode,
+              rows.map((r) => r.id),
             );
-            const flagged = await pendingCancellationJobIds(
+            rows = rows.filter((r) => flagged.has(r.id));
+            total = rows.length;
+          } else {
+            total = count ?? rows.length;
+            flagged = new Set();
+          }
+          const paged = rows.slice((page - 1) * pageSize, page * pageSize);
+          if (!cancellationOnly && paged.length > 0) {
+            flagged = await pendingCancellationJobIds(
               user.tenantCode,
               paged.map((r) => r.id),
             );
-            jobs = paged.map((r) => ({
-              ...r,
-              has_active_cancellation_request: flagged.has(r.id),
-            }));
           }
+
+          const jobs = paged.map((r) => ({
+            ...r,
+            has_active_cancellation_request: flagged.has(r.id),
+          }));
 
           return Response.json({
             jobs,
-            total: count ?? rows.length,
+            total,
             page,
             pageSize,
           });
         } catch (err) {
+
           const resp = guardResponse(err);
           if (resp) return resp;
           console.error("[workspace/jobs/pending] failed", err);
