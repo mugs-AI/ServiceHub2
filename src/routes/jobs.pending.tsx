@@ -24,7 +24,10 @@ interface CancellationRow {
   prior_status: string;
 }
 
+/** Admin decision-queue key (also used by the Admin Dashboard deep link). */
 const CANCELLATION_QUEUE = "cancellation_requests";
+/** Safe Workspace queue key used by Normal Users for the same visible tab. */
+const CANCELLATION_WORKSPACE_QUEUE = "cancellation_requested";
 
 interface QueueRow {
   id: string;
@@ -54,9 +57,9 @@ const QUEUE_TABS = [
   { key: "pending_approval", label: "Job Approvals", emptyMsg: "No Job Approvals pending.", adminOnly: false },
   {
     key: CANCELLATION_QUEUE,
-    label: "Cancellation Requests",
-    emptyMsg: "No cancellation requests awaiting a decision.",
-    adminOnly: true,
+    label: "Cancellation Requested",
+    emptyMsg: "No jobs with a pending cancellation request.",
+    adminOnly: false,
   },
   { key: "open_unassigned", label: "Open · Unassigned", emptyMsg: "No Open unassigned jobs.", adminOnly: false },
   { key: "assigned_not_started", label: "Assigned", emptyMsg: "No Assigned jobs.", adminOnly: false },
@@ -101,7 +104,11 @@ function PendingQueuePage() {
   const { currentUser } = useSession();
   const isAdmin = !!currentUser?.isAdministrator;
   const visibleTabs = QUEUE_TABS.filter((t) => !t.adminOnly || isAdmin);
-  const cancellationView = queueType === CANCELLATION_QUEUE && isAdmin;
+  const isCancellationTab =
+    queueType === CANCELLATION_QUEUE || queueType === CANCELLATION_WORKSPACE_QUEUE;
+  // Owner/Admin keep the rich decision queue; Normal Users get the safe,
+  // Job-state-only Workspace view of the very same tab.
+  const cancellationView = isCancellationTab && isAdmin;
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -125,7 +132,8 @@ function PendingQueuePage() {
         return;
       }
 
-      if (queueType) sp.set("queueType", queueType);
+      if (isCancellationTab) sp.set("queueType", CANCELLATION_WORKSPACE_QUEUE);
+      else if (queueType) sp.set("queueType", queueType);
       if (technicianFilter) sp.set("technician", technicianFilter);
       if (excludeMe) sp.set("excludeMe", "1");
       const res = await fetch(`/api/workspace/jobs/pending?${sp.toString()}`, {
@@ -141,7 +149,16 @@ function PendingQueuePage() {
     } finally {
       setLoading(false);
     }
-  }, [queueType, q, priority, technicianFilter, excludeMe, page, cancellationView]);
+  }, [
+    queueType,
+    q,
+    priority,
+    technicianFilter,
+    excludeMe,
+    page,
+    cancellationView,
+    isCancellationTab,
+  ]);
 
   useEffect(() => {
     void reload();
@@ -202,7 +219,8 @@ function PendingQueuePage() {
 
       <div className="flex flex-wrap gap-1 rounded-lg border bg-card p-1">
         {visibleTabs.map((t) => {
-          const active = t.key === queueType;
+          const active =
+            t.key === CANCELLATION_QUEUE ? isCancellationTab : t.key === queueType;
           return (
             <button
               key={t.key || "all"}
@@ -262,7 +280,9 @@ function PendingQueuePage() {
       )}
       {!loading && rows.length === 0 && cancelRows.length === 0 && !err && (
         <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
-          {QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg ?? "No jobs."}
+          {(isCancellationTab
+            ? QUEUE_TABS.find((t) => t.key === CANCELLATION_QUEUE)?.emptyMsg
+            : QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg) ?? "No jobs."}
         </div>
       )}
 
@@ -273,7 +293,7 @@ function PendingQueuePage() {
               <button
                 type="button"
                 onClick={() => openRequest(r)}
-                className="block w-full rounded-lg border bg-background p-3 text-left shadow-sm hover:bg-accent/40"
+                className="block w-full rounded-lg border-2 border-red-300 border-l-4 border-l-red-500 bg-red-50 p-3 text-left shadow-sm hover:bg-red-100"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-mono text-xs font-semibold text-primary">
@@ -320,7 +340,11 @@ function PendingQueuePage() {
               <button
                 type="button"
                 onClick={() => open(r)}
-                className="block w-full rounded-lg border bg-background p-3 text-left shadow-sm hover:bg-accent/40"
+                className={`block w-full rounded-lg border p-3 text-left shadow-sm ${
+                  r.has_active_cancellation_request
+                    ? "border-red-300 border-l-4 border-l-red-500 bg-red-50 hover:bg-red-100"
+                    : "bg-background hover:bg-accent/40"
+                }`}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-mono text-xs font-semibold text-primary">
