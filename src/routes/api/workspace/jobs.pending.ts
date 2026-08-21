@@ -13,7 +13,8 @@ type QueueType =
   | "open_unassigned"
   | "assigned_not_started"
   | "waiting_customer"
-  | "waiting_vendor";
+  | "waiting_vendor"
+  | "cancellation_requested";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
