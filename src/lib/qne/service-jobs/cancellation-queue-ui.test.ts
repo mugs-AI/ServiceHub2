@@ -38,10 +38,24 @@ describe("Admin Dashboard source contract", () => {
 });
 
 describe("Pending Queue source contract", () => {
-  it("hides the Cancellation Requests tab from Normal Users", () => {
-    expect(pending).toContain("adminOnly: true");
-    expect(pending).toContain("QUEUE_TABS.filter((t) => !t.adminOnly || isAdmin)");
+  it("shows one Cancellation Requested tab to every authenticated user", () => {
+    expect(pending).toContain('label: "Cancellation Requested"');
+    expect(pending).not.toContain("adminOnly: true");
     expect(pending).toContain("currentUser?.isAdministrator");
+  });
+
+  it("keeps the rich decision queue Admin-only and routes Normal Users to the safe Workspace filter", () => {
+    expect(pending).toContain("const cancellationView = isCancellationTab && isAdmin");
+    expect(pending).toContain('CANCELLATION_WORKSPACE_QUEUE = "cancellation_requested"');
+    expect(pending).toContain(
+      'if (isCancellationTab) sp.set("queueType", CANCELLATION_WORKSPACE_QUEUE);',
+    );
+  });
+
+  it("highlights the whole card for a Job with an active cancellation request", () => {
+    expect(pending).toContain("r.has_active_cancellation_request");
+    expect(pending).toContain("border-l-red-500");
+    expect(pending).toContain("bg-red-50");
   });
 
   it("renders request context and the awaiting-decision badge", () => {

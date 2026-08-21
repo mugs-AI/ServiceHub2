@@ -309,14 +309,103 @@ describe("GET /api/workspace/jobs/pending cancellation flag", () => {
     expect(body.jobs[0].has_active_cancellation_request).toBe(true);
   });
 
-  it("sends no tenant-wide cancellation metadata to a Normal User", async () => {
+  it("shares the safe boolean with a Normal User and nothing else", async () => {
     const job = seedJob();
     seedRequest(job);
     session = { tenantCode: "T1", isAdministrator: false };
     const h = await handlers(PATH);
     const res = await h.GET({ request: get("https://app.test/api/workspace/jobs/pending") });
     const body = (await res.json()) as { jobs: Row[] };
-    expect(body.jobs[0].has_active_cancellation_request).toBeUndefined();
+    expect(body.jobs[0].has_active_cancellation_request).toBe(true);
+    const serialized = JSON.stringify(body);
+    for (const forbidden of [
+      "requested_by",
+      "requested_at",
+      "prior_status",
+      "reason",
+      "request_id",
+      "decision",
+    ]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
+
+  it("does not flag a Job whose pending request belongs to another tenant", async () => {
+    const job = seedJob();
+    seedRequest(job, { tenant_code: "T2" });
+    const h = await handlers(PATH);
+    const res = await h.GET({ request: get("https://app.test/api/workspace/jobs/pending") });
+    const body = (await res.json()) as { jobs: Row[] };
+    expect(body.jobs[0].has_active_cancellation_request).toBe(false);
+  });
+});
+
+/* ---------------- shared cancellation_requested filter ---------------- */
+
+describe("GET /api/workspace/jobs/pending?queueType=cancellation_requested", () => {
+  const PATH = "@/routes/api/workspace/jobs.pending";
+  const URL_BASE =
+    "https://app.test/api/workspace/jobs/pending?queueType=cancellation_requested";
+
+  it("returns only Jobs with an active request, for a Normal User", async () => {
+    const flagged = seedJob({ id: "job-a", job_number: "JB26082101" });
+    seedJob({ id: "job-b", job_number: "JB26082102" });
+    const decided = seedJob({ id: "job-c", job_number: "JB26082103" });
+    seedRequest(flagged);
+    seedRequest(decided, { status: "approved" });
+    session = { tenantCode: "T1", isAdministrator: false };
+    const h = await handlers(PATH);
+    const res = await h.GET({ request: get(URL_BASE) });
+    const body = (await res.json()) as { jobs: Row[]; total: number };
+    expect(body.total).toBe(1);
+    expect(body.jobs).toHaveLength(1);
+    expect(body.jobs[0].job_number).toBe("JB26082101");
+    expect(body.jobs[0].status).toBe("Open");
+    expect(body.jobs[0].has_active_cancellation_request).toBe(true);
+  });
+
+  it("excludes deleted Jobs and other tenants", async () => {
+    const del = seedJob({ id: "job-del", is_deleted: true });
+    seedRequest(del);
+    const other = seedJob({ id: "job-x", tenant_code: "T2" });
+    seedRequest(other, { tenant_code: "T2" });
+    const h = await handlers(PATH);
+    const res = await h.GET({ request: get(URL_BASE) });
+    expect(((await res.json()) as { total: number }).total).toBe(0);
+  });
+
+  it("sorts by priority then oldest and paginates after cancellation filtering", async () => {
+    const low = seedJob({ id: "job-low", job_number: "JB-LOW", priority: "Low" });
+    const high = seedJob({
+      id: "job-high",
+      job_number: "JB-HIGH",
+      priority: "High",
+      created_at: "2026-08-21T03:00:00.000Z",
+    });
+    const plain = seedJob({ id: "job-plain", job_number: "JB-PLAIN", priority: "High" });
+    void plain;
+    seedRequest(low);
+    seedRequest(high);
+    const h = await handlers(PATH);
+    const first = await h.GET({ request: get(`${URL_BASE}&pageSize=1&page=1`) });
+    const b1 = (await first.json()) as { jobs: Row[]; total: number };
+    expect(b1.total).toBe(2);
+    expect(b1.jobs[0].job_number).toBe("JB-HIGH");
+    const second = await h.GET({ request: get(`${URL_BASE}&pageSize=1&page=2`) });
+    const b2 = (await second.json()) as { jobs: Row[] };
+    expect(b2.jobs[0].job_number).toBe("JB-LOW");
+  });
+
+  it("still honours the priority filter", async () => {
+    const high = seedJob({ id: "job-h", priority: "High" });
+    const lowJob = seedJob({ id: "job-l", priority: "Low" });
+    seedRequest(high);
+    seedRequest(lowJob);
+    const h = await handlers(PATH);
+    const res = await h.GET({ request: get(`${URL_BASE}&priority=Low`) });
+    const body = (await res.json()) as { jobs: Row[]; total: number };
+    expect(body.total).toBe(1);
+    expect(body.jobs[0].priority).toBe("Low");
   });
 
   it("drops the flag once the request is decided", async () => {
