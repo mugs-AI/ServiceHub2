@@ -59,6 +59,7 @@ import { Route as ApiDiagnosticsTypeRouteImport } from './routes/api/diagnostics
 import { Route as ApiDashboardMyWorkRouteImport } from './routes/api/dashboard/my-work'
 import { Route as ApiAuthConnectRouteImport } from './routes/api/auth/connect'
 import { Route as ApiAdminDashboardRouteImport } from './routes/api/admin/dashboard'
+import { Route as ApiAdminCancellationRequestsRouteImport } from './routes/api/admin/cancellation-requests'
 import { Route as ApiAdminAllowlistRouteImport } from './routes/api/admin/allowlist'
 import { Route as ApiWorkspaceJobsSummaryRouteImport } from './routes/api/workspace/jobs.summary'
 import { Route as ApiWorkspaceJobsPendingRouteImport } from './routes/api/workspace/jobs.pending'
@@ -344,6 +345,12 @@ const ApiAdminDashboardRoute = ApiAdminDashboardRouteImport.update({
   path: '/api/admin/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminCancellationRequestsRoute =
+  ApiAdminCancellationRequestsRouteImport.update({
+    id: '/api/admin/cancellation-requests',
+    path: '/api/admin/cancellation-requests',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminAllowlistRoute = ApiAdminAllowlistRouteImport.update({
   id: '/api/admin/allowlist',
   path: '/api/admin/allowlist',
@@ -499,6 +506,7 @@ export interface FileRoutesByFullPath {
   '/jobs/pending': typeof JobsPendingRoute
   '/customers/': typeof CustomersIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
+  '/api/admin/cancellation-requests': typeof ApiAdminCancellationRequestsRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
@@ -573,6 +581,7 @@ export interface FileRoutesByTo {
   '/jobs/pending': typeof JobsPendingRoute
   '/customers': typeof CustomersIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
+  '/api/admin/cancellation-requests': typeof ApiAdminCancellationRequestsRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
@@ -649,6 +658,7 @@ export interface FileRoutesById {
   '/jobs/pending': typeof JobsPendingRoute
   '/customers/': typeof CustomersIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
+  '/api/admin/cancellation-requests': typeof ApiAdminCancellationRequestsRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
   '/api/auth/connect': typeof ApiAuthConnectRoute
   '/api/dashboard/my-work': typeof ApiDashboardMyWorkRoute
@@ -726,6 +736,7 @@ export interface FileRouteTypes {
     | '/jobs/pending'
     | '/customers/'
     | '/api/admin/allowlist'
+    | '/api/admin/cancellation-requests'
     | '/api/admin/dashboard'
     | '/api/auth/connect'
     | '/api/dashboard/my-work'
@@ -800,6 +811,7 @@ export interface FileRouteTypes {
     | '/jobs/pending'
     | '/customers'
     | '/api/admin/allowlist'
+    | '/api/admin/cancellation-requests'
     | '/api/admin/dashboard'
     | '/api/auth/connect'
     | '/api/dashboard/my-work'
@@ -875,6 +887,7 @@ export interface FileRouteTypes {
     | '/jobs/pending'
     | '/customers/'
     | '/api/admin/allowlist'
+    | '/api/admin/cancellation-requests'
     | '/api/admin/dashboard'
     | '/api/auth/connect'
     | '/api/dashboard/my-work'
@@ -948,6 +961,7 @@ export interface RootRouteChildren {
   JobsNewRoute: typeof JobsNewRoute
   JobsPendingRoute: typeof JobsPendingRoute
   ApiAdminAllowlistRoute: typeof ApiAdminAllowlistRoute
+  ApiAdminCancellationRequestsRoute: typeof ApiAdminCancellationRequestsRoute
   ApiAdminDashboardRoute: typeof ApiAdminDashboardRoute
   ApiAuthConnectRoute: typeof ApiAuthConnectRoute
   ApiDashboardMyWorkRoute: typeof ApiDashboardMyWorkRoute
@@ -1334,6 +1348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/cancellation-requests': {
+      id: '/api/admin/cancellation-requests'
+      path: '/api/admin/cancellation-requests'
+      fullPath: '/api/admin/cancellation-requests'
+      preLoaderRoute: typeof ApiAdminCancellationRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/allowlist': {
       id: '/api/admin/allowlist'
       path: '/api/admin/allowlist'
@@ -1610,6 +1631,7 @@ const rootRouteChildren: RootRouteChildren = {
   JobsNewRoute: JobsNewRoute,
   JobsPendingRoute: JobsPendingRoute,
   ApiAdminAllowlistRoute: ApiAdminAllowlistRoute,
+  ApiAdminCancellationRequestsRoute: ApiAdminCancellationRequestsRoute,
   ApiAdminDashboardRoute: ApiAdminDashboardRoute,
   ApiAuthConnectRoute: ApiAuthConnectRoute,
   ApiDashboardMyWorkRoute: ApiDashboardMyWorkRoute,

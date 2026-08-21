@@ -210,3 +210,139 @@ export async function decideCancellationAtomic(input: {
   if (error) throw error;
   return asResult(data);
 }
+
+/* ---------------- shared pending-decision read model ---------------- */
+//
+// One helper serves the Owner/Admin Dashboard KPI, the Owner/Admin decision
+// queue and the "Cancellation Requested" flag in the ordinary Pending Queue,
+// so those three surfaces can never disagree. Reads only: no RPC, no writes.
+// "Actionable" means status = pending AND the Job still exists in the same
+// tenant and is not soft-deleted.
+
+export interface PendingCancellationQueueRow {
+  request_id: string;
+  service_job_id: string;
+  job_number: string;
+  subject: string;
+  customer_code: string;
+  customer_name: string | null;
+  job_status: string;
+  priority: string;
+  assigned_user_id: string | null;
+  assigned_user_name: string | null;
+  requested_by_name: string | null;
+  requested_at: string;
+  reason: string;
+  prior_status: string;
+}
+
+interface RawPendingRequest {
+  id: string;
+  service_job_id: string;
+  reason: string;
+  prior_status: string;
+  requested_at: string;
+  requested_by_name_snapshot: string | null;
+}
+
+const PENDING_SCAN_LIMIT = 1000;
+
+async function loadPendingRequests(tenantCode: string): Promise<RawPendingRequest[]> {
+  const { data, error } = await supabaseAdmin
+    .from("service_job_cancellation_requests")
+    .select("id, service_job_id, reason, prior_status, requested_at, requested_by_name_snapshot")
+    .eq("tenant_code", tenantCode)
+    .eq("status", "pending")
+    .order("requested_at", { ascending: true })
+    .limit(PENDING_SCAN_LIMIT);
+  if (error) throw error;
+  return (data ?? []) as RawPendingRequest[];
+}
+
+interface QueueJobRow {
+  id: string;
+  job_number: string;
+  subject: string;
+  customer_code_snapshot: string;
+  customer_name_snapshot: string | null;
+  status: string;
+  priority: string;
+  assigned_user_id: string | null;
+  assigned_user_name_snapshot: string | null;
+}
+
+async function loadJobsForRequests(
+  tenantCode: string,
+  jobIds: string[],
+): Promise<Map<string, QueueJobRow>> {
+  const map = new Map<string, QueueJobRow>();
+  if (jobIds.length === 0) return map;
+  const { data, error } = await supabaseAdmin
+    .from("service_jobs")
+    .select(
+      "id, job_number, subject, customer_code_snapshot, customer_name_snapshot, status, priority, assigned_user_id, assigned_user_name_snapshot",
+    )
+    .eq("tenant_code", tenantCode)
+    .eq("is_deleted", false)
+    .in("id", jobIds);
+  if (error) throw error;
+  for (const row of (data ?? []) as QueueJobRow[]) map.set(row.id, row);
+  return map;
+}
+
+/** Full actionable pending queue, oldest request first. */
+export async function loadPendingCancellationQueue(
+  tenantCode: string,
+): Promise<PendingCancellationQueueRow[]> {
+  const pending = await loadPendingRequests(tenantCode);
+  const jobs = await loadJobsForRequests(
+    tenantCode,
+    pending.map((r) => r.service_job_id),
+  );
+  const rows: PendingCancellationQueueRow[] = [];
+  for (const r of pending) {
+    const job = jobs.get(r.service_job_id);
+    if (!job) continue; // deleted or missing Job — not actionable
+    rows.push({
+      request_id: r.id,
+      service_job_id: job.id,
+      job_number: job.job_number,
+      subject: job.subject,
+      customer_code: job.customer_code_snapshot,
+      customer_name: job.customer_name_snapshot,
+      job_status: job.status,
+      priority: job.priority,
+      assigned_user_id: job.assigned_user_id,
+      assigned_user_name: job.assigned_user_name_snapshot,
+      requested_by_name: r.requested_by_name_snapshot,
+      requested_at: r.requested_at,
+      reason: r.reason,
+      prior_status: r.prior_status,
+    });
+  }
+  return rows;
+}
+
+/** Dashboard KPI — actionable pending cancellation decisions for the tenant. */
+export async function countPendingCancellationRequests(tenantCode: string): Promise<number> {
+  return (await loadPendingCancellationQueue(tenantCode)).length;
+}
+
+/**
+ * Owner/Admin flag source for the ordinary Pending Queue. One extra query for
+ * the whole page rather than one per Job row.
+ */
+export async function pendingCancellationJobIds(
+  tenantCode: string,
+  jobIds: string[],
+): Promise<Set<string>> {
+  if (jobIds.length === 0) return new Set();
+  const { data, error } = await supabaseAdmin
+    .from("service_job_cancellation_requests")
+    .select("service_job_id")
+    .eq("tenant_code", tenantCode)
+    .eq("status", "pending")
+    .in("service_job_id", jobIds);
+  if (error) throw error;
+  return new Set(((data ?? []) as { service_job_id: string }[]).map((r) => r.service_job_id));
+}

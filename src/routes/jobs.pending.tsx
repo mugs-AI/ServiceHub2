@@ -3,8 +3,28 @@ import { useCallback, useEffect, useState } from "react";
 
 import { getStoredToken } from "@/lib/qne/tokens";
 import { useTabs } from "@/lib/tabs";
+import { useSession } from "@/lib/qne/session-context";
 import { formatMYDateTime } from "@/lib/format-date";
 import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
+
+/** Owner/Admin decision queue row (GET /api/admin/cancellation-requests). */
+interface CancellationRow {
+  request_id: string;
+  service_job_id: string;
+  job_number: string;
+  subject: string;
+  customer_code: string;
+  customer_name: string | null;
+  job_status: string;
+  priority: string;
+  assigned_user_name: string | null;
+  requested_by_name: string | null;
+  requested_at: string;
+  reason: string;
+  prior_status: string;
+}
+
+const CANCELLATION_QUEUE = "cancellation_requests";
 
 interface QueueRow {
   id: string;
@@ -24,16 +44,24 @@ interface QueueRow {
   assigned_user_id: string | null;
   assigned_user_name_snapshot: string | null;
   created_at: string;
+  /** Owner/Admin only — set by the server for Jobs with an active request. */
+  has_active_cancellation_request?: boolean;
 }
 
 const QUEUE_TABS = [
-  { key: "", label: "All Pending", emptyMsg: "No jobs currently require action." },
-  { key: "draft", label: "Draft", emptyMsg: "No Draft jobs." },
-  { key: "pending_approval", label: "Pending Approval", emptyMsg: "No Pending Approval jobs." },
-  { key: "open_unassigned", label: "Open · Unassigned", emptyMsg: "No Open unassigned jobs." },
-  { key: "assigned_not_started", label: "Assigned", emptyMsg: "No Assigned jobs." },
-  { key: "waiting_customer", label: "Waiting Customer", emptyMsg: "No jobs waiting on customer." },
-  { key: "waiting_vendor", label: "Waiting Vendor", emptyMsg: "No jobs waiting on vendor." },
+  { key: "", label: "All Pending", emptyMsg: "No jobs currently require action.", adminOnly: false },
+  { key: "draft", label: "Draft", emptyMsg: "No Draft jobs.", adminOnly: false },
+  { key: "pending_approval", label: "Job Approvals", emptyMsg: "No Job Approvals pending.", adminOnly: false },
+  {
+    key: CANCELLATION_QUEUE,
+    label: "Cancellation Requests",
+    emptyMsg: "No cancellation requests awaiting a decision.",
+    adminOnly: true,
+  },
+  { key: "open_unassigned", label: "Open · Unassigned", emptyMsg: "No Open unassigned jobs.", adminOnly: false },
+  { key: "assigned_not_started", label: "Assigned", emptyMsg: "No Assigned jobs.", adminOnly: false },
+  { key: "waiting_customer", label: "Waiting Customer", emptyMsg: "No jobs waiting on customer.", adminOnly: false },
+  { key: "waiting_vendor", label: "Waiting Vendor", emptyMsg: "No jobs waiting on vendor.", adminOnly: false },
 ] as const;
 
 export const Route = createFileRoute("/jobs/pending")({
@@ -63,12 +91,17 @@ function PendingQueuePage() {
   const pageSize = 25;
 
   const [rows, setRows] = useState<QueueRow[]>([]);
+  const [cancelRows, setCancelRows] = useState<CancellationRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { openJobTab } = useTabs();
+  const { currentUser } = useSession();
+  const isAdmin = !!currentUser?.isAdministrator;
+  const visibleTabs = QUEUE_TABS.filter((t) => !t.adminOnly || isAdmin);
+  const cancellationView = queueType === CANCELLATION_QUEUE && isAdmin;
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -77,9 +110,22 @@ function PendingQueuePage() {
       const sp = new URLSearchParams();
       sp.set("page", String(page));
       sp.set("pageSize", String(pageSize));
-      if (queueType) sp.set("queueType", queueType);
       if (q.trim()) sp.set("q", q.trim());
       if (priority) sp.set("priority", priority);
+
+      if (cancellationView) {
+        const res = await fetch(`/api/admin/cancellation-requests?${sp.toString()}`, {
+          headers: authHeaders(),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error ?? "Failed to load cancellation requests");
+        setCancelRows(body.requests ?? []);
+        setRows([]);
+        setTotal(body.total ?? 0);
+        return;
+      }
+
+      if (queueType) sp.set("queueType", queueType);
       if (technicianFilter) sp.set("technician", technicianFilter);
       if (excludeMe) sp.set("excludeMe", "1");
       const res = await fetch(`/api/workspace/jobs/pending?${sp.toString()}`, {
@@ -88,13 +134,14 @@ function PendingQueuePage() {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? "Failed to load queue");
       setRows(body.jobs ?? []);
+      setCancelRows([]);
       setTotal(body.total ?? 0);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
     } finally {
       setLoading(false);
     }
-  }, [queueType, q, priority, technicianFilter, excludeMe, page]);
+  }, [queueType, q, priority, technicianFilter, excludeMe, page, cancellationView]);
 
   useEffect(() => {
     void reload();
@@ -103,6 +150,11 @@ function PendingQueuePage() {
   const open = (r: QueueRow) => {
     openJobTab(r.id, r.job_number);
     navigate({ to: "/jobs/$jobId", params: { jobId: r.id } });
+  };
+
+  const openRequest = (r: CancellationRow) => {
+    openJobTab(r.service_job_id, r.job_number);
+    navigate({ to: "/jobs/$jobId", params: { jobId: r.service_job_id } });
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -149,7 +201,7 @@ function PendingQueuePage() {
       </header>
 
       <div className="flex flex-wrap gap-1 rounded-lg border bg-card p-1">
-        {QUEUE_TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const active = t.key === queueType;
           return (
             <button
@@ -208,10 +260,57 @@ function PendingQueuePage() {
           <Skeleton className="h-20 w-full" />
         </div>
       )}
-      {!loading && rows.length === 0 && !err && (
+      {!loading && rows.length === 0 && cancelRows.length === 0 && !err && (
         <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
           {QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg ?? "No jobs."}
         </div>
+      )}
+
+      {cancellationView && cancelRows.length > 0 && (
+        <ul className="space-y-2">
+          {cancelRows.map((r) => (
+            <li key={r.request_id}>
+              <button
+                type="button"
+                onClick={() => openRequest(r)}
+                className="block w-full rounded-lg border bg-background p-3 text-left shadow-sm hover:bg-accent/40"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-mono text-xs font-semibold text-primary">
+                    {r.job_number}
+                  </span>
+                  <span className="text-[10px] uppercase text-muted-foreground">
+                    Requested {formatMYDateTime(r.requested_at)}
+                  </span>
+                </div>
+                <div className="mt-1 truncate text-sm font-semibold">{r.subject}</div>
+                <div className="text-xs text-muted-foreground">
+                  {r.customer_name ?? r.customer_code}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                  <StatusBadge status={r.job_status} />
+                  <PriorityBadge priority={r.priority} />
+                  <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
+                    {r.assigned_user_name ?? "Unassigned"}
+                  </span>
+                  <span className="rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-red-900">
+                    Awaiting Owner/Admin Decision
+                  </span>
+                </div>
+                <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                  <div>
+                    Requested by{" "}
+                    <span className="font-medium text-foreground">
+                      {r.requested_by_name ?? "—"}
+                    </span>{" "}
+                    · Prior status {r.prior_status}
+                  </div>
+                  <div className="whitespace-pre-wrap text-foreground">{r.reason}</div>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       {rows.length > 0 && (
@@ -241,6 +340,11 @@ function PendingQueuePage() {
                   <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
                     {r.assigned_user_name_snapshot ?? "Unassigned"}
                   </span>
+                  {r.has_active_cancellation_request && (
+                    <span className="rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-red-900">
+                      Cancellation Requested
+                    </span>
+                  )}
                   {r.requires_approval && (
                     <span className="rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 text-amber-900">
                       Waiting for Approval{r.approval_reason ? ` · ${r.approval_reason}` : ""}
