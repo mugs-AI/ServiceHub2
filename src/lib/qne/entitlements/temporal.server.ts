@@ -6,6 +6,9 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { classifyEntitlement, type EntitlementTemporalStatus } from "./temporal";
+import { normalizeStoredDueSoonDays } from "./due-soon-policy";
+
+export * from "./due-soon-policy";
 
 export * from "./temporal";
 
