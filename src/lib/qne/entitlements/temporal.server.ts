@@ -6,6 +6,9 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { classifyEntitlement, type EntitlementTemporalStatus } from "./temporal";
+import { normalizeStoredDueSoonDays } from "./due-soon-policy";
+
+export * from "./due-soon-policy";
 
 export * from "./temporal";
 
@@ -33,8 +36,7 @@ export async function resolveDueSoonDays(tenantCode: string): Promise<number> {
     .select("due_soon_days")
     .eq("tenant_code", tenantCode)
     .maybeSingle();
-  const v = data?.due_soon_days;
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 30;
+  return normalizeStoredDueSoonDays(data?.due_soon_days);
 }
 
 export async function entitlementClock(tenantCode: string): Promise<EntitlementClock> {

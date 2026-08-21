@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { AdminOnly } from "@/components/qne/AdminOnly";
 import { CancellationSettingsCard } from "@/components/qne/CancellationSettingsCard";
+import { EntitlementPolicyCard } from "@/components/qne/EntitlementPolicyCard";
 import { RoleDiagnostics } from "@/components/qne/RoleDiagnostics";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
@@ -159,6 +160,8 @@ function Settings() {
         }}
         onError={(msg) => notify("err", msg)}
       />
+
+      <EntitlementPolicyCard onNotify={notify} />
 
       <CancellationSettingsCard onNotify={notify} />
 
