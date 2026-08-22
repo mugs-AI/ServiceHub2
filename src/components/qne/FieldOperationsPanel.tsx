@@ -134,11 +134,9 @@ const BTN_PRIMARY =
 export function FieldOperationsPanel({
   jobId,
   onChanged,
-  attachmentCount,
 }: {
   jobId: string;
   onChanged: () => void | Promise<void>;
-  attachmentCount: number;
 }) {
   const [data, setData] = useState<FieldStateResponse | null>(null);
   const [loading, setLoading] = useState(true);
