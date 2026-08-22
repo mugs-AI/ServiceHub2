@@ -70,22 +70,19 @@ export async function loadFieldState(
   tenantCode: string,
   jobId: string,
   job: JobRow,
-): Promise<FieldState & { openSession: OpenSession | null }> {
+): Promise<FieldState & { openSession: OpenSession | null; sessionCount: number; waitingCount: number }> {
   const [sessions, waiting, notes] = await Promise.all([
     supabaseAdmin
       .from("service_job_work_sessions")
-      .select("id, status, started_at, technician_user_id")
+      .select("id, status, started_at, ended_at, duration_minutes, technician_user_id")
       .eq("tenant_code", tenantCode)
       .eq("service_job_id", jobId)
-      .in("status", ["active", "paused"])
-      .order("started_at", { ascending: false })
-      .limit(1),
+      .order("started_at", { ascending: false }),
     supabaseAdmin
       .from("service_job_waiting_periods")
-      .select("id, waiting_type")
+      .select("id, waiting_type, resolved_at")
       .eq("tenant_code", tenantCode)
-      .eq("service_job_id", jobId)
-      .is("resolved_at", null),
+      .eq("service_job_id", jobId),
     supabaseAdmin
       .from("service_job_work_notes")
       .select("id", { count: "exact", head: true })
@@ -96,15 +93,33 @@ export async function loadFieldState(
   if (waiting.error) throw waiting.error;
   if (notes.error) throw notes.error;
 
-  const open = (sessions.data?.[0] ?? null) as OpenSession | null;
-  const types = new Set((waiting.data ?? []).map((w) => w.waiting_type));
+  const rows = sessions.data ?? [];
+  const segState = workSessionState(rows);
+  const openRows = (waiting.data ?? []).filter((w) => !w.resolved_at);
+  const types = new Set(openRows.map((w) => w.waiting_type));
+  const open: OpenSession | null = segState.activeSegment
+    ? {
+        id: segState.activeSegment.id,
+        status: "active",
+        started_at: segState.activeSegment.started_at,
+        technician_user_id:
+          (segState.activeSegment as { technician_user_id?: string }).technician_user_id ?? "",
+      }
+    : null;
+
   return {
     status: job.status,
     is_deleted: job.is_deleted,
-    activeSession: open ? { status: open.status } : null,
+    supportMode: job.support_mode ?? null,
+    travelStartedAt: job.travel_started_at,
+    arrivedAt: job.arrived_on_site_at,
+    leftAt: job.left_site_at,
+    activeSession: segState.status ? { status: segState.status } : null,
     openWaiting: { customer: types.has("customer"), vendor: types.has("vendor") },
     workNoteCount: notes.count ?? 0,
     openSession: open,
+    sessionCount: rows.length,
+    waitingCount: (waiting.data ?? []).length,
   };
 }
 
@@ -115,22 +130,11 @@ export async function recomputeWorkMinutes(
 ): Promise<number> {
   const { data, error } = await supabaseAdmin
     .from("service_job_work_sessions")
-    .select("started_at, ended_at, duration_minutes, status")
+    .select("id, started_at, ended_at, duration_minutes, status")
     .eq("tenant_code", tenantCode)
     .eq("service_job_id", jobId);
   if (error) throw error;
-  let total = 0;
-  for (const s of data ?? []) {
-    if (s.status === "cancelled") continue;
-    if (typeof s.duration_minutes === "number") {
-      total += s.duration_minutes;
-    } else if (s.started_at && s.ended_at) {
-      total += Math.max(
-        0,
-        Math.round((new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000),
-      );
-    }
-  }
+  const total = computeWorkMinutes(data ?? []);
   await supabaseAdmin
     .from("service_jobs")
     .update({ total_work_minutes: total })
@@ -138,6 +142,7 @@ export async function recomputeWorkMinutes(
     .eq("id", jobId);
   return total;
 }
+
 
 export async function logFieldEvent(
   actor: FieldActor,
