@@ -352,10 +352,44 @@ export function FieldOperationsPanel({
           {blocked} This section is read-only.
         </p>
       )}
+      {!canMutate && !blocked && (
+        <p className="mt-3 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+          Only the Primary PIC or an Owner / Administrator can record field actions. You can still
+          follow progress here.
+        </p>
+      )}
       {remote && !blocked && (
         <p className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
           Remote support — travel, arrival and location are not required. Start Work directly.
         </p>
+      )}
+      {!data.job.support_mode && (
+        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="font-semibold">Support mode is not set.</p>
+          <p className="mt-0.5 text-xs">
+            Field actions stay locked until the Primary PIC or an Administrator records how this
+            Job is being served.
+          </p>
+          {data.permissions?.canSetSupportMode && (
+            <select
+              className="input mt-2"
+              defaultValue=""
+              disabled={busy !== null}
+              onChange={(e) => {
+                if (e.target.value) void saveSupportMode(e.target.value);
+              }}
+            >
+              <option value="" disabled>
+                Select support mode…
+              </option>
+              {SUPPORT_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {SUPPORT_MODE_LABEL[m]}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       )}
       {error && (
         <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -366,7 +400,7 @@ export function FieldOperationsPanel({
         <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">{info}</p>
       )}
 
-      {!blocked && (
+      {!blocked && canMutate && (
         <div className="mt-4 flex flex-wrap gap-2">
           {visible.map((a) => {
             const needsForm =
@@ -387,17 +421,7 @@ export function FieldOperationsPanel({
               </button>
             );
           })}
-          {session && (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => setDialog("ready_for_completion")}
-              className={BTN}
-              title="Close the open work session"
-            >
-              Stop Work
-            </button>
-          )}
+
           {!ready.ok && data.state.status === "In Progress" && (
             <span className="self-center text-xs text-muted-foreground">
               Ready for Completion blocked: {ready.reason}
