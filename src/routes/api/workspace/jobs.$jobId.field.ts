@@ -410,11 +410,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
                 started_at: now,
                 status: "active",
               });
-              if (error) {
-                throw error.code === "23505"
-                  ? new FieldOpsError("You already have an open session on this job.", 409)
-                  : error;
-              }
+              if (error) throw asConflict(error);
               if (job.status !== "In Progress") {
                 await jobPatch({ status: "In Progress", started_at: now });
               }
