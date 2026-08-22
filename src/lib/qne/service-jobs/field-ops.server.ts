@@ -53,11 +53,13 @@ export async function loadJob(tenantCode: string, jobId: string): Promise<JobRow
   return data as JobRow;
 }
 
-/** Only the assigned technician or an administrator may act in the field. */
+/** Physical Field mutation = Primary PIC OR Owner/Admin (shared pure rule). */
 export function assertFieldPermission(job: JobRow, actor: FieldActor): void {
-  if (actor.isAdmin) return;
-  if (job.assigned_user_id && actor.userId && job.assigned_user_id === actor.userId) return;
-  throw new FieldOpsError("Only the assigned technician can perform field actions.", 403);
+  if (canMutateField(job, { isAdmin: actor.isAdmin, actorUserId: actor.userId })) return;
+  throw new FieldOpsError(
+    "Only the Primary PIC or an Administrator can perform field actions.",
+    403,
+  );
 }
 
 export interface OpenSession {
