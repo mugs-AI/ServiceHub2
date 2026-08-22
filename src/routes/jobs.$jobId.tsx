@@ -6,6 +6,7 @@ import { useSession } from "@/lib/qne/session-context";
 import { useTabs } from "@/lib/tabs";
 import { allowedTransitionsClient } from "@/lib/qne/service-jobs/workflow";
 import { CancellationPanel } from "@/components/qne/CancellationPanel";
+import { FieldOperationsPanel } from "@/components/qne/FieldOperationsPanel";
 import { isTakeoverEligibleStatus } from "@/lib/qne/service-jobs/permissions";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { DateField, TimeField } from "@/components/qne/DateTimeFields";
@@ -320,6 +321,13 @@ function JobDetailPage() {
         canEdit={!job.is_deleted}
         onDone={reloadAll}
       />
+
+      {/* WP1 — Field Operations. Visible to every teammate; the server allows
+          mutation only for the Primary PIC or an Owner / Administrator. */}
+      {!pendingLock && !job.is_deleted && (
+        <FieldOperationsPanel jobId={job.id} attachmentCount={0} onChanged={reloadAll} />
+      )}
+
 
       <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
         <Section title="Job details">

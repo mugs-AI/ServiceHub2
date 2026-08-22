@@ -20,7 +20,13 @@ import {
   type FieldEvent,
 } from "@/lib/qne/service-jobs/field-ops";
 import { gpsRequestFor, type TravelGpsSettings } from "@/lib/qne/service-jobs/tenant-settings";
-import { isRemoteMode, supportModeLabel, usesTravel } from "@/lib/qne/service-jobs/support-mode";
+import {
+  SUPPORT_MODES,
+  SUPPORT_MODE_LABEL,
+  isRemoteMode,
+  supportModeLabel,
+  usesTravel,
+} from "@/lib/qne/service-jobs/support-mode";
 
 export interface FieldStateResponse {
   jobStatus: string;
@@ -40,10 +46,22 @@ export interface FieldStateResponse {
   state: {
     status: string;
     is_deleted: boolean;
+    supportMode?: string | null;
     activeSession: { status: "active" | "paused" } | null;
     openWaiting: { customer: boolean; vendor: boolean };
     workNoteCount: number;
+    travelStartedAt?: string | null;
+    arrivedAt?: string | null;
+    leftAt?: string | null;
   };
+  permissions?: {
+    canMutate: boolean;
+    canSetSupportMode: boolean;
+    supportModeLockReason: string | null;
+  };
+  blockedReason?: string | null;
+  availableActions?: FieldEvent[];
+
   openSession: { id: string; started_at: string; status: string } | null;
   sessions: Array<{
     id: string;
@@ -192,10 +210,36 @@ export function FieldOperationsPanel({
     [data, jobId, load, onChanged],
   );
 
+  // The server is the authority: prefer its action list, fall back to the
+  // shared pure rules while an older response shape is in flight.
   const actions = useMemo<FieldEvent[]>(
-    () => (data ? availableFieldActions(data.state) : []),
+    () => (data ? (data.availableActions ?? availableFieldActions(data.state)) : []),
     [data],
   );
+
+  const saveSupportMode = useCallback(
+    async (mode: string) => {
+      setBusy("support_mode_set");
+      setError(null);
+      try {
+        const res = await fetch(`/api/workspace/jobs/${jobId}/field`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ action: "support_mode_set", support_mode: mode }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+        await load();
+        await onChanged();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not set support mode.");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [jobId, load, onChanged],
+  );
+
 
   if (loading && !data) {
     return (
@@ -218,11 +262,13 @@ export function FieldOperationsPanel({
     );
   }
 
-  const blocked = fieldActionsBlocked(data.state);
+  const blocked = data.blockedReason ?? fieldActionsBlocked(data.state);
+  const canMutate = data.permissions?.canMutate ?? true;
   const travel = usesTravel(data.job.support_mode);
   const remote = isRemoteMode(data.job.support_mode);
   const ready = canReadyForCompletion(data.state);
   const session = data.state.activeSession;
+
 
   const stage = data.state.openWaiting.customer
     ? "Waiting Customer"
@@ -312,10 +358,44 @@ export function FieldOperationsPanel({
           {blocked} This section is read-only.
         </p>
       )}
+      {!canMutate && !blocked && (
+        <p className="mt-3 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+          Only the Primary PIC or an Owner / Administrator can record field actions. You can still
+          follow progress here.
+        </p>
+      )}
       {remote && !blocked && (
         <p className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
           Remote support — travel, arrival and location are not required. Start Work directly.
         </p>
+      )}
+      {!data.job.support_mode && (
+        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="font-semibold">Support mode is not set.</p>
+          <p className="mt-0.5 text-xs">
+            Field actions stay locked until the Primary PIC or an Administrator records how this
+            Job is being served.
+          </p>
+          {data.permissions?.canSetSupportMode && (
+            <select
+              className="input mt-2"
+              defaultValue=""
+              disabled={busy !== null}
+              onChange={(e) => {
+                if (e.target.value) void saveSupportMode(e.target.value);
+              }}
+            >
+              <option value="" disabled>
+                Select support mode…
+              </option>
+              {SUPPORT_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {SUPPORT_MODE_LABEL[m]}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       )}
       {error && (
         <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -326,7 +406,7 @@ export function FieldOperationsPanel({
         <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">{info}</p>
       )}
 
-      {!blocked && (
+      {!blocked && canMutate && (
         <div className="mt-4 flex flex-wrap gap-2">
           {visible.map((a) => {
             const needsForm =
@@ -347,17 +427,7 @@ export function FieldOperationsPanel({
               </button>
             );
           })}
-          {session && (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => setDialog("ready_for_completion")}
-              className={BTN}
-              title="Close the open work session"
-            >
-              Stop Work
-            </button>
-          )}
+
           {!ready.ok && data.state.status === "In Progress" && (
             <span className="self-center text-xs text-muted-foreground">
               Ready for Completion blocked: {ready.reason}

@@ -49,27 +49,38 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           if (waiting.error) throw waiting.error;
           if (notes.error) throw notes.error;
 
-          const totalMinutes = (sessions.data ?? []).reduce((n, s) => {
-            if (s.status === "cancelled") return n;
-            if (typeof s.duration_minutes === "number") return n + s.duration_minutes;
-            if (s.started_at && s.ended_at) {
-              return (
-                n +
-                Math.max(
-                  0,
-                  Math.round(
-                    (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000,
-                  ),
-                )
-              );
-            }
-            return n;
-          }, 0);
+          const {
+            computeWorkMinutes,
+            availableFieldActions,
+            canMutateField,
+            canSetSupportMode,
+            fieldActionsBlocked,
+          } = await import("@/lib/qne/service-jobs/field-ops");
+          const totalMinutes = computeWorkMinutes((sessions.data ?? []) as never);
+
 
           const { loadTenantSettings } = await import(
             "@/lib/qne/service-jobs/tenant-settings.server"
           );
           const settings = await loadTenantSettings(user.tenantCode);
+
+          const actorUserId = user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
+          const isAdmin = Boolean(user.isAdministrator);
+          const canMutate = canMutateField(
+            { assigned_user_id: job.assigned_user_id },
+            { isAdmin, actorUserId },
+          );
+          const supportModeGate = canSetSupportMode(
+            { assigned_user_id: job.assigned_user_id, support_mode: job.support_mode },
+            { isAdmin, actorUserId },
+            {
+              sessionCount: state.sessionCount,
+              waitingCount: state.waitingCount,
+              workNoteCount: state.workNoteCount ?? 0,
+              travelStartedAt: job.travel_started_at,
+              arrivedAt: job.arrived_on_site_at,
+            },
+          );
 
           return Response.json({
             jobStatus: job.status,
@@ -90,10 +101,25 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             state: {
               status: state.status,
               is_deleted: state.is_deleted,
+              supportMode: state.supportMode,
               activeSession: state.activeSession,
               openWaiting: state.openWaiting,
               workNoteCount: state.workNoteCount,
+              travelStartedAt: state.travelStartedAt,
+              arrivedAt: state.arrivedAt,
+              leftAt: state.leftAt,
             },
+            permissions: {
+              canMutate,
+              canSetSupportMode: supportModeGate.ok,
+              supportModeLockReason: supportModeGate.ok ? null : supportModeGate.reason,
+            },
+            blockedReason: fieldActionsBlocked({
+              status: state.status,
+              is_deleted: state.is_deleted,
+              supportMode: state.supportMode,
+            }),
+            availableActions: availableFieldActions(state),
             openSession: state.openSession,
             sessions: sessions.data ?? [],
             waiting: waiting.data ?? [],
@@ -101,6 +127,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             totalWorkMinutes: totalMinutes,
             serverNow: new Date().toISOString(),
           });
+
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;
@@ -127,8 +154,15 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           sanitizeLocation,
           FieldOpsError,
         } = await import("@/lib/qne/service-jobs/field-ops.server");
-        const { fieldActionsBlocked, canReadyForCompletion, FIELD_EVENTS } = await import(
-          "@/lib/qne/service-jobs/field-ops"
+        const {
+          fieldActionsBlocked,
+          canReadyForCompletion,
+          canSetSupportMode,
+          actionAllowedForMode,
+          FIELD_EVENTS,
+        } = await import("@/lib/qne/service-jobs/field-ops");
+        const { isSupportMode, SUPPORT_MODE_LABEL } = await import(
+          "@/lib/qne/service-jobs/support-mode"
         );
 
         try {
@@ -141,16 +175,69 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           };
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
           const action = String(body.action ?? "");
-          if (!(FIELD_EVENTS as readonly string[]).includes(action)) {
+          const isSupportModeSet = action === "support_mode_set";
+          if (!isSupportModeSet && !(FIELD_EVENTS as readonly string[]).includes(action)) {
             return Response.json({ error: "Unknown field action." }, { status: 400 });
           }
 
           const job = await loadJob(actor.tenantCode, params.jobId);
           assertFieldPermission(job, actor);
-          const blocked = fieldActionsBlocked({ status: job.status, is_deleted: job.is_deleted });
+          const state = await loadFieldState(actor.tenantCode, params.jobId, job);
+
+          // Support mode repair path — Primary PIC / Admin only, audited, and
+          // locked once material field evidence exists.
+          if (isSupportModeSet) {
+            const lifecycleBlocked = fieldActionsBlocked({
+              status: job.status,
+              is_deleted: job.is_deleted,
+            });
+            if (lifecycleBlocked) {
+              return Response.json({ error: lifecycleBlocked }, { status: 400 });
+            }
+            const next = String(body.support_mode ?? "");
+            if (!isSupportMode(next)) {
+              return Response.json({ error: "Invalid support mode." }, { status: 400 });
+            }
+            const gate = canSetSupportMode(
+              { assigned_user_id: job.assigned_user_id, support_mode: job.support_mode },
+              { isAdmin: actor.isAdmin, actorUserId: actor.userId },
+              {
+                sessionCount: state.sessionCount,
+                waitingCount: state.waitingCount,
+                workNoteCount: state.workNoteCount ?? 0,
+                travelStartedAt: job.travel_started_at,
+                arrivedAt: job.arrived_on_site_at,
+              },
+            );
+            if (!gate.ok) {
+              return Response.json({ error: gate.reason }, { status: 409 });
+            }
+            const { error: updErr } = await supabaseAdmin
+              .from("service_jobs")
+              .update({ support_mode: next })
+              .eq("tenant_code", actor.tenantCode)
+              .eq("id", job.id);
+            if (updErr) throw updErr;
+            await logFieldEvent(actor, job.id, "support_mode_set" as never, {
+              oldValue: job.support_mode,
+              newValue: next,
+              note: `Support mode set to ${SUPPORT_MODE_LABEL[next]}`,
+            });
+            return Response.json({ ok: true, support_mode: next });
+          }
+
+          const blocked = fieldActionsBlocked({
+            status: job.status,
+            is_deleted: job.is_deleted,
+            supportMode: job.support_mode ?? null,
+          });
           if (blocked) return Response.json({ error: blocked }, { status: 400 });
 
-          const state = await loadFieldState(actor.tenantCode, params.jobId, job);
+          // Remote / onsite applicability is decided from the STORED mode.
+          const modeError = actionAllowedForMode(action as never, job.support_mode);
+          if (modeError) return Response.json({ error: modeError }, { status: 400 });
+
+
           const now = new Date().toISOString();
           const location = sanitizeLocation(body.location);
           const note = typeof body.note === "string" ? body.note.trim().slice(0, 2000) : null;
@@ -198,12 +285,45 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             if (error) throw error;
           }
 
+          // Close the currently open work segment and record its minutes.
+          async function closeActiveSegment(
+            finalStatus: "paused" | "completed",
+            reason: string | null,
+          ) {
+            const open = state.openSession;
+            if (!open) return;
+            const minutes = Math.max(
+              0,
+              Math.round((Date.parse(now) - Date.parse(open.started_at)) / 60000),
+            );
+            const { error } = await supabaseAdmin
+              .from("service_job_work_sessions")
+              .update({
+                status: finalStatus,
+                ended_at: now,
+                duration_minutes: minutes,
+                pause_reason: finalStatus === "paused" ? reason : null,
+              })
+              .eq("tenant_code", actor.tenantCode)
+              .eq("id", open.id)
+              .eq("status", "active")
+              .is("ended_at", null);
+            if (error) throw error;
+            return minutes;
+          }
+
           switch (action) {
             case "travel_started": {
+              if (job.travel_started_at) {
+                throw new FieldOpsError("Travel has already been recorded for this Job.", 409);
+              }
               await jobPatch({ travel_started_at: now, travel_note: note });
               break;
             }
             case "arrived_on_site": {
+              if (job.arrived_on_site_at) {
+                throw new FieldOpsError("Arrival has already been recorded for this Job.", 409);
+              }
               await jobPatch({ arrived_on_site_at: now, arrival_note: note });
               if (job.travel_started_at) {
                 meta.travel_minutes = Math.max(
@@ -217,6 +337,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               if (!job.arrived_on_site_at) {
                 throw new FieldOpsError("Record Arrived On Site before leaving.", 409);
               }
+              if (job.left_site_at) {
+                throw new FieldOpsError("Leaving site has already been recorded.", 409);
+              }
               await jobPatch({ left_site_at: now, leave_note: note });
               meta.onsite_minutes = Math.max(
                 0,
@@ -225,8 +348,13 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               break;
             }
             case "work_started": {
-              if (state.openSession) {
-                throw new FieldOpsError("A work session is already open for this job.", 409);
+              if (state.activeSession) {
+                throw new FieldOpsError(
+                  state.activeSession.status === "paused"
+                    ? "Work is paused — resume it instead of starting new work."
+                    : "A work session is already open for this job.",
+                  409,
+                );
               }
               const { error } = await supabaseAdmin.from("service_job_work_sessions").insert({
                 tenant_code: actor.tenantCode,
@@ -246,31 +374,48 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               break;
             }
             case "work_paused": {
-              const open = state.openSession;
-              if (!open || open.status !== "active") {
+              if (state.activeSession?.status !== "active" || !state.openSession) {
                 throw new FieldOpsError("No active work session to pause.", 409);
               }
-              const { error } = await supabaseAdmin
-                .from("service_job_work_sessions")
-                .update({ status: "paused", pause_reason: note })
-                .eq("tenant_code", actor.tenantCode)
-                .eq("id", open.id);
-              if (error) throw error;
+              // Pause closes the billable segment; the paused interval itself
+              // is never stored and therefore can never be billed.
+              meta.segment_minutes = await closeActiveSegment("paused", note);
               break;
             }
             case "work_resumed": {
-              const open = state.openSession;
-              if (!open || open.status !== "paused") {
+              if (state.activeSession?.status !== "paused") {
                 throw new FieldOpsError("No paused work session to resume.", 409);
               }
-              const { error } = await supabaseAdmin
-                .from("service_job_work_sessions")
-                .update({ status: "active", pause_reason: null })
-                .eq("tenant_code", actor.tenantCode)
-                .eq("id", open.id);
+              const { error } = await supabaseAdmin.from("service_job_work_sessions").insert({
+                tenant_code: actor.tenantCode,
+                service_job_id: job.id,
+                ...tech,
+                started_at: now,
+                status: "active",
+              });
               if (error) throw error;
               break;
             }
+            case "work_stopped": {
+              if (!state.activeSession) {
+                throw new FieldOpsError("No open work session to stop.", 409);
+              }
+              if (state.openSession) {
+                meta.segment_minutes = await closeActiveSegment("completed", null);
+              } else {
+                // Already paused (segment closed) — mark the paused segment as
+                // completed so no open work remains.
+                const { error } = await supabaseAdmin
+                  .from("service_job_work_sessions")
+                  .update({ status: "completed" })
+                  .eq("tenant_code", actor.tenantCode)
+                  .eq("service_job_id", job.id)
+                  .eq("status", "paused");
+                if (error) throw error;
+              }
+              break;
+            }
+
             case "waiting_customer_started":
             case "waiting_vendor_started": {
               const type = action === "waiting_customer_started" ? "customer" : "vendor";
@@ -297,22 +442,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               const dateOnly = (v: unknown) =>
                 typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 
-              // Close any open work session so waiting time is not billed as work.
+              // Waiting must stop billable work: close the active segment and
+              // leave no paused segment behind.
               if (state.openSession) {
-                const started = new Date(state.openSession.started_at).getTime();
-                await supabaseAdmin
+                await closeActiveSegment("completed", null);
+              } else if (state.activeSession?.status === "paused") {
+                const { error: pauseErr } = await supabaseAdmin
                   .from("service_job_work_sessions")
-                  .update({
-                    status: "completed",
-                    ended_at: now,
-                    duration_minutes: Math.max(
-                      0,
-                      Math.round((Date.parse(now) - started) / 60000),
-                    ),
-                  })
+                  .update({ status: "completed" })
                   .eq("tenant_code", actor.tenantCode)
-                  .eq("id", state.openSession.id);
+                  .eq("service_job_id", job.id)
+                  .eq("status", "paused");
+                if (pauseErr) throw pauseErr;
               }
+
 
               const { error } = await supabaseAdmin.from("service_job_waiting_periods").insert({
                 tenant_code: actor.tenantCode,

@@ -3,6 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getStoredToken } from "@/lib/qne/tokens";
 import { formatMY } from "@/lib/format-date";
+import {
+  SUPPORT_MODES,
+  SUPPORT_MODE_LABEL,
+  type SupportMode,
+} from "@/lib/qne/service-jobs/support-mode";
+
 
 type Priority = "High" | "Medium" | "Low";
 type SourceType =
@@ -83,6 +89,8 @@ function NewJobPage() {
   const [problem, setProblem] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [source, setSource] = useState<SourceType>("Phone");
+  const [supportMode, setSupportMode] = useState<SupportMode>("remote_support");
+
   const [internalNote, setInternalNote] = useState("");
 
   // Optional technician assignment at creation time.
@@ -278,6 +286,8 @@ function NewJobPage() {
           problem_description: problem,
           priority,
           source,
+          support_mode: supportMode,
+
           internal_note: internalNote || null,
           subscription_snapshot_id: selectedSubId || null,
           assigned_user_id: assignee?.user_id || null,
@@ -511,6 +521,23 @@ function NewJobPage() {
                 className="input"
               />
             </Field>
+            <Field label="Support mode *">
+              <select
+                value={supportMode}
+                onChange={(e) => setSupportMode(e.target.value as SupportMode)}
+                required
+                className="input"
+              >
+                {SUPPORT_MODES.map((m) => (
+                  <option key={m} value={m}>
+                    {SUPPORT_MODE_LABEL[m]}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Remote and phone jobs skip Travel and Arrival controls.
+              </p>
+            </Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Source">
                 <select
@@ -537,6 +564,7 @@ function NewJobPage() {
                 </select>
               </Field>
             </div>
+
             <Field label="Problem description *">
               <textarea
                 value={problem}
