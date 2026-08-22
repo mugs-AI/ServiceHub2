@@ -73,7 +73,15 @@ export async function loadFieldState(
   tenantCode: string,
   jobId: string,
   job: JobRow,
-): Promise<FieldState & { openSession: OpenSession | null; sessionCount: number; waitingCount: number }> {
+): Promise<
+  FieldState & {
+    openSession: OpenSession | null;
+    /** Exact current paused state marker (never a historical paused row). */
+    pausedSessionId: string | null;
+    sessionCount: number;
+    waitingCount: number;
+  }
+> {
   const [sessions, waiting, notes] = await Promise.all([
     supabaseAdmin
       .from("service_job_work_sessions")
@@ -121,6 +129,7 @@ export async function loadFieldState(
     openWaiting: { customer: types.has("customer"), vendor: types.has("vendor") },
     workNoteCount: notes.count ?? 0,
     openSession: open,
+    pausedSessionId: segState.pausedSegment?.id ?? null,
     sessionCount: rows.length,
     waitingCount: (waiting.data ?? []).length,
   };

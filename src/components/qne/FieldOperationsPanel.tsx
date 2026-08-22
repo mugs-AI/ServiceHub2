@@ -134,11 +134,9 @@ const BTN_PRIMARY =
 export function FieldOperationsPanel({
   jobId,
   onChanged,
-  attachmentCount,
 }: {
   jobId: string;
   onChanged: () => void | Promise<void>;
-  attachmentCount: number;
 }) {
   const [data, setData] = useState<FieldStateResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -350,7 +348,7 @@ export function FieldOperationsPanel({
         />
         <Stat label="Waiting vendor" value={data.state.openWaiting.vendor ? "Open" : "None"} />
         <Stat label="Work notes" value={String(data.state.workNoteCount)} />
-        <Stat label="Attachments" value={String(attachmentCount)} />
+        {/* Attachment truth is not wired yet; no fabricated count is shown. */}
       </dl>
 
       {blocked && (

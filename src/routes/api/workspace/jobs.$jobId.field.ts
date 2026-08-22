@@ -286,17 +286,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           }
 
           // Close the currently open work segment and record its minutes.
+          // The write is conditioned on the exact persisted row state; a
+          // zero-row result means another request already moved the segment
+          // and this one is stale.
           async function closeActiveSegment(
             finalStatus: "paused" | "completed",
             reason: string | null,
           ) {
             const open = state.openSession;
-            if (!open) return;
+            if (!open) throw new FieldOpsError("No active work session.", 409);
             const minutes = Math.max(
               0,
               Math.round((Date.parse(now) - Date.parse(open.started_at)) / 60000),
             );
-            const { error } = await supabaseAdmin
+            const { data, error } = await supabaseAdmin
               .from("service_job_work_sessions")
               .update({
                 status: finalStatus,
@@ -305,11 +308,55 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
                 pause_reason: finalStatus === "paused" ? reason : null,
               })
               .eq("tenant_code", actor.tenantCode)
+              .eq("service_job_id", job.id)
               .eq("id", open.id)
               .eq("status", "active")
-              .is("ended_at", null);
+              .is("ended_at", null)
+              .select("id");
             if (error) throw error;
+            if (!data || data.length === 0) {
+              throw new FieldOpsError(
+                "The work session changed in another session. Refresh and try again.",
+                409,
+              );
+            }
             return minutes;
+          }
+
+          // Close ONLY the current/latest paused state marker. Historical
+          // paused rows stay untouched as field evidence.
+          async function closeCurrentPausedSegment() {
+            const pausedId = state.pausedSessionId;
+            if (!pausedId) {
+              throw new FieldOpsError("No paused work session.", 409);
+            }
+            const { data, error } = await supabaseAdmin
+              .from("service_job_work_sessions")
+              .update({ status: "completed" })
+              .eq("tenant_code", actor.tenantCode)
+              .eq("service_job_id", job.id)
+              .eq("id", pausedId)
+              .eq("status", "paused")
+              .select("id");
+            if (error) throw error;
+            if (!data || data.length === 0) {
+              throw new FieldOpsError(
+                "The work session changed in another session. Refresh and try again.",
+                409,
+              );
+            }
+          }
+
+          // A unique-index violation means another request already opened the
+          // single allowed active segment for this Job.
+          function asConflict(error: { code?: string } | null) {
+            if (error && error.code === "23505") {
+              return new FieldOpsError(
+                "A work session is already open for this job.",
+                409,
+              );
+            }
+            return error as unknown as Error | null;
           }
 
           switch (action) {
@@ -363,11 +410,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
                 started_at: now,
                 status: "active",
               });
-              if (error) {
-                throw error.code === "23505"
-                  ? new FieldOpsError("You already have an open session on this job.", 409)
-                  : error;
-              }
+              if (error) throw asConflict(error);
               if (job.status !== "In Progress") {
                 await jobPatch({ status: "In Progress", started_at: now });
               }
@@ -393,7 +436,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
                 started_at: now,
                 status: "active",
               });
-              if (error) throw error;
+              if (error) throw asConflict(error);
               break;
             }
             case "work_stopped": {
@@ -403,15 +446,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               if (state.openSession) {
                 meta.segment_minutes = await closeActiveSegment("completed", null);
               } else {
-                // Already paused (segment closed) — mark the paused segment as
-                // completed so no open work remains.
-                const { error } = await supabaseAdmin
-                  .from("service_job_work_sessions")
-                  .update({ status: "completed" })
-                  .eq("tenant_code", actor.tenantCode)
-                  .eq("service_job_id", job.id)
-                  .eq("status", "paused");
-                if (error) throw error;
+                // Already paused: the billable segment is already closed, so
+                // only the current paused state marker is completed.
+                await closeCurrentPausedSegment();
               }
               break;
             }
@@ -447,13 +484,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               if (state.openSession) {
                 await closeActiveSegment("completed", null);
               } else if (state.activeSession?.status === "paused") {
-                const { error: pauseErr } = await supabaseAdmin
-                  .from("service_job_work_sessions")
-                  .update({ status: "completed" })
-                  .eq("tenant_code", actor.tenantCode)
-                  .eq("service_job_id", job.id)
-                  .eq("status", "paused");
-                if (pauseErr) throw pauseErr;
+                await closeCurrentPausedSegment();
               }
 
 
