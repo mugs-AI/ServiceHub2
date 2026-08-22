@@ -49,27 +49,40 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           if (waiting.error) throw waiting.error;
           if (notes.error) throw notes.error;
 
-          const totalMinutes = (sessions.data ?? []).reduce((n, s) => {
-            if (s.status === "cancelled") return n;
-            if (typeof s.duration_minutes === "number") return n + s.duration_minutes;
-            if (s.started_at && s.ended_at) {
-              return (
-                n +
-                Math.max(
-                  0,
-                  Math.round(
-                    (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000,
-                  ),
-                )
-              );
-            }
-            return n;
-          }, 0);
+          const {
+            computeWorkMinutes,
+            availableFieldActions,
+            canMutateField,
+            canSetSupportMode,
+            fieldActionsBlocked,
+          } = await import("@/lib/qne/service-jobs/field-ops");
+          const totalMinutes = computeWorkMinutes(
+            (sessions.data ?? []) as never,
+            new Date().toISOString(),
+          );
 
           const { loadTenantSettings } = await import(
             "@/lib/qne/service-jobs/tenant-settings.server"
           );
           const settings = await loadTenantSettings(user.tenantCode);
+
+          const actorUserId = user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
+          const isAdmin = Boolean(user.isAdministrator);
+          const canMutate = canMutateField(
+            { assigned_user_id: job.assigned_user_id },
+            { isAdmin, actorUserId },
+          );
+          const supportModeGate = canSetSupportMode(
+            { assigned_user_id: job.assigned_user_id, support_mode: job.support_mode },
+            { isAdmin, actorUserId },
+            {
+              sessionCount: state.sessionCount,
+              waitingCount: state.waitingCount,
+              workNoteCount: state.workNoteCount ?? 0,
+              travelStartedAt: job.travel_started_at,
+              arrivedAt: job.arrived_on_site_at,
+            },
+          );
 
           return Response.json({
             jobStatus: job.status,
@@ -90,10 +103,25 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             state: {
               status: state.status,
               is_deleted: state.is_deleted,
+              supportMode: state.supportMode,
               activeSession: state.activeSession,
               openWaiting: state.openWaiting,
               workNoteCount: state.workNoteCount,
+              travelStartedAt: state.travelStartedAt,
+              arrivedAt: state.arrivedAt,
+              leftAt: state.leftAt,
             },
+            permissions: {
+              canMutate,
+              canSetSupportMode: supportModeGate.ok,
+              supportModeLockReason: supportModeGate.ok ? null : supportModeGate.reason,
+            },
+            blockedReason: fieldActionsBlocked({
+              status: state.status,
+              is_deleted: state.is_deleted,
+              supportMode: state.supportMode,
+            }),
+            availableActions: availableFieldActions(state),
             openSession: state.openSession,
             sessions: sessions.data ?? [],
             waiting: waiting.data ?? [],
@@ -101,6 +129,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             totalWorkMinutes: totalMinutes,
             serverNow: new Date().toISOString(),
           });
+
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;
