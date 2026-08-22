@@ -89,6 +89,8 @@ function NewJobPage() {
   const [problem, setProblem] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [source, setSource] = useState<SourceType>("Phone");
+  const [supportMode, setSupportMode] = useState<SupportMode>("remote_support");
+
   const [internalNote, setInternalNote] = useState("");
 
   // Optional technician assignment at creation time.
