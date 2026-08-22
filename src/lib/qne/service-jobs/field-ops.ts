@@ -326,7 +326,9 @@ export function canSetSupportMode(
     evidence.workNoteCount > 0 ||
     Boolean(evidence.travelStartedAt) ||
     Boolean(evidence.arrivedAt);
-  if (job.support_mode && hasEvidence) {
+  // Material field evidence locks support mode even when the stored mode is
+  // still null — a legacy Job cannot be reclassified after work happened.
+  if (hasEvidence) {
     return { ok: false, reason: "Support mode is locked once field evidence exists." };
   }
   return { ok: true };
