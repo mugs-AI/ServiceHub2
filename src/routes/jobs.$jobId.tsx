@@ -325,7 +325,7 @@ function JobDetailPage() {
       {/* WP1 — Field Operations. Visible to every teammate; the server allows
           mutation only for the Primary PIC or an Owner / Administrator. */}
       {!pendingLock && !job.is_deleted && (
-        <FieldOperationsPanel jobId={job.id} attachmentCount={0} onChanged={reloadAll} />
+        <FieldOperationsPanel jobId={job.id} onChanged={reloadAll} />
       )}
 
 
