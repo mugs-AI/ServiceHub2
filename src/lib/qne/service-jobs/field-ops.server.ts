@@ -2,6 +2,7 @@
 // append-only audit writes shared by every field endpoint.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { computeWorkMinutes, workSessionState } from "./field-ops";
 import type { FieldEvent, FieldState } from "./field-ops";
 
 export interface FieldActor {
