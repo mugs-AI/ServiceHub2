@@ -281,6 +281,8 @@ export const Route = createFileRoute("/api/workspace/jobs")({
             status,
             priority,
             source,
+            support_mode: supportMode,
+
             requires_approval: requiresApproval,
             approval_reason: approvalReason,
             subscription_snapshot_id: entitlementSnap?.id ?? null,
