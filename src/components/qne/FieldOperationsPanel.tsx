@@ -204,10 +204,36 @@ export function FieldOperationsPanel({
     [data, jobId, load, onChanged],
   );
 
+  // The server is the authority: prefer its action list, fall back to the
+  // shared pure rules while an older response shape is in flight.
   const actions = useMemo<FieldEvent[]>(
-    () => (data ? availableFieldActions(data.state) : []),
+    () => (data ? (data.availableActions ?? availableFieldActions(data.state)) : []),
     [data],
   );
+
+  const saveSupportMode = useCallback(
+    async (mode: string) => {
+      setBusy("support_mode_set");
+      setError(null);
+      try {
+        const res = await fetch(`/api/workspace/jobs/${jobId}/field`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ action: "support_mode_set", support_mode: mode }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+        await load();
+        await onChanged();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not set support mode.");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [jobId, load, onChanged],
+  );
+
 
   if (loading && !data) {
     return (
