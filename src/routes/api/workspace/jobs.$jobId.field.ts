@@ -436,7 +436,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
                 started_at: now,
                 status: "active",
               });
-              if (error) throw error;
+              if (error) throw asConflict(error);
               break;
             }
             case "work_stopped": {
@@ -446,15 +446,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               if (state.openSession) {
                 meta.segment_minutes = await closeActiveSegment("completed", null);
               } else {
-                // Already paused (segment closed) — mark the paused segment as
-                // completed so no open work remains.
-                const { error } = await supabaseAdmin
-                  .from("service_job_work_sessions")
-                  .update({ status: "completed" })
-                  .eq("tenant_code", actor.tenantCode)
-                  .eq("service_job_id", job.id)
-                  .eq("status", "paused");
-                if (error) throw error;
+                // Already paused: the billable segment is already closed, so
+                // only the current paused state marker is completed.
+                await closeCurrentPausedSegment();
               }
               break;
             }
