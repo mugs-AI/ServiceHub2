@@ -458,6 +458,6 @@ describe("Field Operations UI truth", () => {
   });
 
   it("keeps mutation authority server-derived, not browser-derived", () => {
-    expect(panel).toContain("permissions.canMutate");
+    expect(panel).toMatch(/data\.permissions\??\.canMutate/);
   });
 });
