@@ -2237,6 +2237,18 @@ export type Database = {
         }
         Returns: Json
       }
+      sh_field_mutate: {
+        Args: {
+          p_action: string
+          p_actor_name: string
+          p_actor_user_id: string
+          p_is_admin: boolean
+          p_job_id: string
+          p_payload?: Json
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
       sh_next_job_number: {
         Args: { p_date_key: string; p_tenant_code: string }
         Returns: number
