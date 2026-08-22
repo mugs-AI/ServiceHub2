@@ -20,7 +20,13 @@ import {
   type FieldEvent,
 } from "@/lib/qne/service-jobs/field-ops";
 import { gpsRequestFor, type TravelGpsSettings } from "@/lib/qne/service-jobs/tenant-settings";
-import { isRemoteMode, supportModeLabel, usesTravel } from "@/lib/qne/service-jobs/support-mode";
+import {
+  SUPPORT_MODES,
+  SUPPORT_MODE_LABEL,
+  isRemoteMode,
+  supportModeLabel,
+  usesTravel,
+} from "@/lib/qne/service-jobs/support-mode";
 
 export interface FieldStateResponse {
   jobStatus: string;
