@@ -258,12 +258,45 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             if (error) throw error;
           }
 
+          // Close the currently open work segment and record its minutes.
+          async function closeActiveSegment(
+            finalStatus: "paused" | "completed",
+            reason: string | null,
+          ) {
+            const open = state.openSession;
+            if (!open) return;
+            const minutes = Math.max(
+              0,
+              Math.round((Date.parse(now) - Date.parse(open.started_at)) / 60000),
+            );
+            const { error } = await supabaseAdmin
+              .from("service_job_work_sessions")
+              .update({
+                status: finalStatus,
+                ended_at: now,
+                duration_minutes: minutes,
+                pause_reason: finalStatus === "paused" ? reason : null,
+              })
+              .eq("tenant_code", actor.tenantCode)
+              .eq("id", open.id)
+              .eq("status", "active")
+              .is("ended_at", null);
+            if (error) throw error;
+            return minutes;
+          }
+
           switch (action) {
             case "travel_started": {
+              if (job.travel_started_at) {
+                throw new FieldOpsError("Travel has already been recorded for this Job.", 409);
+              }
               await jobPatch({ travel_started_at: now, travel_note: note });
               break;
             }
             case "arrived_on_site": {
+              if (job.arrived_on_site_at) {
+                throw new FieldOpsError("Arrival has already been recorded for this Job.", 409);
+              }
               await jobPatch({ arrived_on_site_at: now, arrival_note: note });
               if (job.travel_started_at) {
                 meta.travel_minutes = Math.max(
@@ -277,6 +310,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               if (!job.arrived_on_site_at) {
                 throw new FieldOpsError("Record Arrived On Site before leaving.", 409);
               }
+              if (job.left_site_at) {
+                throw new FieldOpsError("Leaving site has already been recorded.", 409);
+              }
               await jobPatch({ left_site_at: now, leave_note: note });
               meta.onsite_minutes = Math.max(
                 0,
@@ -285,8 +321,13 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               break;
             }
             case "work_started": {
-              if (state.openSession) {
-                throw new FieldOpsError("A work session is already open for this job.", 409);
+              if (state.activeSession) {
+                throw new FieldOpsError(
+                  state.activeSession.status === "paused"
+                    ? "Work is paused — resume it instead of starting new work."
+                    : "A work session is already open for this job.",
+                  409,
+                );
               }
               const { error } = await supabaseAdmin.from("service_job_work_sessions").insert({
                 tenant_code: actor.tenantCode,
@@ -306,31 +347,48 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               break;
             }
             case "work_paused": {
-              const open = state.openSession;
-              if (!open || open.status !== "active") {
+              if (state.activeSession?.status !== "active" || !state.openSession) {
                 throw new FieldOpsError("No active work session to pause.", 409);
               }
-              const { error } = await supabaseAdmin
-                .from("service_job_work_sessions")
-                .update({ status: "paused", pause_reason: note })
-                .eq("tenant_code", actor.tenantCode)
-                .eq("id", open.id);
-              if (error) throw error;
+              // Pause closes the billable segment; the paused interval itself
+              // is never stored and therefore can never be billed.
+              meta.segment_minutes = await closeActiveSegment("paused", note);
               break;
             }
             case "work_resumed": {
-              const open = state.openSession;
-              if (!open || open.status !== "paused") {
+              if (state.activeSession?.status !== "paused") {
                 throw new FieldOpsError("No paused work session to resume.", 409);
               }
-              const { error } = await supabaseAdmin
-                .from("service_job_work_sessions")
-                .update({ status: "active", pause_reason: null })
-                .eq("tenant_code", actor.tenantCode)
-                .eq("id", open.id);
+              const { error } = await supabaseAdmin.from("service_job_work_sessions").insert({
+                tenant_code: actor.tenantCode,
+                service_job_id: job.id,
+                ...tech,
+                started_at: now,
+                status: "active",
+              });
               if (error) throw error;
               break;
             }
+            case "work_stopped": {
+              if (!state.activeSession) {
+                throw new FieldOpsError("No open work session to stop.", 409);
+              }
+              if (state.openSession) {
+                meta.segment_minutes = await closeActiveSegment("completed", null);
+              } else {
+                // Already paused (segment closed) — mark the paused segment as
+                // completed so no open work remains.
+                const { error } = await supabaseAdmin
+                  .from("service_job_work_sessions")
+                  .update({ status: "completed" })
+                  .eq("tenant_code", actor.tenantCode)
+                  .eq("service_job_id", job.id)
+                  .eq("status", "paused");
+                if (error) throw error;
+              }
+              break;
+            }
+
             case "waiting_customer_started":
             case "waiting_vendor_started": {
               const type = action === "waiting_customer_started" ? "customer" : "vendor";
