@@ -40,10 +40,22 @@ export interface FieldStateResponse {
   state: {
     status: string;
     is_deleted: boolean;
+    supportMode?: string | null;
     activeSession: { status: "active" | "paused" } | null;
     openWaiting: { customer: boolean; vendor: boolean };
     workNoteCount: number;
+    travelStartedAt?: string | null;
+    arrivedAt?: string | null;
+    leftAt?: string | null;
   };
+  permissions?: {
+    canMutate: boolean;
+    canSetSupportMode: boolean;
+    supportModeLockReason: string | null;
+  };
+  blockedReason?: string | null;
+  availableActions?: FieldEvent[];
+
   openSession: { id: string; started_at: string; status: string } | null;
   sessions: Array<{
     id: string;
