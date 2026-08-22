@@ -321,6 +321,13 @@ function JobDetailPage() {
         onDone={reloadAll}
       />
 
+      {/* WP1 — Field Operations. Visible to every teammate; the server allows
+          mutation only for the Primary PIC or an Owner / Administrator. */}
+      {!pendingLock && !job.is_deleted && (
+        <FieldOperationsPanel jobId={job.id} attachmentCount={0} onChanged={reloadAll} />
+      )}
+
+
       <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
         <Section title="Job details">
           <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
