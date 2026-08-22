@@ -127,8 +127,15 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           sanitizeLocation,
           FieldOpsError,
         } = await import("@/lib/qne/service-jobs/field-ops.server");
-        const { fieldActionsBlocked, canReadyForCompletion, FIELD_EVENTS } = await import(
-          "@/lib/qne/service-jobs/field-ops"
+        const {
+          fieldActionsBlocked,
+          canReadyForCompletion,
+          canSetSupportMode,
+          actionAllowedForMode,
+          FIELD_EVENTS,
+        } = await import("@/lib/qne/service-jobs/field-ops");
+        const { isSupportMode, SUPPORT_MODE_LABEL } = await import(
+          "@/lib/qne/service-jobs/support-mode"
         );
 
         try {
@@ -141,16 +148,69 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           };
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
           const action = String(body.action ?? "");
-          if (!(FIELD_EVENTS as readonly string[]).includes(action)) {
+          const isSupportModeSet = action === "support_mode_set";
+          if (!isSupportModeSet && !(FIELD_EVENTS as readonly string[]).includes(action)) {
             return Response.json({ error: "Unknown field action." }, { status: 400 });
           }
 
           const job = await loadJob(actor.tenantCode, params.jobId);
           assertFieldPermission(job, actor);
-          const blocked = fieldActionsBlocked({ status: job.status, is_deleted: job.is_deleted });
+          const state = await loadFieldState(actor.tenantCode, params.jobId, job);
+
+          // Support mode repair path — Primary PIC / Admin only, audited, and
+          // locked once material field evidence exists.
+          if (isSupportModeSet) {
+            const lifecycleBlocked = fieldActionsBlocked({
+              status: job.status,
+              is_deleted: job.is_deleted,
+            });
+            if (lifecycleBlocked) {
+              return Response.json({ error: lifecycleBlocked }, { status: 400 });
+            }
+            const next = String(body.support_mode ?? "");
+            if (!isSupportMode(next)) {
+              return Response.json({ error: "Invalid support mode." }, { status: 400 });
+            }
+            const gate = canSetSupportMode(
+              { assigned_user_id: job.assigned_user_id, support_mode: job.support_mode },
+              { isAdmin: actor.isAdmin, actorUserId: actor.userId },
+              {
+                sessionCount: state.sessionCount,
+                waitingCount: state.waitingCount,
+                workNoteCount: state.workNoteCount ?? 0,
+                travelStartedAt: job.travel_started_at,
+                arrivedAt: job.arrived_on_site_at,
+              },
+            );
+            if (!gate.ok) {
+              return Response.json({ error: gate.reason }, { status: 409 });
+            }
+            const { error: updErr } = await supabaseAdmin
+              .from("service_jobs")
+              .update({ support_mode: next })
+              .eq("tenant_code", actor.tenantCode)
+              .eq("id", job.id);
+            if (updErr) throw updErr;
+            await logFieldEvent(actor, job.id, "support_mode_set" as never, {
+              oldValue: job.support_mode,
+              newValue: next,
+              note: `Support mode set to ${SUPPORT_MODE_LABEL[next]}`,
+            });
+            return Response.json({ ok: true, support_mode: next });
+          }
+
+          const blocked = fieldActionsBlocked({
+            status: job.status,
+            is_deleted: job.is_deleted,
+            supportMode: job.support_mode ?? null,
+          });
           if (blocked) return Response.json({ error: blocked }, { status: 400 });
 
-          const state = await loadFieldState(actor.tenantCode, params.jobId, job);
+          // Remote / onsite applicability is decided from the STORED mode.
+          const modeError = actionAllowedForMode(action as never, job.support_mode);
+          if (modeError) return Response.json({ error: modeError }, { status: 400 });
+
+
           const now = new Date().toISOString();
           const location = sanitizeLocation(body.location);
           const note = typeof body.note === "string" ? body.note.trim().slice(0, 2000) : null;
