@@ -146,6 +146,16 @@ export interface FieldState {
   activeSession?: { status: "active" | "paused" } | null;
   openWaiting?: { customer: boolean; vendor: boolean };
   workNoteCount?: number;
+  /**
+   * Stored Job support mode. `undefined` means "not supplied by this caller";
+   * `null` means the Job genuinely has no support mode yet and Field activity
+   * must not assume Onsite.
+   */
+  supportMode?: string | null;
+  /** Onsite single-visit evidence, used to prevent overwrite. */
+  travelStartedAt?: string | null;
+  arrivedAt?: string | null;
+  leftAt?: string | null;
 }
 
 export function fieldActionsBlocked(state: FieldState): string | null {
@@ -153,8 +163,40 @@ export function fieldActionsBlocked(state: FieldState): string | null {
   if ((FIELD_BLOCKED_STATUSES as readonly string[]).includes(state.status)) {
     return `${state.status} jobs cannot use field actions.`;
   }
+  if (state.supportMode === null) {
+    return "Support mode is not set for this Job.";
+  }
   return null;
 }
+
+/** True when the Job has no stored support mode and Field work cannot start. */
+export function supportModeMissing(state: FieldState): boolean {
+  return state.supportMode === null;
+}
+
+/**
+ * Server-mirrored applicability rule. Travel / arrival / leave only exist for
+ * onsite-style support modes and a missing mode is never treated as Onsite.
+ */
+export function actionAllowedForMode(
+  action: FieldEvent,
+  supportMode: string | null | undefined,
+): string | null {
+  if (!TRAVEL_ONLY_EVENTS.includes(action)) return null;
+  if (!supportMode) return "Support mode is not set for this Job.";
+  if (!ONSITE_SUPPORT_MODES.includes(supportMode)) {
+    return "Travel, arrival and leave do not apply to this support mode.";
+  }
+  return null;
+}
+
+/** Onsite-style modes, mirrored from support-mode.ts to keep this module pure. */
+const ONSITE_SUPPORT_MODES: readonly string[] = [
+  "onsite_support",
+  "training",
+  "installation",
+  "migration",
+];
 
 /** Which field actions the UI should offer right now. */
 export function availableFieldActions(state: FieldState): FieldEvent[] {
@@ -166,17 +208,122 @@ export function availableFieldActions(state: FieldState): FieldEvent[] {
   if (!session) {
     out.push("travel_started", "arrived_on_site", "work_started", "leave_site");
   } else if (session.status === "active") {
-    out.push("work_paused");
+    out.push("work_paused", "work_stopped");
   } else {
-    out.push("work_resumed");
+    out.push("work_resumed", "work_stopped");
   }
 
   out.push(waiting.customer ? "waiting_customer_resolved" : "waiting_customer_started");
   out.push(waiting.vendor ? "waiting_vendor_resolved" : "waiting_vendor_started");
 
   if (canReadyForCompletion(state).ok) out.push("ready_for_completion");
-  return out;
+
+  return out.filter((a) => {
+    if (state.supportMode !== undefined && actionAllowedForMode(a, state.supportMode)) {
+      return false;
+    }
+    if (a === "travel_started" && state.travelStartedAt) return false;
+    if (a === "arrived_on_site" && state.arrivedAt) return false;
+    if (a === "leave_site" && (state.leftAt || !state.arrivedAt)) return false;
+    return true;
+  });
 }
+
+/* ---------------- work-session lifecycle (pure) ---------------- */
+
+export interface WorkSessionRow {
+  id: string;
+  status: string;
+  started_at: string;
+  ended_at?: string | null;
+  duration_minutes?: number | null;
+}
+
+/**
+ * A work session is modelled as a sequence of segments:
+ *  - Start Work opens an `active` segment;
+ *  - Pause closes that segment as `paused` (its minutes are kept, the paused
+ *    interval itself is never recorded, so it can never be billed);
+ *  - Resume opens a new `active` segment;
+ *  - Stop Work closes the active segment as `completed`.
+ */
+export function workSessionState(rows: readonly WorkSessionRow[]): {
+  activeSegment: WorkSessionRow | null;
+  status: "active" | "paused" | null;
+} {
+  const sorted = [...rows].sort(
+    (a, b) => Date.parse(b.started_at) - Date.parse(a.started_at),
+  );
+  const activeSegment = sorted.find((r) => r.status === "active" && !r.ended_at) ?? null;
+  if (activeSegment) return { activeSegment, status: "active" };
+  const latest = sorted.find((r) => r.status !== "cancelled") ?? null;
+  if (latest && latest.status === "paused") return { activeSegment: null, status: "paused" };
+  return { activeSegment: null, status: null };
+}
+
+/** Server-derived total work minutes: closed, non-cancelled segments only. */
+export function computeWorkMinutes(rows: readonly WorkSessionRow[]): number {
+  let total = 0;
+  for (const r of rows) {
+    if (r.status === "cancelled") continue;
+    if (typeof r.duration_minutes === "number") {
+      total += Math.max(0, r.duration_minutes);
+    } else if (r.started_at && r.ended_at) {
+      total += Math.max(
+        0,
+        Math.round((Date.parse(r.ended_at) - Date.parse(r.started_at)) / 60000),
+      );
+    }
+  }
+  return total;
+}
+
+/* ---------------- authority (pure) ---------------- */
+
+export interface FieldActorFacts {
+  isAdmin: boolean;
+  actorUserId: string | null;
+}
+
+/** Physical Field mutation = Primary PIC OR Owner/Admin. Never all teammates. */
+export function canMutateField(
+  job: { assigned_user_id: string | null },
+  actor: FieldActorFacts,
+): boolean {
+  if (actor.isAdmin) return true;
+  return Boolean(job.assigned_user_id && actor.actorUserId && job.assigned_user_id === actor.actorUserId);
+}
+
+/**
+ * Support mode may be set on a legacy Job by the Primary PIC or an Admin, but
+ * it locks as soon as material Field evidence exists.
+ */
+export function canSetSupportMode(
+  job: { assigned_user_id: string | null; support_mode: string | null },
+  actor: FieldActorFacts,
+  evidence: {
+    sessionCount: number;
+    waitingCount: number;
+    workNoteCount: number;
+    travelStartedAt?: string | null;
+    arrivedAt?: string | null;
+  },
+): { ok: boolean; reason?: string } {
+  if (!canMutateField(job, actor)) {
+    return { ok: false, reason: "Only the Primary PIC or an Administrator can set support mode." };
+  }
+  const hasEvidence =
+    evidence.sessionCount > 0 ||
+    evidence.waitingCount > 0 ||
+    evidence.workNoteCount > 0 ||
+    Boolean(evidence.travelStartedAt) ||
+    Boolean(evidence.arrivedAt);
+  if (job.support_mode && hasEvidence) {
+    return { ok: false, reason: "Support mode is locked once field evidence exists." };
+  }
+  return { ok: true };
+}
+
 
 export function canReadyForCompletion(state: FieldState): { ok: boolean; reason?: string } {
   const blocked = fieldActionsBlocked(state);
