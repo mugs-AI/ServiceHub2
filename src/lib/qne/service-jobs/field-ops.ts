@@ -249,16 +249,24 @@ export interface WorkSessionRow {
  */
 export function workSessionState(rows: readonly WorkSessionRow[]): {
   activeSegment: WorkSessionRow | null;
+  /**
+   * The single most recent paused segment, i.e. the current paused state
+   * marker. Older paused rows are closed historical evidence and are never
+   * touched by a state transition.
+   */
+  pausedSegment: WorkSessionRow | null;
   status: "active" | "paused" | null;
 } {
   const sorted = [...rows].sort(
     (a, b) => Date.parse(b.started_at) - Date.parse(a.started_at),
   );
   const activeSegment = sorted.find((r) => r.status === "active" && !r.ended_at) ?? null;
-  if (activeSegment) return { activeSegment, status: "active" };
+  if (activeSegment) return { activeSegment, pausedSegment: null, status: "active" };
   const latest = sorted.find((r) => r.status !== "cancelled") ?? null;
-  if (latest && latest.status === "paused") return { activeSegment: null, status: "paused" };
-  return { activeSegment: null, status: null };
+  if (latest && latest.status === "paused") {
+    return { activeSegment: null, pausedSegment: latest, status: "paused" };
+  }
+  return { activeSegment: null, pausedSegment: null, status: null };
 }
 
 /** Server-derived total work minutes: closed, non-cancelled segments only. */
