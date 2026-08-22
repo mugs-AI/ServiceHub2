@@ -70,6 +70,7 @@ export const Route = createFileRoute("/api/workspace/jobs")({
           const problem = trim(body.problem_description, 5000);
           const priority = (trim(body.priority, 20) ?? "Medium") as Priority;
           const source = (trim(body.source, 20) ?? "Phone") as SourceType;
+          const supportModeRaw = trim(body.support_mode, 40);
 
           if (!customerCode || !subject || !problem) {
             return Response.json(
@@ -83,6 +84,14 @@ export const Route = createFileRoute("/api/workspace/jobs")({
           if (!SOURCES.includes(source)) {
             return Response.json({ error: "Invalid source." }, { status: 400 });
           }
+          // Support mode decides whether travel/arrival applies, so it is
+          // captured at creation rather than inferred later.
+          const { isSupportMode } = await import("@/lib/qne/service-jobs/support-mode");
+          if (!isSupportMode(supportModeRaw)) {
+            return Response.json({ error: "Support mode is required." }, { status: 400 });
+          }
+          const supportMode = supportModeRaw;
+
 
           // 1) Verify customer belongs to this tenant, and grab display + N3 id.
           const { data: cust, error: custErr } = await supabaseAdmin
