@@ -11,6 +11,7 @@ export const FIELD_EVENTS = [
   "work_started",
   "work_paused",
   "work_resumed",
+  "work_stopped",
   "waiting_customer_started",
   "waiting_customer_resolved",
   "waiting_vendor_started",
@@ -27,12 +28,21 @@ export const FIELD_EVENT_LABEL: Record<FieldEvent, string> = {
   work_started: "Start Work",
   work_paused: "Pause",
   work_resumed: "Resume",
+  work_stopped: "Stop Work",
   waiting_customer_started: "Waiting Customer",
   waiting_customer_resolved: "Resolve Waiting Customer",
   waiting_vendor_started: "Waiting Vendor",
   waiting_vendor_resolved: "Resolve Waiting Vendor",
   ready_for_completion: "Ready for Completion",
 };
+
+/** Field actions that only make sense for onsite-style support modes. */
+export const TRAVEL_ONLY_EVENTS: readonly FieldEvent[] = [
+  "travel_started",
+  "arrived_on_site",
+  "leave_site",
+];
+
 
 /** Statuses where no field action is ever permitted. */
 export const FIELD_BLOCKED_STATUSES = [
