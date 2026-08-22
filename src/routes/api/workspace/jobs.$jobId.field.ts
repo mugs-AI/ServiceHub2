@@ -484,13 +484,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               if (state.openSession) {
                 await closeActiveSegment("completed", null);
               } else if (state.activeSession?.status === "paused") {
-                const { error: pauseErr } = await supabaseAdmin
-                  .from("service_job_work_sessions")
-                  .update({ status: "completed" })
-                  .eq("tenant_code", actor.tenantCode)
-                  .eq("service_job_id", job.id)
-                  .eq("status", "paused");
-                if (pauseErr) throw pauseErr;
+                await closeCurrentPausedSegment();
               }
 
 
