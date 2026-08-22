@@ -56,10 +56,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             canSetSupportMode,
             fieldActionsBlocked,
           } = await import("@/lib/qne/service-jobs/field-ops");
-          const totalMinutes = computeWorkMinutes(
-            (sessions.data ?? []) as never,
-            new Date().toISOString(),
-          );
+          const totalMinutes = computeWorkMinutes((sessions.data ?? []) as never);
+
 
           const { loadTenantSettings } = await import(
             "@/lib/qne/service-jobs/tenant-settings.server"
