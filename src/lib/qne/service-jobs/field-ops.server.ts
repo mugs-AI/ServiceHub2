@@ -129,6 +129,7 @@ export async function loadFieldState(
     openWaiting: { customer: types.has("customer"), vendor: types.has("vendor") },
     workNoteCount: notes.count ?? 0,
     openSession: open,
+    pausedSessionId: segState.pausedSegment?.id ?? null,
     sessionCount: rows.length,
     waitingCount: (waiting.data ?? []).length,
   };
