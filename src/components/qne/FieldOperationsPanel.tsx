@@ -256,11 +256,13 @@ export function FieldOperationsPanel({
     );
   }
 
-  const blocked = fieldActionsBlocked(data.state);
+  const blocked = data.blockedReason ?? fieldActionsBlocked(data.state);
+  const canMutate = data.permissions?.canMutate ?? true;
   const travel = usesTravel(data.job.support_mode);
   const remote = isRemoteMode(data.job.support_mode);
   const ready = canReadyForCompletion(data.state);
   const session = data.state.activeSession;
+
 
   const stage = data.state.openWaiting.customer
     ? "Waiting Customer"
