@@ -415,22 +415,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
               const dateOnly = (v: unknown) =>
                 typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 
-              // Close any open work session so waiting time is not billed as work.
+              // Waiting must stop billable work: close the active segment and
+              // leave no paused segment behind.
               if (state.openSession) {
-                const started = new Date(state.openSession.started_at).getTime();
-                await supabaseAdmin
+                await closeActiveSegment("completed", null);
+              } else if (state.activeSession?.status === "paused") {
+                const { error: pauseErr } = await supabaseAdmin
                   .from("service_job_work_sessions")
-                  .update({
-                    status: "completed",
-                    ended_at: now,
-                    duration_minutes: Math.max(
-                      0,
-                      Math.round((Date.parse(now) - started) / 60000),
-                    ),
-                  })
+                  .update({ status: "completed" })
                   .eq("tenant_code", actor.tenantCode)
-                  .eq("id", state.openSession.id);
+                  .eq("service_job_id", job.id)
+                  .eq("status", "paused");
+                if (pauseErr) throw pauseErr;
               }
+
 
               const { error } = await supabaseAdmin.from("service_job_waiting_periods").insert({
                 tenant_code: actor.tenantCode,
