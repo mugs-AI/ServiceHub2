@@ -511,6 +511,23 @@ function NewJobPage() {
                 className="input"
               />
             </Field>
+            <Field label="Support mode *">
+              <select
+                value={supportMode}
+                onChange={(e) => setSupportMode(e.target.value as SupportMode)}
+                required
+                className="input"
+              >
+                {SUPPORT_MODES.map((m) => (
+                  <option key={m} value={m}>
+                    {SUPPORT_MODE_LABEL[m]}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Remote and phone jobs skip Travel and Arrival controls.
+              </p>
+            </Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Source">
                 <select
@@ -537,6 +554,7 @@ function NewJobPage() {
                 </select>
               </Field>
             </div>
+
             <Field label="Problem description *">
               <textarea
                 value={problem}
