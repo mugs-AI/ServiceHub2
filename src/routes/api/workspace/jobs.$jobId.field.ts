@@ -269,8 +269,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             p_tenant_code: actor.tenantCode,
             p_job_id: params.jobId,
             p_action: action,
-            p_actor_user_id: actor.userId,
-            p_actor_name: actor.name,
+            p_actor_user_id: actor.userId as unknown as string,
+            p_actor_name: actor.name as unknown as string,
+
             p_is_admin: actor.isAdmin,
             p_payload: payload as never,
           });
