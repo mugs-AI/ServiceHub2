@@ -11,13 +11,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
   server: {
     handlers: {
       GET: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { loadJob, loadFieldState } = await import(
-          "@/lib/qne/service-jobs/field-ops.server"
-        );
+        const { loadJob, loadFieldState } = await import("@/lib/qne/service-jobs/field-ops.server");
         try {
           const user = await requireAuthenticatedN3User(request);
           const job = await loadJob(user.tenantCode, params.jobId);
@@ -58,10 +55,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
           } = await import("@/lib/qne/service-jobs/field-ops");
           const totalMinutes = computeWorkMinutes((sessions.data ?? []) as never);
 
-
-          const { loadTenantSettings } = await import(
-            "@/lib/qne/service-jobs/tenant-settings.server"
-          );
+          const { loadTenantSettings } =
+            await import("@/lib/qne/service-jobs/tenant-settings.server");
           const settings = await loadTenantSettings(user.tenantCode);
 
           const actorUserId = user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
@@ -127,7 +122,6 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
             totalWorkMinutes: totalMinutes,
             serverNow: new Date().toISOString(),
           });
-
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;
@@ -146,17 +140,14 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
       // success audit. This route only authenticates, validates request shape
       // and tenant GPS policy, then maps RPC outcomes to HTTP statuses.
       POST: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { loadJob, assertFieldPermission, sanitizeLocation, FieldOpsError } = await import(
-          "@/lib/qne/service-jobs/field-ops.server"
-        );
+        const { loadJob, assertFieldPermission, sanitizeLocation, FieldOpsError } =
+          await import("@/lib/qne/service-jobs/field-ops.server");
         const { FIELD_EVENTS } = await import("@/lib/qne/service-jobs/field-ops");
-        const { isSupportMode, SUPPORT_MODE_LABEL } = await import(
-          "@/lib/qne/service-jobs/support-mode"
-        );
+        const { isSupportMode, SUPPORT_MODE_LABEL } =
+          await import("@/lib/qne/service-jobs/support-mode");
 
         try {
           const user = await requireAuthenticatedN3User(request);
@@ -195,9 +186,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
 
             // Tenant Travel & GPS policy — never silently collect, never block
             // remote work, and require an exception reason when mandated.
-            const { loadTenantSettings } = await import(
-              "@/lib/qne/service-jobs/tenant-settings.server"
-            );
+            const { loadTenantSettings } =
+              await import("@/lib/qne/service-jobs/tenant-settings.server");
             const { gpsRequestFor } = await import("@/lib/qne/service-jobs/tenant-settings");
             const tenantSettings = await loadTenantSettings(actor.tenantCode);
             const gpsNeed = gpsRequestFor(tenantSettings.travelGps, action, job.support_mode);
@@ -316,4 +306,3 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/field")({
     },
   },
 });
-

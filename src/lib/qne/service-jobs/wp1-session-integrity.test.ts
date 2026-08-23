@@ -7,11 +7,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  canSetSupportMode,
-  computeWorkMinutes,
-  workSessionState,
-} from "./field-ops";
+import { canSetSupportMode, computeWorkMinutes, workSessionState } from "./field-ops";
 import type { WorkSessionRow } from "./field-ops";
 
 const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
@@ -70,7 +66,6 @@ describe("work-session schema contract", () => {
       expect(schemaOnly).not.toMatch(/UPDATE\s+[^;]*service_job_work_sessions/i);
     }
   });
-
 });
 
 /* ---------------- lifecycle ---------------- */
@@ -446,10 +441,7 @@ describe("Field Operations UI truth", () => {
     join(process.cwd(), "src", "components", "qne", "FieldOperationsPanel.tsx"),
     "utf8",
   );
-  const jobDetail = readFileSync(
-    join(process.cwd(), "src", "routes", "jobs.$jobId.tsx"),
-    "utf8",
-  );
+  const jobDetail = readFileSync(join(process.cwd(), "src", "routes", "jobs.$jobId.tsx"), "utf8");
 
   it("remains mounted on Job Detail", () => {
     expect(jobDetail).toContain("<FieldOperationsPanel");

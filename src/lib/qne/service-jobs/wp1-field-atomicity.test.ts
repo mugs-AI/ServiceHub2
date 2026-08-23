@@ -15,14 +15,7 @@ import { describe, expect, it } from "vitest";
 import { FIELD_EVENTS } from "./field-ops";
 
 const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
-const ROUTE = join(
-  process.cwd(),
-  "src",
-  "routes",
-  "api",
-  "workspace",
-  "jobs.$jobId.field.ts",
-);
+const ROUTE = join(process.cwd(), "src", "routes", "api", "workspace", "jobs.$jobId.field.ts");
 const HISTORICAL = "20260801003537_bcb53731-c1d2-41bd-8ee5-359fe7ec9e62.sql";
 const SESSION_INTEGRITY = "20260822125838_81778a3d-d050-424c-8055-14a8a3aa13b7.sql";
 
@@ -34,7 +27,9 @@ function migrations(): { name: string; sql: string }[] {
 }
 
 const files = migrations();
-const rpcFile = files.find((f) => /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.sh_field_mutate/i.test(f.sql));
+const rpcFile = files.find((f) =>
+  /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.sh_field_mutate/i.test(f.sql),
+);
 const rpcSql = rpcFile?.sql ?? "";
 const routeSrc = readFileSync(ROUTE, "utf8");
 
@@ -90,10 +85,14 @@ describe("atomic field-mutation RPC", () => {
   it("is SECURITY DEFINER with a fixed search_path and service-role-only execute", () => {
     expect(rpcSql).toMatch(/SECURITY\s+DEFINER/i);
     expect(rpcSql).toMatch(/SET\s+search_path\s+TO\s+'public'/i);
-    expect(rpcSql).toMatch(/REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.sh_field_mutate[\s\S]*FROM\s+PUBLIC/i);
+    expect(rpcSql).toMatch(
+      /REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.sh_field_mutate[\s\S]*FROM\s+PUBLIC/i,
+    );
     expect(rpcSql).toMatch(/FROM\s+anon/i);
     expect(rpcSql).toMatch(/FROM\s+authenticated/i);
-    expect(rpcSql).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.sh_field_mutate[\s\S]*TO\s+service_role/i);
+    expect(rpcSql).toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.sh_field_mutate[\s\S]*TO\s+service_role/i,
+    );
   });
 
   it("translates a unique violation into a controlled conflict, not a 500", () => {
@@ -113,10 +112,13 @@ describe("atomic field-mutation RPC", () => {
   it("never mass-updates historical paused evidence", () => {
     // Paused rows are only ever closed by their exact id.
     const pausedUpdates =
-      rpcSql.match(/UPDATE\s+public\.service_job_work_sessions\s+SET\s+status\s*=\s*'completed'\s+WHERE\s+id\s*=\s*v_paused\.id/gi) ??
-      [];
+      rpcSql.match(
+        /UPDATE\s+public\.service_job_work_sessions\s+SET\s+status\s*=\s*'completed'\s+WHERE\s+id\s*=\s*v_paused\.id/gi,
+      ) ?? [];
     expect(pausedUpdates.length).toBeGreaterThanOrEqual(2);
-    expect(rpcSql).not.toMatch(/UPDATE\s+public\.service_job_work_sessions[^;]*WHERE\s+service_job_id\s*=\s*p_job_id[^;]*status\s*=\s*'paused'/i);
+    expect(rpcSql).not.toMatch(
+      /UPDATE\s+public\.service_job_work_sessions[^;]*WHERE\s+service_job_id\s*=\s*p_job_id[^;]*status\s*=\s*'paused'/i,
+    );
   });
 });
 
