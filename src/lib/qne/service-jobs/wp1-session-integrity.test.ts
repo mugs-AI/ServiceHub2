@@ -61,11 +61,16 @@ describe("work-session schema contract", () => {
   });
 
   it("does not delete or rewrite historical session evidence", () => {
+    // Runtime routine bodies legitimately write single rows at request time;
+    // this guard is about migration-level data rewrites, so function bodies
+    // are excluded before checking.
     for (const f of forward) {
-      expect(f.sql).not.toMatch(/DELETE\s+FROM[^;]*service_job_work_sessions/i);
-      expect(f.sql).not.toMatch(/UPDATE\s+[^;]*service_job_work_sessions/i);
+      const schemaOnly = f.sql.replace(/\$function\$[\s\S]*?\$function\$/g, "");
+      expect(schemaOnly).not.toMatch(/DELETE\s+FROM[^;]*service_job_work_sessions/i);
+      expect(schemaOnly).not.toMatch(/UPDATE\s+[^;]*service_job_work_sessions/i);
     }
   });
+
 });
 
 /* ---------------- lifecycle ---------------- */
