@@ -137,8 +137,8 @@ export async function applyConnection(
     p_patch: patch as never,
     p_action: action,
     p_detail: detail as never,
-    p_actor_user_id: actor.userId,
-    p_actor_name: actor.name,
+    p_actor_user_id: actor.userId ?? undefined,
+    p_actor_name: actor.name ?? undefined,
   });
   if (error || !data) {
     throw new Error(
@@ -181,8 +181,8 @@ export async function beginAuthorization(actor: DriveActor): Promise<string> {
     p_verifier_ciphertext: await encryptSecret(verifier),
     p_redirect_uri: cfg.redirectUri,
     p_expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
-    p_actor_user_id: actor.userId,
-    p_actor_name: actor.name,
+    p_actor_user_id: actor.userId ?? undefined,
+    p_actor_name: actor.name ?? undefined,
   });
   if (error) {
     throw new Error(
