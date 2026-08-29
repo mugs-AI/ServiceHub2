@@ -322,11 +322,26 @@ export class DriveAuthError extends Error {
   }
 }
 
+/**
+ * Background/system actor for mutations that are not initiated by a person
+ * (token refresh, fail-closed status changes). Truthful: no fabricated user.
+ */
+function systemActor(row: ConnectionRow): DriveActor {
+  return { tenantCode: row.tenant_code, userId: null, name: null };
+}
+
+/**
+ * P1-3 (patch): every persisted status/credential change goes through the
+ * atomic connection-mutation + audit RPC. A direct table update would allow a
+ * persisted change without its audit record.
+ */
 async function markNeedsReconnect(row: ConnectionRow, reason: string): Promise<void> {
-  await supabaseAdmin
-    .from("google_drive_connections")
-    .update({ status: "needs_reconnect", last_error: reason })
-    .eq("id", row.id);
+  await applyConnection(
+    systemActor(row),
+    { status: "needs_reconnect", last_error: reason },
+    "token_refresh_failed",
+    { reason },
+  );
 }
 
 /**
