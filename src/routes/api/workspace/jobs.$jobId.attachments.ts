@@ -63,6 +63,13 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
       },
 
       POST: async ({ request, params }) => {
+        // WP2A: refuse NEW Supabase production bytes while WP2B is pending.
+        const { ATTACHMENT_BYTES_ENABLED, ATTACHMENT_BYTES_DISABLED_MESSAGE } = await import(
+          "@/lib/qne/storage/attachment-bytes"
+        );
+        if (!ATTACHMENT_BYTES_ENABLED) {
+          return Response.json({ error: ATTACHMENT_BYTES_DISABLED_MESSAGE }, { status: 503 });
+        }
         const { requireAuthenticatedN3User, guardResponse } = await import(
           "@/lib/qne/session/current-user.server"
         );
