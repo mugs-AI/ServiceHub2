@@ -995,7 +995,8 @@ describe("FINAL-3 token refresh and status changes are atomic with audit", () =>
     expect(String(connRow().refresh_token_ciphertext)).not.toContain("rt-2");
     expect(
       H.db.audit.some(
-        (a) => a.action === "token_refreshed" && (a.detail as { rotated?: boolean }).rotated === true,
+        (a) =>
+          a.action === "token_refreshed" && (a.detail as { rotated?: boolean }).rotated === true,
       ),
     ).toBe(true);
   });
