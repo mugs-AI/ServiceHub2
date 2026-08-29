@@ -297,6 +297,8 @@ export function redirectUriFor(origin: string): string {
 export type CallbackOutcome =
   | "connected"
   | "account_changed"
+  | "identity_failed"
+  | "folder_recheck_required"
   | "state_invalid"
   | "state_expired"
   | "state_used"
@@ -309,6 +311,10 @@ export const CALLBACK_MESSAGE: Record<CallbackOutcome, string> = {
   connected: "Google Drive connected.",
   account_changed:
     "Google Drive connected with a different Google account. Select the Root Folder again.",
+  identity_failed:
+    "Google did not confirm which Google account authorised the connection, so nothing was connected and the new access was revoked. Start the connection again.",
+  folder_recheck_required:
+    "Google Drive re-authorised, but the saved Root Folder could not be confirmed as usable. An Owner/Admin must check the folder in Google Drive or select it again.",
   state_invalid: "The Google sign-in response could not be verified. Start the connection again.",
   state_expired: "The Google sign-in request expired. Start the connection again.",
   state_used: "That Google sign-in response was already used. Start the connection again.",

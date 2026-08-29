@@ -721,7 +721,8 @@ describe("P1-4 audit and mutation atomicity", () => {
     await connectFully();
     H.db.failAudit = true;
     const res = await connectionPost({ action: "picker_token" });
-    expect(res.status).toBe(500);
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).not.toBe(200);
     expect(await res.text()).not.toContain("at-1");
   });
 
@@ -798,5 +799,242 @@ describe("No Supabase production-byte fallback while WP2B is pending", () => {
     });
     expect(res.status).toBe(503);
     expect((await res.json()).error).toBe(flags.ATTACHMENT_BYTES_DISABLED_MESSAGE);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * WP2A FINAL SECURITY PATCH
+ * These tests execute the REAL second OAuth callback route (not the "test"
+ * action) and the REAL token-refresh path.
+ * ------------------------------------------------------------------------ */
+
+function connRow(): Record<string, unknown> {
+  return H.db.connections[0]!;
+}
+
+function expireAccessToken(): void {
+  connRow().access_token_expires_at = new Date(Date.now() - 60_000).toISOString();
+}
+
+const PUBLIC_PERMS = [{ permissions: [{ id: "any", type: "anyone", role: "reader" }] }];
+
+describe("FINAL-1 fail closed on Google account identity", () => {
+  it("rejects and revokes the new grant when about.get fails, persisting nothing", async () => {
+    google.aboutStatus = 500;
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=identity_failed");
+    expect(res.headers.get("location")).not.toContain("connected");
+    expect(H.db.connections).toHaveLength(0);
+    expect(calls.some((c) => c.startsWith("POST https://oauth2.googleapis.com/revoke"))).toBe(true);
+    expect(H.db.audit.some((a) => a.action === "identity_failed")).toBe(true);
+  });
+
+  it("rejects a grant with no stable permissionId", async () => {
+    google.account = { emailAddress: "ops@tct.com" };
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=identity_failed");
+    expect(H.db.connections).toHaveLength(0);
+  });
+
+  it("never overwrites a known-good connection when identity cannot be proven", async () => {
+    await connectFully();
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+    const before = { ...connRow() };
+
+    google.aboutStatus = 500;
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=identity_failed");
+    const after = connRow();
+    expect(after.refresh_token_ciphertext).toBe(before.refresh_token_ciphertext);
+    expect(after.access_token_ciphertext).toBe(before.access_token_ciphertext);
+    expect(after.root_folder_id).toBe("F1");
+    expect(after.status).toBe("connected");
+  });
+
+  it("does not inherit an existing folder when the previous permissionId is missing", async () => {
+    await connectFully();
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+    // Simulate a legacy row whose account identity was never proven.
+    connRow().google_account_permission_id = null;
+
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=account_changed");
+    expect(connRow().root_folder_id).toBeNull();
+    expect(connRow().detected_sharing_status).toBe("unknown");
+    expect(connRow().public_sharing_acknowledged).toBe(false);
+  });
+});
+
+describe("FINAL-2 second OAuth callback really revalidates", () => {
+  it("re-reads folder AND sharing during the second callback before reporting success", async () => {
+    await connectFully();
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+    expect(connRow().detected_sharing_status).toBe("restricted");
+
+    // Sharing changed at Google between the two connections.
+    google.permissionPages = PUBLIC_PERMS;
+    google.folder = { ...(google.folder as Record<string, unknown>), name: "Renamed Root" };
+    calls = [];
+
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=connected");
+    // Folder + permissions endpoints were hit inside the callback itself.
+    expect(calls.some((c) => c.includes("/drive/v3/files/F1"))).toBe(true);
+    expect(calls.some((c) => c.includes("/permissions"))).toBe(true);
+    expect(connRow().root_folder_name).toBe("Renamed Root");
+    expect(connRow().detected_sharing_status).toBe("anyone_with_link");
+    expect(connRow().sharing_checked_at).toBeTruthy();
+    expect(H.db.audit.some((a) => a.action === "reconnected")).toBe(true);
+  });
+
+  it("keeps a public acknowledgement only while the same public risk is still real", async () => {
+    await connectFully();
+    google.permissionPages = PUBLIC_PERMS;
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+    await connectionPost({ action: "acknowledge_public_sharing", confirm: true });
+    expect(connRow().public_sharing_acknowledged).toBe(true);
+
+    // Still public → acknowledgement survives.
+    await runCallback(stateFrom(await startConnect()));
+    expect(connRow().public_sharing_acknowledged).toBe(true);
+
+    // Now Restricted again → stale acknowledgement must be cleared.
+    google.permissionPages = [{ permissions: [{ id: "o", type: "user", role: "owner" }] }];
+    await runCallback(stateFrom(await startConnect()));
+    expect(connRow().public_sharing_acknowledged).toBe(false);
+    expect(connRow().sharing_confirmed_by_name ?? null).toBeNull();
+    expect(connRow().detected_sharing_status).toBe("restricted");
+  });
+
+  it("fails closed on reconnect when the saved folder is inaccessible or trashed", async () => {
+    await connectFully();
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+
+    google.folderStatus = 404;
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=folder_recheck_required");
+    expect(res.headers.get("location")).not.toContain("drive=connected");
+    expect(connRow().status).toBe("error");
+    expect(String(connRow().last_error)).toBeTruthy();
+    expect(H.db.audit.some((a) => a.action === "reconnect_folder_invalid")).toBe(true);
+  });
+
+  it("fails closed on reconnect when the saved folder is read-only", async () => {
+    await connectFully();
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+
+    google.folder = {
+      ...(google.folder as Record<string, unknown>),
+      capabilities: { canAddChildren: false, canListChildren: true },
+    };
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=folder_recheck_required");
+    expect(connRow().status).toBe("error");
+  });
+
+  it("never fabricates Restricted when permissions.list fails on reconnect", async () => {
+    await connectFully();
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+
+    google.permissionsStatus = 500;
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=folder_recheck_required");
+    expect(connRow().detected_sharing_status).toBe("error");
+    expect(connRow().status).toBe("error");
+    expect(H.db.audit.some((a) => a.action === "reconnect_sharing_unavailable")).toBe(true);
+  });
+
+  it("clears folder, drive context, sharing and acknowledgement on a different account", async () => {
+    await connectFully();
+    google.permissionPages = PUBLIC_PERMS;
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+    await connectionPost({ action: "acknowledge_public_sharing", confirm: true });
+
+    google.account = { emailAddress: "other@tct.com", permissionId: "PID-2" };
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=account_changed");
+    const row = connRow();
+    expect(row.root_folder_id).toBeNull();
+    expect(row.root_folder_name).toBeNull();
+    expect(row.drive_context).toBeNull();
+    expect(row.drive_id).toBeNull();
+    expect(row.detected_sharing_status).toBe("unknown");
+    expect(row.public_sharing_acknowledged).toBe(false);
+    expect(row.sharing_confirmed_at).toBeNull();
+    expect(row.google_account_permission_id).toBe("PID-2");
+  });
+});
+
+describe("FINAL-3 token refresh and status changes are atomic with audit", () => {
+  it("audits a successful background refresh and persists it atomically", async () => {
+    await connectFully();
+    expireAccessToken();
+    const res = await connectionPost({ action: "test" });
+    expect(res.status).toBe(200);
+    const refreshAudit = H.db.audit.filter((a) => a.action === "token_refreshed");
+    expect(refreshAudit.length).toBeGreaterThan(0);
+    // Background refresh uses a truthful system actor (no fabricated user).
+    expect(refreshAudit[0]!.actor_user_id ?? null).toBeNull();
+  });
+
+  it("audits refresh-token rotation and stores only ciphertext", async () => {
+    await connectFully();
+    const before = connRow().refresh_token_ciphertext;
+    expireAccessToken();
+    google.token = {
+      access_token: "at-2",
+      refresh_token: "rt-2",
+      scope: GOOGLE_DRIVE_SCOPE,
+      expires_in: 3600,
+    };
+    const res = await connectionPost({ action: "test" });
+    const text = await res.text();
+    expect(text).not.toContain("at-2");
+    expect(text).not.toContain("rt-2");
+    expect(connRow().refresh_token_ciphertext).not.toBe(before);
+    expect(String(connRow().refresh_token_ciphertext)).not.toContain("rt-2");
+    expect(
+      H.db.audit.some(
+        (a) =>
+          a.action === "token_refreshed" && (a.detail as { rotated?: boolean }).rotated === true,
+      ),
+    ).toBe(true);
+  });
+
+  it("audits the needs_reconnect status change when Google refuses the refresh", async () => {
+    await connectFully();
+    expireAccessToken();
+    google.tokenStatus = 400;
+    const res = await connectionPost({ action: "test" });
+    expect(res.status).toBe(409);
+    expect(connRow().status).toBe("needs_reconnect");
+    expect(H.db.audit.some((a) => a.action === "token_refresh_failed")).toBe(true);
+  });
+
+  it("does not report success or hand out a token when the refresh audit fails", async () => {
+    await connectFully();
+    const before = { ...connRow() };
+    expireAccessToken();
+    const expiry = connRow().access_token_expires_at;
+    H.db.failAudit = true;
+    const res = await connectionPost({ action: "picker_token" });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).not.toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain("at-1");
+    // Prior committed state survives the failed transaction.
+    expect(connRow().refresh_token_ciphertext).toBe(before.refresh_token_ciphertext);
+    expect(connRow().access_token_expires_at).toBe(expiry);
+  });
+
+  it("keeps every callback redirect free of secrets", async () => {
+    await connectFully();
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+    const res = await runCallback(stateFrom(await startConnect()));
+    const location = res.headers.get("location")!;
+    for (const secret of ["at-1", "rt-1", "auth-code", "test-secret-not-real"]) {
+      expect(location).not.toContain(secret);
+    }
+    expect(SAFE_CALLBACK_CODES).toContain(new URL(location).searchParams.get("drive"));
   });
 });

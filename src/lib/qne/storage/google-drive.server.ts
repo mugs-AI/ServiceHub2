@@ -322,11 +322,26 @@ export class DriveAuthError extends Error {
   }
 }
 
+/**
+ * Background/system actor for mutations that are not initiated by a person
+ * (token refresh, fail-closed status changes). Truthful: no fabricated user.
+ */
+function systemActor(row: ConnectionRow): DriveActor {
+  return { tenantCode: row.tenant_code, userId: null, name: null };
+}
+
+/**
+ * P1-3 (patch): every persisted status/credential change goes through the
+ * atomic connection-mutation + audit RPC. A direct table update would allow a
+ * persisted change without its audit record.
+ */
 async function markNeedsReconnect(row: ConnectionRow, reason: string): Promise<void> {
-  await supabaseAdmin
-    .from("google_drive_connections")
-    .update({ status: "needs_reconnect", last_error: reason })
-    .eq("id", row.id);
+  await applyConnection(
+    systemActor(row),
+    { status: "needs_reconnect", last_error: reason },
+    "token_refresh_failed",
+    { reason },
+  );
 }
 
 /**
@@ -376,13 +391,12 @@ export async function accessTokenFor(row: ConnectionRow): Promise<string> {
     last_error: null,
   };
   // Refresh-token rotation: persist the replacement whenever Google sends one.
-  if (token.refresh_token && token.refresh_token !== refresh) {
-    patch.refresh_token_ciphertext = await encryptSecret(token.refresh_token);
+  const rotated = Boolean(token.refresh_token && token.refresh_token !== refresh);
+  if (rotated) {
+    patch.refresh_token_ciphertext = await encryptSecret(token.refresh_token!);
   }
-  await supabaseAdmin
-    .from("google_drive_connections")
-    .update(patch as never)
-    .eq("id", row.id);
+  // Atomic with audit: if this throws, the caller never receives the token.
+  await applyConnection(systemActor(row), patch, "token_refreshed", { rotated });
   return token.access_token;
 }
 
@@ -423,19 +437,26 @@ export interface DriveAccount {
 /**
  * Connected-account identity from Drive `about.get`, which is supported by
  * drive.file. No OIDC/UserInfo call is made anywhere in this vertical.
+ *
+ * `ok` is true ONLY when Google answered AND returned a stable permissionId.
+ * Email is display-only and is never used to compare accounts.
  */
-export async function fetchDriveAccount(accessToken: string): Promise<DriveAccount> {
+export async function fetchDriveAccount(
+  accessToken: string,
+): Promise<DriveAccount & { ok: boolean }> {
   const res = await driveFetch(
     accessToken,
     `${DRIVE_ABOUT}?fields=${encodeURIComponent("user(emailAddress,permissionId)")}`,
   );
-  if (!res.ok) return { email: null, permissionId: null };
+  if (!res.ok) return { ok: false, email: null, permissionId: null };
   const json = (await res.json().catch(() => null)) as {
     user?: { emailAddress?: string; permissionId?: string };
   } | null;
+  const permissionId = json?.user?.permissionId ? String(json.user.permissionId) : null;
   return {
+    ok: Boolean(permissionId),
     email: json?.user?.emailAddress ?? null,
-    permissionId: json?.user?.permissionId ?? null,
+    permissionId,
   };
 }
 
