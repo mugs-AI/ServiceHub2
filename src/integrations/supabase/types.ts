@@ -356,6 +356,168 @@ export type Database = {
         }
         Relationships: []
       }
+      google_drive_audit_log: {
+        Row: {
+          action: string
+          actor_name: string | null
+          actor_user_id: string | null
+          created_at: string
+          detail: Json
+          id: string
+          tenant_code: string
+        }
+        Insert: {
+          action: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          tenant_code: string
+        }
+        Update: {
+          action?: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          tenant_code?: string
+        }
+        Relationships: []
+      }
+      google_drive_connections: {
+        Row: {
+          access_token_ciphertext: string | null
+          access_token_expires_at: string | null
+          cipher_version: number
+          connected_by_name: string | null
+          connected_by_user_id: string | null
+          created_at: string
+          drive_context: string | null
+          drive_id: string | null
+          google_account_email: string | null
+          google_account_sub: string | null
+          id: string
+          is_active: boolean
+          last_error: string | null
+          last_test_result: string | null
+          last_tested_at: string | null
+          refresh_token_ciphertext: string | null
+          root_folder_id: string | null
+          root_folder_name: string | null
+          scopes: string[]
+          sharing_confirmed_at: string | null
+          sharing_confirmed_by_name: string | null
+          sharing_confirmed_by_user_id: string | null
+          sharing_policy: string
+          status: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_ciphertext?: string | null
+          access_token_expires_at?: string | null
+          cipher_version?: number
+          connected_by_name?: string | null
+          connected_by_user_id?: string | null
+          created_at?: string
+          drive_context?: string | null
+          drive_id?: string | null
+          google_account_email?: string | null
+          google_account_sub?: string | null
+          id?: string
+          is_active?: boolean
+          last_error?: string | null
+          last_test_result?: string | null
+          last_tested_at?: string | null
+          refresh_token_ciphertext?: string | null
+          root_folder_id?: string | null
+          root_folder_name?: string | null
+          scopes?: string[]
+          sharing_confirmed_at?: string | null
+          sharing_confirmed_by_name?: string | null
+          sharing_confirmed_by_user_id?: string | null
+          sharing_policy?: string
+          status?: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_ciphertext?: string | null
+          access_token_expires_at?: string | null
+          cipher_version?: number
+          connected_by_name?: string | null
+          connected_by_user_id?: string | null
+          created_at?: string
+          drive_context?: string | null
+          drive_id?: string | null
+          google_account_email?: string | null
+          google_account_sub?: string | null
+          id?: string
+          is_active?: boolean
+          last_error?: string | null
+          last_test_result?: string | null
+          last_tested_at?: string | null
+          refresh_token_ciphertext?: string | null
+          root_folder_id?: string | null
+          root_folder_name?: string | null
+          scopes?: string[]
+          sharing_confirmed_at?: string | null
+          sharing_confirmed_by_name?: string | null
+          sharing_confirmed_by_user_id?: string | null
+          sharing_policy?: string
+          status?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      google_drive_oauth_states: {
+        Row: {
+          actor_name: string | null
+          actor_user_id: string | null
+          code_verifier_ciphertext: string
+          created_at: string
+          expires_at: string
+          id: string
+          purpose: string
+          redirect_uri: string
+          state_hash: string
+          tenant_code: string
+          updated_at: string
+          used_at: string | null
+        }
+        Insert: {
+          actor_name?: string | null
+          actor_user_id?: string | null
+          code_verifier_ciphertext: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          purpose?: string
+          redirect_uri: string
+          state_hash: string
+          tenant_code: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Update: {
+          actor_name?: string | null
+          actor_user_id?: string | null
+          code_verifier_ciphertext?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          purpose?: string
+          redirect_uri?: string
+          state_hash?: string
+          tenant_code?: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       job_number_sequences: {
         Row: {
           date_key: string
