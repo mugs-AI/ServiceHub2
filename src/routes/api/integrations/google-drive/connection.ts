@@ -2,11 +2,14 @@
 //
 // GET  → truthful connection status for the server-resolved tenant.
 // POST → actions: test | create_folder | select_folder | picker_token
-//                 | set_sharing | disconnect
+//                 | refresh_sharing | acknowledge_public_sharing | disconnect
 //
 // No response ever contains a refresh token, the Client Secret or ciphertext.
 // The only token that can reach the browser is a short-lived drive.file access
 // token requested explicitly for the Google Picker.
+//
+// WP2A correction: sharing status is read from Google (permissions.list) and
+// never set by ServiceHub; every persisted change is atomic with its audit.
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -24,6 +27,8 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
           ATTACHMENTS_NOT_IMPLEMENTED_NOTICE,
           PUBLIC_SHARING_WARNING,
           PUBLIC_SHARING_CONFIRMATION,
+          SHARING_READ_ONLY_NOTICE,
+          SHARING_UNKNOWN_RECOVERY,
           redirectUriFor,
           REQUIRED_ENV,
           OPTIONAL_ENV,
@@ -56,11 +61,11 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
               process.env["GOOGLE_DRIVE_REDIRECT_URI"] ??
               redirectUriFor(new URL(request.url).origin),
             pickerApiKeyConfigured: Boolean(gd.pickerApiKey()),
-            pickerClientId: process.env["GOOGLE_DRIVE_CLIENT_ID"] ?? null,
-            pickerApiKey: gd.pickerApiKey(),
             attachmentsNotice: ATTACHMENTS_NOT_IMPLEMENTED_NOTICE,
             sharingWarning: PUBLIC_SHARING_WARNING,
             sharingConfirmationText: PUBLIC_SHARING_CONFIRMATION,
+            sharingReadOnlyNotice: SHARING_READ_ONLY_NOTICE,
+            sharingUnknownRecovery: SHARING_UNKNOWN_RECOVERY,
             audit: audit ?? [],
           });
         } catch (err) {
@@ -76,15 +81,13 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
           "@/lib/qne/session/current-user.server"
         );
         const gd = await import("@/lib/qne/storage/google-drive.server");
-        const {
-          sanitizeFolderName,
-          toPublicConnection,
-          PUBLIC_SHARING_CONFIRMATION,
-        } = await import("@/lib/qne/storage/google-drive");
+        const { sanitizeFolderName, toPublicConnection, PUBLIC_SHARING_CONFIRMATION } =
+          await import("@/lib/qne/storage/google-drive");
         const { decryptSecret } = await import("@/lib/qne/storage/token-crypto.server");
 
         try {
           const user = await requireAdministrator(request);
+          // Tenant and actor are ALWAYS server-resolved; the body cannot choose them.
           const actor = {
             tenantCode: user.tenantCode,
             userId: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
@@ -114,35 +117,48 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
             );
           }
 
-          // --- disconnect: revoke + wipe token material, keep metadata -----
+          // --- disconnect: revoke externally, then atomically wipe + audit --
           if (action === "disconnect") {
             if (body.confirm !== true) {
-              return Response.json(
-                { error: "Disconnect must be confirmed." },
-                { status: 400 },
-              );
+              return Response.json({ error: "Disconnect must be confirmed." }, { status: 400 });
             }
             let revoked = false;
+            let revokeError: string | null = null;
             try {
               const refresh = await decryptSecret(row.refresh_token_ciphertext);
-              if (refresh) revoked = await gd.revokeToken(refresh);
+              if (!refresh) {
+                revokeError = "No stored Google credential was available to revoke.";
+              } else {
+                revoked = await gd.revokeToken(refresh);
+                if (!revoked) revokeError = "Google did not confirm the revoke request.";
+              }
             } catch {
-              revoked = false;
+              revokeError = "The stored Google credential could not be read for revoke.";
             }
-            await gd.upsertConnection(actor.tenantCode, {
-              status: "disconnected",
-              access_token_ciphertext: null,
-              access_token_expires_at: null,
-              refresh_token_ciphertext: null,
-              last_error: null,
-              last_test_result: null,
-            });
-            await gd.auditDrive(actor, "disconnected", { revoked });
+            // Local credentials are wiped whether or not Google confirmed.
+            await gd.applyConnection(
+              actor,
+              {
+                status: "disconnected",
+                access_token_ciphertext: null,
+                access_token_expires_at: null,
+                refresh_token_ciphertext: null,
+                last_error: revokeError,
+                last_test_result: null,
+                detected_sharing_status: "unknown",
+                sharing_detail: null,
+                sharing_checked_at: null,
+              },
+              "disconnected",
+              { revoked, revokeError },
+            );
             return Response.json({
               ok: true,
               revoked,
-              message:
-                "Google Drive disconnected. Stored credentials were removed; your Drive folder and files were NOT deleted.",
+              revokeError,
+              message: revoked
+                ? "Google Drive disconnected and access revoked at Google. Your Drive folder and files were NOT deleted."
+                : `Stored credentials were removed, but Google did not confirm the revoke (${revokeError ?? "unknown reason"}). Remove ServiceHub access in your Google Account security settings. Your Drive folder and files were NOT deleted.`,
             });
           }
 
@@ -152,7 +168,9 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
             accessToken = await gd.accessTokenFor(row);
           } catch (e) {
             const recovery =
-              e instanceof gd.DriveAuthError ? e.recovery : "Reconnect Google Drive from Settings.";
+              e instanceof gd.DriveAuthError
+                ? e.recovery
+                : "Reconnect Google Drive from Settings.";
             return Response.json(
               {
                 error: e instanceof Error ? e.message : "Google Drive credential unavailable.",
@@ -163,32 +181,76 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
             );
           }
 
-          if (action === "test") {
+          if (action === "test" || action === "refresh_sharing") {
             const about = await gd.driveAbout(accessToken);
-            let message = about.message;
             let ok = about.ok;
-            if (ok && row.root_folder_id) {
-              const folder = await gd.revalidateFolder(accessToken, row.root_folder_id);
-              ok = folder.ok;
-              message = folder.ok
-                ? `${about.message} Root folder "${folder.folder!.name}" is usable.`
-                : `${folder.reason} ${folder.recovery}`;
+            let message = about.message;
+            const patch: Record<string, unknown> = {};
+
+            // P1-3: reconnect truth — the live account decides folder validity.
+            const sameAccount =
+              !about.account.permissionId ||
+              !row.google_account_permission_id ||
+              about.account.permissionId === row.google_account_permission_id;
+            if (ok && !sameAccount) {
+              ok = false;
+              message =
+                "Google Drive is now authorised by a different Google account. The saved Root Folder no longer applies — select a Root Folder again.";
+              Object.assign(patch, {
+                root_folder_id: null,
+                root_folder_name: null,
+                drive_id: null,
+                drive_context: null,
+                detected_sharing_status: "unknown",
+                sharing_detail: null,
+                sharing_checked_at: null,
+                public_sharing_acknowledged: false,
+              });
             } else if (ok) {
-              message = `${about.message} No Root Folder is selected yet.`;
+              patch.google_account_email = about.account.email;
+              patch.google_account_permission_id = about.account.permissionId;
+              if (row.root_folder_id) {
+                const folder = await gd.revalidateFolder(accessToken, row.root_folder_id);
+                if (!folder.ok) {
+                  ok = false;
+                  message = `${folder.reason} ${folder.recovery}`;
+                } else {
+                  const sharing = await gd.readSharing(accessToken, row.root_folder_id);
+                  Object.assign(patch, {
+                    root_folder_name: folder.folder!.name,
+                    drive_id: folder.folder!.driveId,
+                    drive_context: folder.folder!.driveContext,
+                    detected_sharing_status: sharing.status,
+                    sharing_detail: sharing.detail,
+                    sharing_checked_at: new Date().toISOString(),
+                  });
+                  message = `${about.message} Root folder "${folder.folder!.name}" is usable. Sharing: ${sharing.detail}`;
+                }
+              } else {
+                message = `${about.message} No Root Folder is selected yet.`;
+              }
             }
-            await gd.upsertConnection(actor.tenantCode, {
+
+            Object.assign(patch, {
               status: ok ? "connected" : "error",
               last_tested_at: new Date().toISOString(),
               last_test_result: message,
               last_error: ok ? null : message,
             });
-            await gd.auditDrive(actor, "tested", { ok });
-            return Response.json({ ok, message });
+            const saved = await gd.applyConnection(
+              actor,
+              patch,
+              action === "test" ? "tested" : "sharing_checked",
+              { ok },
+            );
+            return Response.json({
+              ok,
+              message,
+              connection: toPublicConnection(saved),
+            });
           }
 
           if (action === "picker_token") {
-            // Short-lived drive.file token for the Google Picker only. It is
-            // held in browser memory by the caller and never persisted.
             const apiKey = gd.pickerApiKey();
             if (!apiKey) {
               return Response.json(
@@ -199,6 +261,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
                 { status: 503 },
               );
             }
+            // The token is only released once its issuance is recorded.
             await gd.auditDrive(actor, "picker_token_issued", {});
             return Response.json({
               accessToken,
@@ -218,35 +281,74 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
                 : await gd.revalidateFolder(accessToken, String(body.folderId ?? ""));
 
             if (!validated.ok || !validated.folder) {
-              await gd.upsertConnection(actor.tenantCode, {
-                last_error: validated.reason,
-              });
+              await gd.applyConnection(
+                actor,
+                { last_error: validated.reason },
+                `${action}_failed`,
+                { reason: validated.reason },
+              );
               return Response.json(
                 { error: validated.reason, recovery: validated.recovery },
                 { status: 400 },
               );
             }
-            const saved = await gd.upsertConnection(actor.tenantCode, {
-              root_folder_id: validated.folder.id,
-              root_folder_name: validated.folder.name,
-              drive_id: validated.folder.driveId,
-              drive_context: validated.folder.driveContext,
-              status: "connected",
-              last_error: null,
+            const sharing = await gd.readSharing(accessToken, validated.folder.id);
+            const saved = await gd.applyConnection(
+              actor,
+              {
+                root_folder_id: validated.folder.id,
+                root_folder_name: validated.folder.name,
+                drive_id: validated.folder.driveId,
+                drive_context: validated.folder.driveContext,
+                detected_sharing_status: sharing.status,
+                sharing_detail: sharing.detail,
+                sharing_checked_at: new Date().toISOString(),
+                public_sharing_acknowledged: false,
+                sharing_confirmed_by_user_id: null,
+                sharing_confirmed_by_name: null,
+                sharing_confirmed_at: null,
+                status: "connected",
+                last_error: null,
+              },
+              action,
+              {
+                folderName: validated.folder.name,
+                driveContext: validated.folder.driveContext,
+                detectedSharing: sharing.status,
+              },
+            );
+            return Response.json({
+              ok: true,
+              connection: toPublicConnection(saved),
+              sharing: { status: sharing.status, detail: sharing.detail },
             });
-            await gd.auditDrive(actor, action, {
-              folderName: validated.folder.name,
-              driveContext: validated.folder.driveContext,
-            });
-            return Response.json({ ok: true, connection: toPublicConnection(saved) });
           }
 
-          if (action === "set_sharing") {
-            const policy = String(body.sharingPolicy ?? "restricted");
-            if (policy !== "restricted" && policy !== "anyone_with_link") {
-              return Response.json({ error: "Unknown sharing policy." }, { status: 400 });
+          if (action === "acknowledge_public_sharing") {
+            // Only meaningful when Google ACTUALLY reports public sharing now.
+            const sharing = await gd.readSharing(accessToken, row.root_folder_id ?? "");
+            if (sharing.status !== "anyone_with_link") {
+              const saved = await gd.applyConnection(
+                actor,
+                {
+                  detected_sharing_status: sharing.status,
+                  sharing_detail: sharing.detail,
+                  sharing_checked_at: new Date().toISOString(),
+                  public_sharing_acknowledged: false,
+                },
+                "sharing_checked",
+                { detectedSharing: sharing.status },
+              );
+              return Response.json(
+                {
+                  error:
+                    "Google does not currently report public link sharing on this folder, so there is nothing to confirm.",
+                  connection: toPublicConnection(saved),
+                },
+                { status: 409 },
+              );
             }
-            if (policy === "anyone_with_link" && body.confirm !== true) {
+            if (body.confirm !== true) {
               return Response.json(
                 {
                   error: "Public sharing requires an explicit risk confirmation.",
@@ -255,14 +357,20 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
                 { status: 400 },
               );
             }
-            const saved = await gd.upsertConnection(actor.tenantCode, {
-              sharing_policy: policy,
-              sharing_confirmed_by_user_id: policy === "anyone_with_link" ? actor.userId : null,
-              sharing_confirmed_by_name: policy === "anyone_with_link" ? actor.name : null,
-              sharing_confirmed_at:
-                policy === "anyone_with_link" ? new Date().toISOString() : null,
-            });
-            await gd.auditDrive(actor, "sharing_policy_set", { policy });
+            const saved = await gd.applyConnection(
+              actor,
+              {
+                detected_sharing_status: sharing.status,
+                sharing_detail: sharing.detail,
+                sharing_checked_at: new Date().toISOString(),
+                public_sharing_acknowledged: true,
+                sharing_confirmed_by_user_id: actor.userId,
+                sharing_confirmed_by_name: actor.name,
+                sharing_confirmed_at: new Date().toISOString(),
+              },
+              "public_sharing_acknowledged",
+              { detectedSharing: sharing.status, detail: sharing.detail },
+            );
             return Response.json({ ok: true, connection: toPublicConnection(saved) });
           }
 
