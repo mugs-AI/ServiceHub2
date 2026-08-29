@@ -11,7 +11,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/connect")({
         const { requireAdministrator, guardResponse } = await import(
           "@/lib/qne/session/current-user.server"
         );
-        const { beginAuthorization, missingDriveEnv, auditDrive } = await import(
+        const { beginAuthorization, missingDriveEnv } = await import(
           "@/lib/qne/storage/google-drive.server"
         );
         try {
@@ -32,8 +32,8 @@ export const Route = createFileRoute("/api/integrations/google-drive/connect")({
               { status: 503 },
             );
           }
+          // State creation and the connect_started audit commit atomically.
           const authorizationUrl = await beginAuthorization(actor);
-          await auditDrive(actor, "connect_started", {});
           return Response.json({ authorizationUrl });
         } catch (err) {
           const resp = guardResponse(err);

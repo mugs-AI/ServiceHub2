@@ -12,6 +12,9 @@ import {
   NOT_CONNECTED,
   PUBLIC_SHARING_CONFIRMATION,
   PUBLIC_SHARING_WARNING,
+  SHARING_LABEL,
+  SHARING_READ_ONLY_NOTICE,
+  SHARING_UNKNOWN_RECOVERY,
   type PublicDriveConnection,
 } from "@/lib/qne/storage/google-drive";
 import { getStoredToken } from "@/lib/qne/tokens";
@@ -261,11 +264,12 @@ export function GoogleDriveCard({
           <dd className="text-foreground">{conn.lastTestResult ?? "Never tested"}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Sharing</dt>
+          <dt className="text-muted-foreground">Sharing (read from Google)</dt>
           <dd className="text-foreground">
-            {conn.sharingPolicy === "anyone_with_link"
-              ? "Anyone with the link"
-              : "Restricted (recommended)"}
+            {SHARING_LABEL[conn.detectedSharing]}
+            {conn.sharingCheckedAt
+              ? ` — checked ${conn.sharingCheckedAt.slice(0, 19).replace("T", " ")}`
+              : ""}
           </dd>
         </div>
       </dl>
@@ -276,16 +280,24 @@ export function GoogleDriveCard({
         </p>
       )}
 
-      {conn.sharingPolicy === "anyone_with_link" && (
+      {conn.detectedSharing === "anyone_with_link" && (
         <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
           {PUBLIC_SHARING_WARNING}
-          {conn.sharingConfirmedBy
-            ? ` Confirmed by ${conn.sharingConfirmedBy}${
+          {conn.publicSharingAcknowledged && conn.sharingConfirmedBy
+            ? ` Risk confirmed by ${conn.sharingConfirmedBy}${
                 conn.sharingConfirmedAt ? ` on ${conn.sharingConfirmedAt.slice(0, 10)}` : ""
               }.`
-            : ""}
+            : " Not yet acknowledged by an Owner/Admin."}
         </p>
       )}
+
+      {(conn.detectedSharing === "unknown" || conn.detectedSharing === "error") &&
+        conn.rootFolderId && (
+          <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            {SHARING_UNKNOWN_RECOVERY}
+            {conn.sharingDetail ? ` (${conn.sharingDetail})` : ""}
+          </p>
+        )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -353,34 +365,38 @@ export function GoogleDriveCard({
       </div>
 
       <div className="mt-4 rounded-md border p-3">
-        <p className="text-xs font-medium text-foreground">Sharing policy</p>
+        <p className="text-xs font-medium text-foreground">Sharing status</p>
+        <p className="mt-1 text-xs text-muted-foreground">{SHARING_READ_ONLY_NOTICE}</p>
+        <p className="mt-1 text-xs text-foreground">
+          {SHARING_LABEL[conn.detectedSharing]}
+          {conn.sharingDetail ? ` — ${conn.sharingDetail}` : ""}
+        </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <button
             onClick={() =>
-              void post({ action: "set_sharing", sharingPolicy: "restricted" }, "sharing")
-                .then(() => onNotify("ok", "Sharing set to Restricted."))
+              void post({ action: "refresh_sharing" }, "sharing")
+                .then((b) => onNotify(b.ok ? "ok" : "err", String(b.message ?? "Sharing checked.")))
                 .catch((e) => onNotify("err", e instanceof Error ? e.message : String(e)))
             }
-            disabled={!connected || busy !== null}
+            disabled={!connected || !conn.rootFolderId || busy !== null}
             className="rounded-md border px-3 py-1.5 text-xs disabled:opacity-50"
           >
-            Restricted (recommended)
+            Check sharing on Google
           </button>
-          <button
-            onClick={() => {
-              if (!window.confirm(PUBLIC_SHARING_CONFIRMATION)) return;
-              void post(
-                { action: "set_sharing", sharingPolicy: "anyone_with_link", confirm: true },
-                "sharing",
-              )
-                .then(() => onNotify("ok", "Public sharing enabled and recorded."))
-                .catch((e) => onNotify("err", e instanceof Error ? e.message : String(e)));
-            }}
-            disabled={!connected || busy !== null}
-            className="rounded-md border border-destructive px-3 py-1.5 text-xs text-destructive disabled:opacity-50"
-          >
-            Anyone with the link (risk confirmation required)
-          </button>
+          {conn.detectedSharing === "anyone_with_link" && !conn.publicSharingAcknowledged && (
+            <button
+              onClick={() => {
+                if (!window.confirm(PUBLIC_SHARING_CONFIRMATION)) return;
+                void post({ action: "acknowledge_public_sharing", confirm: true }, "sharing")
+                  .then(() => onNotify("ok", "Public sharing risk confirmation recorded."))
+                  .catch((e) => onNotify("err", e instanceof Error ? e.message : String(e)));
+              }}
+              disabled={busy !== null}
+              className="rounded-md border border-destructive px-3 py-1.5 text-xs text-destructive disabled:opacity-50"
+            >
+              Confirm public sharing risk
+            </button>
+          )}
         </div>
       </div>
 
