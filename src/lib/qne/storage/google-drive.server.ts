@@ -460,6 +460,11 @@ export async function fetchDriveAccount(
   };
 }
 
+/**
+ * Connection check. FAILS CLOSED: it is only "ok" when Google answered AND
+ * returned a stable permissionId, because account identity — not reachability —
+ * is what makes a saved Root Folder trustworthy.
+ */
 export async function driveAbout(
   accessToken: string,
 ): Promise<{ ok: boolean; message: string; account: DriveAccount }> {
@@ -479,8 +484,16 @@ export async function driveAbout(
   } | null;
   const account = {
     email: json?.user?.emailAddress ?? null,
-    permissionId: json?.user?.permissionId ?? null,
+    permissionId: json?.user?.permissionId ? String(json.user.permissionId) : null,
   };
+  if (!account.permissionId) {
+    return {
+      ok: false,
+      message:
+        "Google did not confirm which Google account this connection belongs to, so the saved Root Folder cannot be trusted. Reconnect Google Drive from Settings.",
+      account,
+    };
+  }
   return {
     ok: true,
     message: `Google Drive reachable as ${account.email ?? "the connected account"}.`,
