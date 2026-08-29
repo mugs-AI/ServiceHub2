@@ -163,6 +163,8 @@ function Settings() {
 
       <EntitlementPolicyCard onNotify={notify} />
 
+      <GoogleDriveCard onNotify={notify} />
+
       <CancellationSettingsCard onNotify={notify} />
 
       <div className="flex gap-1 border-b">
