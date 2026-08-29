@@ -65,6 +65,7 @@ import { Route as ApiWorkspaceJobsSummaryRouteImport } from './routes/api/worksp
 import { Route as ApiWorkspaceJobsPendingRouteImport } from './routes/api/workspace/jobs.pending'
 import { Route as ApiWorkspaceJobsJobIdRouteImport } from './routes/api/workspace/jobs.$jobId'
 import { Route as ApiIntegrationsGoogleDriveConnectRouteImport } from './routes/api/integrations/google-drive/connect'
+import { Route as ApiIntegrationsGoogleDriveCallbackRouteImport } from './routes/api/integrations/google-drive/callback'
 import { Route as ApiWorkspaceJobsJobIdWorkNotesRouteImport } from './routes/api/workspace/jobs.$jobId.work-notes'
 import { Route as ApiWorkspaceJobsJobIdTimelineRouteImport } from './routes/api/workspace/jobs.$jobId.timeline'
 import { Route as ApiWorkspaceJobsJobIdStatusRouteImport } from './routes/api/workspace/jobs.$jobId.status'
@@ -378,6 +379,12 @@ const ApiIntegrationsGoogleDriveConnectRoute =
     path: '/api/integrations/google-drive/connect',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiIntegrationsGoogleDriveCallbackRoute =
+  ApiIntegrationsGoogleDriveCallbackRouteImport.update({
+    id: '/api/integrations/google-drive/callback',
+    path: '/api/integrations/google-drive/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiWorkspaceJobsJobIdWorkNotesRoute =
   ApiWorkspaceJobsJobIdWorkNotesRouteImport.update({
     id: '/work-notes',
@@ -546,6 +553,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
+  '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
   '/api/workspace/jobs/pending': typeof ApiWorkspaceJobsPendingRoute
@@ -622,6 +630,7 @@ export interface FileRoutesByTo {
   '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
+  '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
   '/api/workspace/jobs/pending': typeof ApiWorkspaceJobsPendingRoute
@@ -700,6 +709,7 @@ export interface FileRoutesById {
   '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
+  '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
   '/api/workspace/jobs/$jobId': typeof ApiWorkspaceJobsJobIdRouteWithChildren
   '/api/workspace/jobs/pending': typeof ApiWorkspaceJobsPendingRoute
@@ -779,6 +789,7 @@ export interface FileRouteTypes {
     | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
+    | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
     | '/api/workspace/jobs/$jobId'
     | '/api/workspace/jobs/pending'
@@ -855,6 +866,7 @@ export interface FileRouteTypes {
     | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
+    | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
     | '/api/workspace/jobs/$jobId'
     | '/api/workspace/jobs/pending'
@@ -932,6 +944,7 @@ export interface FileRouteTypes {
     | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
     | '/api/workspace/technicians'
+    | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
     | '/api/workspace/jobs/$jobId'
     | '/api/workspace/jobs/pending'
@@ -1007,6 +1020,7 @@ export interface RootRouteChildren {
   ApiWorkspaceEntitlementCustomersRoute: typeof ApiWorkspaceEntitlementCustomersRoute
   ApiWorkspaceJobsRoute: typeof ApiWorkspaceJobsRouteWithChildren
   ApiWorkspaceTechniciansRoute: typeof ApiWorkspaceTechniciansRoute
+  ApiIntegrationsGoogleDriveCallbackRoute: typeof ApiIntegrationsGoogleDriveCallbackRoute
   ApiIntegrationsGoogleDriveConnectRoute: typeof ApiIntegrationsGoogleDriveConnectRoute
 }
 
@@ -1404,6 +1418,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsGoogleDriveConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations/google-drive/callback': {
+      id: '/api/integrations/google-drive/callback'
+      path: '/api/integrations/google-drive/callback'
+      fullPath: '/api/integrations/google-drive/callback'
+      preLoaderRoute: typeof ApiIntegrationsGoogleDriveCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/workspace/jobs/$jobId/work-notes': {
       id: '/api/workspace/jobs/$jobId/work-notes'
       path: '/work-notes'
@@ -1688,6 +1709,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceEntitlementCustomersRoute: ApiWorkspaceEntitlementCustomersRoute,
   ApiWorkspaceJobsRoute: ApiWorkspaceJobsRouteWithChildren,
   ApiWorkspaceTechniciansRoute: ApiWorkspaceTechniciansRoute,
+  ApiIntegrationsGoogleDriveCallbackRoute:
+    ApiIntegrationsGoogleDriveCallbackRoute,
   ApiIntegrationsGoogleDriveConnectRoute:
     ApiIntegrationsGoogleDriveConnectRoute,
 }
