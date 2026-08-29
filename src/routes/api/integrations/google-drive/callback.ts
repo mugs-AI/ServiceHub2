@@ -174,6 +174,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/callback")(
                 detected_sharing_status: "unknown",
                 sharing_detail: null,
                 sharing_checked_at: null,
+                ...CLEAR_ACK,
               },
               "reconnect_folder_invalid",
               { account: account.email, reason },
@@ -196,6 +197,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/callback")(
                 detected_sharing_status: sharing.status,
                 sharing_detail: sharing.detail,
                 sharing_checked_at: new Date().toISOString(),
+                ...CLEAR_ACK,
               },
               "reconnect_sharing_unavailable",
               { account: account.email, detectedSharing: sharing.status },
@@ -220,14 +222,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/callback")(
               detected_sharing_status: sharing.status,
               sharing_detail: sharing.detail,
               sharing_checked_at: new Date().toISOString(),
-              ...(keepAck
-                ? {}
-                : {
-                    public_sharing_acknowledged: false,
-                    sharing_confirmed_by_user_id: null,
-                    sharing_confirmed_by_name: null,
-                    sharing_confirmed_at: null,
-                  }),
+              ...(keepAck ? {} : CLEAR_ACK),
             },
             "reconnected",
             {
