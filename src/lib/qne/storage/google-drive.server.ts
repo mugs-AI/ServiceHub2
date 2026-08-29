@@ -391,13 +391,12 @@ export async function accessTokenFor(row: ConnectionRow): Promise<string> {
     last_error: null,
   };
   // Refresh-token rotation: persist the replacement whenever Google sends one.
-  if (token.refresh_token && token.refresh_token !== refresh) {
-    patch.refresh_token_ciphertext = await encryptSecret(token.refresh_token);
+  const rotated = Boolean(token.refresh_token && token.refresh_token !== refresh);
+  if (rotated) {
+    patch.refresh_token_ciphertext = await encryptSecret(token.refresh_token!);
   }
-  await supabaseAdmin
-    .from("google_drive_connections")
-    .update(patch as never)
-    .eq("id", row.id);
+  // Atomic with audit: if this throws, the caller never receives the token.
+  await applyConnection(systemActor(row), patch, "token_refreshed", { rotated });
   return token.access_token;
 }
 
