@@ -2,15 +2,19 @@
 //
 // Responsibilities: OAuth (PKCE + single-use state), token storage with
 // authenticated encryption, refresh with rotation, revoke, and the minimum
-// Drive metadata calls needed to create/validate one Root Folder per tenant.
+// Drive metadata calls needed to create/validate one Root Folder per tenant
+// and to READ its true sharing status.
 //
 // Hard rules enforced here:
 //  • Client Secret and refresh tokens never leave the server.
 //  • Authorization codes / tokens / ciphertext are never logged.
-//  • Only https://www.googleapis.com/auth/drive.file is requested.
+//  • Exactly https://www.googleapis.com/auth/drive.file is requested — no
+//    openid/email/profile, no UserInfo endpoint, no broader Drive scope.
+//  • Connection mutation and its audit record commit atomically (RPC).
 //  • Exactly one active connection + Root Folder per tenant.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Database } from "@/integrations/supabase/types";
 import {
   decryptSecret,
   encryptSecret,
@@ -21,18 +25,23 @@ import {
 import {
   GOOGLE_DRIVE_SCOPE,
   GOOGLE_DRIVE_FOLDER_MIME,
+  classifySharing,
+  sharingUnavailable,
   validateFolderMeta,
   type DriveFolderMeta,
+  type DrivePermission,
   type FolderValidation,
+  type SharingAssessment,
 } from "./google-drive";
 
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke";
-const USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
 const DRIVE_FILES = "https://www.googleapis.com/drive/v3/files";
 const DRIVE_ABOUT = "https://www.googleapis.com/drive/v3/about";
 const STATE_TTL_MS = 10 * 60 * 1000;
+
+export type ConnectionRow = Database["public"]["Tables"]["google_drive_connections"]["Row"];
 
 export interface DriveActor {
   tenantCode: string;
@@ -86,18 +95,57 @@ export function pickerApiKey(): string | null {
 
 // ---------------------------------------------------------------- audit ----
 
+export class AuditWriteError extends Error {
+  constructor(action: string) {
+    super(`The activity record for "${action}" could not be saved, so the action was not applied.`);
+    this.name = "AuditWriteError";
+  }
+}
+
+/**
+ * Standalone audit write. THROWS on failure: no WP2A operation may report
+ * success when its audit record was lost.
+ */
 export async function auditDrive(
   actor: DriveActor,
   action: string,
   detail: Record<string, unknown> = {},
 ): Promise<void> {
-  await supabaseAdmin.from("google_drive_audit_log").insert({
+  const { error } = await supabaseAdmin.from("google_drive_audit_log").insert({
     tenant_code: actor.tenantCode,
     action,
     detail: detail as never,
     actor_user_id: actor.userId,
     actor_name: actor.name,
   });
+  if (error) throw new AuditWriteError(action);
+}
+
+/**
+ * Atomic connection mutation + audit. The RPC locks the tenant's active row,
+ * applies the patch and writes the audit record in ONE transaction, so a
+ * persisted change can never exist without its audit trail.
+ */
+export async function applyConnection(
+  actor: DriveActor,
+  patch: Record<string, unknown>,
+  action: string,
+  detail: Record<string, unknown> = {},
+): Promise<ConnectionRow> {
+  const { data, error } = await supabaseAdmin.rpc("sh_gdrive_apply", {
+    p_tenant_code: actor.tenantCode,
+    p_patch: patch as never,
+    p_action: action,
+    p_detail: detail as never,
+    p_actor_user_id: actor.userId ?? undefined,
+    p_actor_name: actor.name ?? undefined,
+  });
+  if (error || !data) {
+    throw new Error(
+      `The Google Drive change could not be saved together with its activity record (${action}). Nothing was applied.`,
+    );
+  }
+  return data as unknown as ConnectionRow;
 }
 
 // ------------------------------------------------------------ oauth state --
@@ -117,22 +165,30 @@ async function pkcePair(): Promise<{ verifier: string; challenge: string }> {
   return { verifier, challenge: b64url(new Uint8Array(digest)) };
 }
 
-/** Build the consent URL and persist the single-use state bound to tenant+actor. */
+/**
+ * Build the consent URL and persist the single-use state bound to tenant+actor.
+ * State creation and the connect_started audit are one transaction (RPC).
+ * The requested scope is exactly drive.file.
+ */
 export async function beginAuthorization(actor: DriveActor): Promise<string> {
   const cfg = requireConfig();
   const state = randomUrlSafeToken(32);
   const { verifier, challenge } = await pkcePair();
 
-  await supabaseAdmin.from("google_drive_oauth_states").insert({
-    state_hash: await sha256Hex(state),
-    tenant_code: actor.tenantCode,
-    actor_user_id: actor.userId,
-    actor_name: actor.name,
-    code_verifier_ciphertext: await encryptSecret(verifier),
-    redirect_uri: cfg.redirectUri,
-    purpose: "connect",
-    expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+  const { error } = await supabaseAdmin.rpc("sh_gdrive_state_create", {
+    p_tenant_code: actor.tenantCode,
+    p_state_hash: await sha256Hex(state),
+    p_verifier_ciphertext: await encryptSecret(verifier),
+    p_redirect_uri: cfg.redirectUri,
+    p_expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+    p_actor_user_id: actor.userId ?? undefined,
+    p_actor_name: actor.name ?? undefined,
   });
+  if (error) {
+    throw new Error(
+      "The Google connection attempt could not be recorded, so it was not started. Try again.",
+    );
+  }
 
   const url = new URL(AUTH_ENDPOINT);
   url.searchParams.set("client_id", cfg.clientId);
@@ -141,7 +197,7 @@ export async function beginAuthorization(actor: DriveActor): Promise<string> {
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
   url.searchParams.set("include_granted_scopes", "false");
-  url.searchParams.set("scope", `${GOOGLE_DRIVE_SCOPE} openid email`);
+  url.searchParams.set("scope", GOOGLE_DRIVE_SCOPE);
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("state", state);
@@ -149,13 +205,19 @@ export async function beginAuthorization(actor: DriveActor): Promise<string> {
 }
 
 export type StateOutcome =
-  | { ok: true; tenantCode: string; actorUserId: string | null; actorName: string | null; verifier: string }
+  | {
+      ok: true;
+      tenantCode: string;
+      actorUserId: string | null;
+      actorName: string | null;
+      verifier: string;
+    }
   | { ok: false; reason: "state_invalid" | "state_expired" | "state_used" };
 
 /**
  * Consume the state exactly once. Replay is prevented by an atomic
  * conditional update (`used_at is null`), so concurrent callbacks cannot
- * both succeed.
+ * both succeed. The tenant is taken from the stored state, never the browser.
  */
 export async function consumeState(rawState: string | null): Promise<StateOutcome> {
   if (!rawState || rawState.length < 16) return { ok: false, reason: "state_invalid" };
@@ -167,7 +229,8 @@ export async function consumeState(rawState: string | null): Promise<StateOutcom
     .maybeSingle();
   if (!row) return { ok: false, reason: "state_invalid" };
   if (row.used_at) return { ok: false, reason: "state_used" };
-  if (new Date(row.expires_at).getTime() < Date.now()) return { ok: false, reason: "state_expired" };
+  if (new Date(row.expires_at).getTime() < Date.now())
+    return { ok: false, reason: "state_expired" };
 
   const { data: claimed } = await supabaseAdmin
     .from("google_drive_oauth_states")
@@ -191,7 +254,7 @@ export async function consumeState(rawState: string | null): Promise<StateOutcom
 
 // ---------------------------------------------------------------- tokens ---
 
-interface TokenResponse {
+export interface TokenResponse {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
@@ -208,7 +271,7 @@ async function tokenRequest(body: URLSearchParams): Promise<TokenResponse> {
   });
   const json = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || json.error) {
-    // Never log the body: it can echo the authorization code.
+    // Never log the body: it can echo the authorization code or tokens.
     throw new Error(`Google token request failed (${res.status}: ${json.error ?? "unknown"}).`);
   }
   return json;
@@ -238,22 +301,6 @@ async function refreshWithToken(refreshToken: string): Promise<TokenResponse> {
       grant_type: "refresh_token",
     }),
   );
-}
-
-export interface ConnectionRow {
-  id: string;
-  tenant_code: string;
-  status: string;
-  google_account_email: string | null;
-  root_folder_id: string | null;
-  root_folder_name: string | null;
-  drive_id: string | null;
-  drive_context: string | null;
-  access_token_ciphertext: string | null;
-  access_token_expires_at: string | null;
-  refresh_token_ciphertext: string | null;
-  sharing_policy: string;
-  [k: string]: unknown;
 }
 
 export async function loadConnection(tenantCode: string): Promise<ConnectionRow | null> {
@@ -306,7 +353,10 @@ export async function accessTokenFor(row: ConnectionRow): Promise<string> {
   try {
     token = await refreshWithToken(refresh);
   } catch {
-    await markNeedsReconnect(row, "Google refused to refresh the connection (access revoked or expired).");
+    await markNeedsReconnect(
+      row,
+      "Google refused to refresh the connection (access revoked or expired).",
+    );
     throw new DriveAuthError(
       "Google refused to refresh this connection.",
       "Reconnect Google Drive from Settings — access may have been revoked in the Google account.",
@@ -314,13 +364,14 @@ export async function accessTokenFor(row: ConnectionRow): Promise<string> {
   }
   if (!token.access_token) {
     await markNeedsReconnect(row, "Google returned no access token on refresh.");
-    throw new DriveAuthError("Google returned no access token.", "Reconnect Google Drive from Settings.");
+    throw new DriveAuthError(
+      "Google returned no access token.",
+      "Reconnect Google Drive from Settings.",
+    );
   }
   const patch: Record<string, unknown> = {
     access_token_ciphertext: await encryptSecret(token.access_token),
-    access_token_expires_at: new Date(
-      Date.now() + (token.expires_in ?? 3600) * 1000,
-    ).toISOString(),
+    access_token_expires_at: new Date(Date.now() + (token.expires_in ?? 3600) * 1000).toISOString(),
     status: "connected",
     last_error: null,
   };
@@ -328,7 +379,10 @@ export async function accessTokenFor(row: ConnectionRow): Promise<string> {
   if (token.refresh_token && token.refresh_token !== refresh) {
     patch.refresh_token_ciphertext = await encryptSecret(token.refresh_token);
   }
-  await supabaseAdmin.from("google_drive_connections").update(patch as never).eq("id", row.id);
+  await supabaseAdmin
+    .from("google_drive_connections")
+    .update(patch as never)
+    .eq("id", row.id);
   return token.access_token;
 }
 
@@ -361,34 +415,74 @@ async function driveFetch(
   });
 }
 
-export async function fetchAccountEmail(accessToken: string): Promise<string | null> {
-  const res = await driveFetch(accessToken, USERINFO_ENDPOINT);
-  if (!res.ok) return null;
-  const json = (await res.json().catch(() => ({}))) as { email?: string };
-  return json.email ?? null;
+export interface DriveAccount {
+  email: string | null;
+  permissionId: string | null;
 }
 
-export async function driveAbout(accessToken: string): Promise<{ ok: boolean; message: string }> {
-  const res = await driveFetch(accessToken, `${DRIVE_ABOUT}?fields=user(emailAddress),storageQuota`);
+/**
+ * Connected-account identity from Drive `about.get`, which is supported by
+ * drive.file. No OIDC/UserInfo call is made anywhere in this vertical.
+ */
+export async function fetchDriveAccount(accessToken: string): Promise<DriveAccount> {
+  const res = await driveFetch(
+    accessToken,
+    `${DRIVE_ABOUT}?fields=${encodeURIComponent("user(emailAddress,permissionId)")}`,
+  );
+  if (!res.ok) return { email: null, permissionId: null };
+  const json = (await res.json().catch(() => null)) as {
+    user?: { emailAddress?: string; permissionId?: string };
+  } | null;
+  return {
+    email: json?.user?.emailAddress ?? null,
+    permissionId: json?.user?.permissionId ?? null,
+  };
+}
+
+export async function driveAbout(
+  accessToken: string,
+): Promise<{ ok: boolean; message: string; account: DriveAccount }> {
+  const res = await driveFetch(
+    accessToken,
+    `${DRIVE_ABOUT}?fields=${encodeURIComponent("user(emailAddress,permissionId)")}`,
+  );
   if (!res.ok) {
-    return { ok: false, message: `Google Drive rejected the request (HTTP ${res.status}).` };
+    return {
+      ok: false,
+      message: `Google Drive rejected the connection check (HTTP ${res.status}).`,
+      account: { email: null, permissionId: null },
+    };
   }
-  const json = (await res.json().catch(() => ({}))) as {
-    user?: { emailAddress?: string };
+  const json = (await res.json().catch(() => null)) as {
+    user?: { emailAddress?: string; permissionId?: string };
+  } | null;
+  const account = {
+    email: json?.user?.emailAddress ?? null,
+    permissionId: json?.user?.permissionId ?? null,
   };
   return {
     ok: true,
-    message: `Google Drive reachable as ${json.user?.emailAddress ?? "the connected account"}.`,
+    message: `Google Drive reachable as ${account.email ?? "the connected account"}.`,
+    account,
   };
 }
 
-const FOLDER_FIELDS = "id,name,mimeType,trashed,driveId,capabilities(canAddChildren,canListChildren)";
+const FOLDER_FIELDS =
+  "id,name,mimeType,trashed,driveId,capabilities(canAddChildren,canListChildren)";
 
 /** Read folder metadata from Google, then validate it — never trust the browser. */
 export async function revalidateFolder(
   accessToken: string,
   folderId: string,
 ): Promise<FolderValidation> {
+  if (!folderId) {
+    return {
+      ok: false,
+      reason: "No Root Folder is selected for this company.",
+      recovery: "Create a new Software ServiceHub folder, or select an existing folder.",
+      folder: null,
+    };
+  }
   const url = `${DRIVE_FILES}/${encodeURIComponent(folderId)}?fields=${encodeURIComponent(
     FOLDER_FIELDS,
   )}&supportsAllDrives=true`;
@@ -444,35 +538,42 @@ export async function createRootFolder(
 }
 
 /**
- * Persist the one active connection for a tenant. Concurrency-safe: the
- * partial unique index google_drive_connections_one_active guarantees at most
- * one active row per tenant, and we upsert onto the existing active row.
+ * TRUE sharing status, read from Google `permissions.list` (drive.file
+ * supported). Handles pagination, My Drive and Shared Drives. On failure the
+ * result is "error" — never a fabricated "restricted".
  */
-export async function upsertConnection(
-  tenantCode: string,
-  patch: Record<string, unknown>,
-): Promise<ConnectionRow> {
-  const existing = await loadConnection(tenantCode);
-  if (existing) {
-    const { data, error } = await supabaseAdmin
-      .from("google_drive_connections")
-      .update(patch as never)
-      .eq("id", existing.id)
-      .select("*")
-      .single();
-    if (error) throw error;
-    return data as ConnectionRow;
-  }
-  const { data, error } = await supabaseAdmin
-    .from("google_drive_connections")
-    .insert({ tenant_code: tenantCode, is_active: true, ...patch } as never)
-    .select("*")
-    .single();
-  if (error) {
-    // Lost the race against a concurrent connect — reuse the winner.
-    const winner = await loadConnection(tenantCode);
-    if (winner) return winner;
-    throw error;
-  }
-  return data as ConnectionRow;
+export async function readSharing(
+  accessToken: string,
+  folderId: string,
+): Promise<SharingAssessment> {
+  if (!folderId) return sharingUnavailable("No Root Folder is selected yet.");
+  const permissions: DrivePermission[] = [];
+  let pageToken: string | undefined;
+  let pages = 0;
+  do {
+    const url = new URL(`${DRIVE_FILES}/${encodeURIComponent(folderId)}/permissions`);
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("useDomainAdminAccess", "false");
+    url.searchParams.set("pageSize", "100");
+    url.searchParams.set(
+      "fields",
+      "nextPageToken,permissions(id,type,role,allowFileDiscovery,deleted)",
+    );
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const res = await driveFetch(accessToken, url.toString());
+    if (!res.ok) {
+      return sharingUnavailable(
+        `Google Drive did not return the folder's sharing settings (HTTP ${res.status}).`,
+      );
+    }
+    const json = (await res.json().catch(() => null)) as {
+      permissions?: DrivePermission[];
+      nextPageToken?: string;
+    } | null;
+    if (!json) return sharingUnavailable("Google Drive returned an unreadable sharing response.");
+    permissions.push(...(json.permissions ?? []));
+    pageToken = json.nextPageToken;
+    pages += 1;
+  } while (pageToken && pages < 20);
+  return classifySharing(permissions);
 }

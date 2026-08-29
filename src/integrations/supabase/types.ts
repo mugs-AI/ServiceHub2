@@ -394,23 +394,26 @@ export type Database = {
           connected_by_name: string | null
           connected_by_user_id: string | null
           created_at: string
+          detected_sharing_status: string
           drive_context: string | null
           drive_id: string | null
           google_account_email: string | null
-          google_account_sub: string | null
+          google_account_permission_id: string | null
           id: string
           is_active: boolean
           last_error: string | null
           last_test_result: string | null
           last_tested_at: string | null
+          public_sharing_acknowledged: boolean
           refresh_token_ciphertext: string | null
           root_folder_id: string | null
           root_folder_name: string | null
           scopes: string[]
+          sharing_checked_at: string | null
           sharing_confirmed_at: string | null
           sharing_confirmed_by_name: string | null
           sharing_confirmed_by_user_id: string | null
-          sharing_policy: string
+          sharing_detail: string | null
           status: string
           tenant_code: string
           updated_at: string
@@ -422,23 +425,26 @@ export type Database = {
           connected_by_name?: string | null
           connected_by_user_id?: string | null
           created_at?: string
+          detected_sharing_status?: string
           drive_context?: string | null
           drive_id?: string | null
           google_account_email?: string | null
-          google_account_sub?: string | null
+          google_account_permission_id?: string | null
           id?: string
           is_active?: boolean
           last_error?: string | null
           last_test_result?: string | null
           last_tested_at?: string | null
+          public_sharing_acknowledged?: boolean
           refresh_token_ciphertext?: string | null
           root_folder_id?: string | null
           root_folder_name?: string | null
           scopes?: string[]
+          sharing_checked_at?: string | null
           sharing_confirmed_at?: string | null
           sharing_confirmed_by_name?: string | null
           sharing_confirmed_by_user_id?: string | null
-          sharing_policy?: string
+          sharing_detail?: string | null
           status?: string
           tenant_code: string
           updated_at?: string
@@ -450,23 +456,26 @@ export type Database = {
           connected_by_name?: string | null
           connected_by_user_id?: string | null
           created_at?: string
+          detected_sharing_status?: string
           drive_context?: string | null
           drive_id?: string | null
           google_account_email?: string | null
-          google_account_sub?: string | null
+          google_account_permission_id?: string | null
           id?: string
           is_active?: boolean
           last_error?: string | null
           last_test_result?: string | null
           last_tested_at?: string | null
+          public_sharing_acknowledged?: boolean
           refresh_token_ciphertext?: string | null
           root_folder_id?: string | null
           root_folder_name?: string | null
           scopes?: string[]
+          sharing_checked_at?: string | null
           sharing_confirmed_at?: string | null
           sharing_confirmed_by_name?: string | null
           sharing_confirmed_by_user_id?: string | null
-          sharing_policy?: string
+          sharing_detail?: string | null
           status?: string
           tenant_code?: string
           updated_at?: string
@@ -2410,6 +2419,29 @@ export type Database = {
           p_tenant_code: string
         }
         Returns: Json
+      }
+      sh_gdrive_apply: {
+        Args: {
+          p_action: string
+          p_actor_name?: string
+          p_actor_user_id?: string
+          p_detail?: Json
+          p_patch: Json
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
+      sh_gdrive_state_create: {
+        Args: {
+          p_actor_name?: string
+          p_actor_user_id?: string
+          p_expires_at: string
+          p_redirect_uri: string
+          p_state_hash: string
+          p_tenant_code: string
+          p_verifier_ciphertext: string
+        }
+        Returns: string
       }
       sh_next_job_number: {
         Args: { p_date_key: string; p_tenant_code: string }
