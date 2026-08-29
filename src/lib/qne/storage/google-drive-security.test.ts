@@ -1038,3 +1038,141 @@ describe("FINAL-3 token refresh and status changes are atomic with audit", () =>
     expect(SAFE_CALLBACK_CODES).toContain(new URL(location).searchParams.get("drive"));
   });
 });
+
+/* ---------------------------------------------------------------------------
+ * WP2A AUDIT REPAIR — route-level fail-closed / truth-state assertions.
+ * ------------------------------------------------------------------------ */
+
+async function ackPublicFolder(): Promise<void> {
+  await connectFully();
+  google.permissionPages = PUBLIC_PERMS;
+  await connectionPost({ action: "select_folder", folderId: "F1" });
+  await connectionPost({ action: "acknowledge_public_sharing", confirm: true });
+  expect(connRow().public_sharing_acknowledged).toBe(true);
+  expect(connRow().sharing_confirmed_at).toBeTruthy();
+}
+
+function expectAckCleared(): void {
+  const row = connRow();
+  expect(row.public_sharing_acknowledged).toBe(false);
+  expect(row.sharing_confirmed_by_user_id ?? null).toBeNull();
+  expect(row.sharing_confirmed_by_name ?? null).toBeNull();
+  expect(row.sharing_confirmed_at ?? null).toBeNull();
+}
+
+describe("REPAIR-A callback account and acknowledgement truth", () => {
+  it("reports account_changed for a known, different account even with no Root Folder", async () => {
+    await connectFully();
+    expect(connRow().root_folder_id ?? null).toBeNull();
+
+    google.account = { emailAddress: "other@tct.com", permissionId: "PID-2" };
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=account_changed");
+    expect(H.db.audit.some((a) => a.action === "account_changed")).toBe(true);
+    expect(connRow().google_account_permission_id).toBe("PID-2");
+  });
+
+  it("clears the acknowledgement actor and time when the folder fails revalidation", async () => {
+    await ackPublicFolder();
+    google.folderStatus = 404;
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=folder_recheck_required");
+    expectAckCleared();
+  });
+
+  it("clears the acknowledgement actor and time when sharing cannot be read", async () => {
+    await ackPublicFolder();
+    google.permissionsStatus = 500;
+    const res = await runCallback(stateFrom(await startConnect()));
+    expect(res.headers.get("location")).toContain("drive=folder_recheck_required");
+    expectAckCleared();
+    expect(connRow().detected_sharing_status).toBe("error");
+  });
+});
+
+describe("REPAIR-B Test Connection fails closed on identity and sharing truth", () => {
+  it("fails closed when about.get returns no permissionId and keeps the known stored ID", async () => {
+    await connectFully();
+    await connectionPost({ action: "select_folder", folderId: "F1" });
+    google.account = { emailAddress: "ops@tct.com" };
+
+    const res = await connectionPost({ action: "test" });
+    const body = (await res.json()) as { ok: boolean; message: string };
+    expect(body.ok).toBe(false);
+    expect(connRow().google_account_permission_id).toBe("PID-1");
+    expect(connRow().status).toBe("error");
+  });
+
+  it("clears folder, drive context, sharing and confirmation when the live account differs", async () => {
+    await ackPublicFolder();
+    google.account = { emailAddress: "other@tct.com", permissionId: "PID-2" };
+
+    const res = await connectionPost({ action: "test" });
+    const body = (await res.json()) as { ok: boolean; message: string };
+    expect(body.ok).toBe(false);
+    expect(body.message).toContain("different Google account");
+    const row = connRow();
+    expect(row.root_folder_id).toBeNull();
+    expect(row.drive_context).toBeNull();
+    expect(row.detected_sharing_status).toBe("unknown");
+    expectAckCleared();
+  });
+
+  it("fails closed and clears the acknowledgement when the saved folder is unusable", async () => {
+    await ackPublicFolder();
+    google.folder = {
+      ...(google.folder as Record<string, unknown>),
+      capabilities: { canAddChildren: false, canListChildren: true },
+    };
+    const res = await connectionPost({ action: "test" });
+    const body = (await res.json()) as { ok: boolean };
+    expect(body.ok).toBe(false);
+    expect(connRow().status).toBe("error");
+    expectAckCleared();
+  });
+
+  it("never calls the folder usable when permissions.list fails", async () => {
+    await ackPublicFolder();
+    google.permissionsStatus = 500;
+    const res = await connectionPost({ action: "test" });
+    const body = (await res.json()) as { ok: boolean; message: string };
+    expect(body.ok).toBe(false);
+    expect(body.message).not.toContain("is usable");
+    expect(connRow().status).toBe("error");
+    expect(connRow().detected_sharing_status).toBe("error");
+    expectAckCleared();
+  });
+
+  it("clears a stale acknowledgement once sharing really becomes restricted", async () => {
+    await ackPublicFolder();
+    google.permissionPages = [{ permissions: [{ id: "o", type: "user", role: "owner" }] }];
+    const res = await connectionPost({ action: "test" });
+    const body = (await res.json()) as { ok: boolean };
+    expect(body.ok).toBe(true);
+    expect(connRow().detected_sharing_status).toBe("restricted");
+    expectAckCleared();
+  });
+});
+
+describe("REPAIR-C folder selection and acknowledgement truth", () => {
+  it("does not report success when sharing cannot be read after selecting a folder", async () => {
+    await connectFully();
+    google.permissionsStatus = 500;
+    const res = await connectionPost({ action: "select_folder", folderId: "F1" });
+    const body = (await res.json()) as { ok?: boolean; error?: string };
+    expect(res.status).not.toBe(200);
+    expect(body.ok).toBe(false);
+    expect(connRow().root_folder_id).toBe("F1");
+    expect(connRow().status).toBe("error");
+    expect(connRow().detected_sharing_status).toBe("error");
+    expectAckCleared();
+  });
+
+  it("clears acknowledgement actor and time when the folder is not actually public", async () => {
+    await ackPublicFolder();
+    google.permissionPages = [{ permissions: [{ id: "o", type: "user", role: "owner" }] }];
+    const res = await connectionPost({ action: "acknowledge_public_sharing", confirm: true });
+    expect(res.status).toBe(409);
+    expectAckCleared();
+  });
+});
