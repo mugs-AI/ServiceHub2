@@ -437,19 +437,26 @@ export interface DriveAccount {
 /**
  * Connected-account identity from Drive `about.get`, which is supported by
  * drive.file. No OIDC/UserInfo call is made anywhere in this vertical.
+ *
+ * `ok` is true ONLY when Google answered AND returned a stable permissionId.
+ * Email is display-only and is never used to compare accounts.
  */
-export async function fetchDriveAccount(accessToken: string): Promise<DriveAccount> {
+export async function fetchDriveAccount(
+  accessToken: string,
+): Promise<DriveAccount & { ok: boolean }> {
   const res = await driveFetch(
     accessToken,
     `${DRIVE_ABOUT}?fields=${encodeURIComponent("user(emailAddress,permissionId)")}`,
   );
-  if (!res.ok) return { email: null, permissionId: null };
+  if (!res.ok) return { ok: false, email: null, permissionId: null };
   const json = (await res.json().catch(() => null)) as {
     user?: { emailAddress?: string; permissionId?: string };
   } | null;
+  const permissionId = json?.user?.permissionId ? String(json.user.permissionId) : null;
   return {
+    ok: Boolean(permissionId),
     email: json?.user?.emailAddress ?? null,
-    permissionId: json?.user?.permissionId ?? null,
+    permissionId,
   };
 }
 
