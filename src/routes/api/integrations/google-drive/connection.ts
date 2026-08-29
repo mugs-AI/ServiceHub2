@@ -324,6 +324,8 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
               );
             }
             const sharing = await gd.readSharing(accessToken, validated.folder.id);
+            const sharingUnreadable = sharing.status === "error" || sharing.status === "unknown";
+            const failMessage = `The folder "${validated.folder.name}" was saved, but Google did not return its sharing settings, so it cannot be reported as safe to use. ${sharing.detail}`;
             const saved = await gd.applyConnection(
               actor,
               {
@@ -334,12 +336,9 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
                 detected_sharing_status: sharing.status,
                 sharing_detail: sharing.detail,
                 sharing_checked_at: new Date().toISOString(),
-                public_sharing_acknowledged: false,
-                sharing_confirmed_by_user_id: null,
-                sharing_confirmed_by_name: null,
-                sharing_confirmed_at: null,
-                status: "connected",
-                last_error: null,
+                ...CLEAR_ACK,
+                status: sharingUnreadable ? "error" : "connected",
+                last_error: sharingUnreadable ? failMessage : null,
               },
               action,
               {
@@ -348,6 +347,19 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
                 detectedSharing: sharing.status,
               },
             );
+            if (sharingUnreadable) {
+              return Response.json(
+                {
+                  ok: false,
+                  error: failMessage,
+                  recovery:
+                    "Run Test Connection, or check the folder's sharing settings in Google Drive, then try again.",
+                  connection: toPublicConnection(saved),
+                  sharing: { status: sharing.status, detail: sharing.detail },
+                },
+                { status: 502 },
+              );
+            }
             return Response.json({
               ok: true,
               connection: toPublicConnection(saved),
@@ -365,7 +377,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
                   detected_sharing_status: sharing.status,
                   sharing_detail: sharing.detail,
                   sharing_checked_at: new Date().toISOString(),
-                  public_sharing_acknowledged: false,
+                  ...CLEAR_ACK,
                 },
                 "sharing_checked",
                 { detectedSharing: sharing.status },
