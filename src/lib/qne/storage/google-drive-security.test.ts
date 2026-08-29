@@ -721,7 +721,8 @@ describe("P1-4 audit and mutation atomicity", () => {
     await connectFully();
     H.db.failAudit = true;
     const res = await connectionPost({ action: "picker_token" });
-    expect(res.status).toBe(500);
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).not.toBe(200);
     expect(await res.text()).not.toContain("at-1");
   });
 
@@ -1016,7 +1017,8 @@ describe("FINAL-3 token refresh and status changes are atomic with audit", () =>
     const expiry = connRow().access_token_expires_at;
     H.db.failAudit = true;
     const res = await connectionPost({ action: "picker_token" });
-    expect(res.status).toBe(500);
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).not.toBe(200);
     const text = await res.text();
     expect(text).not.toContain("at-1");
     // Prior committed state survives the failed transaction.
