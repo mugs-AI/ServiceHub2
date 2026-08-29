@@ -8,12 +8,10 @@ export const Route = createFileRoute("/api/integrations/google-drive/connect")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { requireAdministrator, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { beginAuthorization, missingDriveEnv } = await import(
-          "@/lib/qne/storage/google-drive.server"
-        );
+        const { requireAdministrator, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { beginAuthorization, missingDriveEnv } =
+          await import("@/lib/qne/storage/google-drive.server");
         try {
           const user = await requireAdministrator(request);
           const actor = {
@@ -39,7 +37,10 @@ export const Route = createFileRoute("/api/integrations/google-drive/connect")({
           const resp = guardResponse(err);
           if (resp) return resp;
           console.error("[google-drive connect] failed");
-          return Response.json({ error: "Failed to start Google Drive connection" }, { status: 500 });
+          return Response.json(
+            { error: "Failed to start Google Drive connection" },
+            { status: 500 },
+          );
         }
       },
     },

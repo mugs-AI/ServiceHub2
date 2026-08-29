@@ -121,7 +121,9 @@ export interface ScopeCheck {
  * owner-approved set. A response that widens access is rejected and revoked.
  */
 export function validateGrantedScopes(raw: string | null | undefined): ScopeCheck {
-  const granted = String(raw ?? "").split(/\s+/).filter(Boolean);
+  const granted = String(raw ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
   const missing = APPROVED_SCOPES.filter((s) => !granted.includes(s));
   const extra = granted.filter((s) => !APPROVED_SCOPES.includes(s));
   const ok = missing.length === 0 && extra.length === 0;
@@ -214,7 +216,9 @@ export function validateFolderMeta(meta: DriveFolderMeta | null | undefined): Fo
 
 /** Folder names are created by us; keep them boring and safe. */
 export function sanitizeFolderName(raw: unknown): string {
-  const name = String(raw ?? "").replace(/[\r\n\t]+/g, " ").trim();
+  const name = String(raw ?? "")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim();
   if (!name) return DEFAULT_ROOT_FOLDER_NAME;
   return name.slice(0, 120);
 }

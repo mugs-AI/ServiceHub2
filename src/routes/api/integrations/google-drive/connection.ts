@@ -17,9 +17,8 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAdministrator, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAdministrator, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const gd = await import("@/lib/qne/storage/google-drive.server");
         const {
           toPublicConnection,
@@ -77,9 +76,8 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
       },
 
       POST: async ({ request }) => {
-        const { requireAdministrator, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAdministrator, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const gd = await import("@/lib/qne/storage/google-drive.server");
         const { sanitizeFolderName, toPublicConnection, PUBLIC_SHARING_CONFIRMATION } =
           await import("@/lib/qne/storage/google-drive");
@@ -168,9 +166,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
             accessToken = await gd.accessTokenFor(row);
           } catch (e) {
             const recovery =
-              e instanceof gd.DriveAuthError
-                ? e.recovery
-                : "Reconnect Google Drive from Settings.";
+              e instanceof gd.DriveAuthError ? e.recovery : "Reconnect Google Drive from Settings.";
             return Response.json(
               {
                 error: e instanceof Error ? e.message : "Google Drive credential unavailable.",

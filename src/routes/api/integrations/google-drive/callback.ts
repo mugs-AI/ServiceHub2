@@ -15,9 +15,8 @@ export const Route = createFileRoute("/api/integrations/google-drive/callback")(
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { CALLBACK_MESSAGE, validateGrantedScopes } = await import(
-          "@/lib/qne/storage/google-drive"
-        );
+        const { CALLBACK_MESSAGE, validateGrantedScopes } =
+          await import("@/lib/qne/storage/google-drive");
         const {
           consumeState,
           exchangeCode,
@@ -65,9 +64,9 @@ export const Route = createFileRoute("/api/integrations/google-drive/callback")(
           const previousId = previous?.google_account_permission_id ?? null;
           const accountChanged = Boolean(
             previous?.root_folder_id &&
-              previousId &&
-              account.permissionId &&
-              previousId !== account.permissionId,
+            previousId &&
+            account.permissionId &&
+            previousId !== account.permissionId,
           );
 
           await applyConnection(

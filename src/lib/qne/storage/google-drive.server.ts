@@ -229,7 +229,8 @@ export async function consumeState(rawState: string | null): Promise<StateOutcom
     .maybeSingle();
   if (!row) return { ok: false, reason: "state_invalid" };
   if (row.used_at) return { ok: false, reason: "state_used" };
-  if (new Date(row.expires_at).getTime() < Date.now()) return { ok: false, reason: "state_expired" };
+  if (new Date(row.expires_at).getTime() < Date.now())
+    return { ok: false, reason: "state_expired" };
 
   const { data: claimed } = await supabaseAdmin
     .from("google_drive_oauth_states")
@@ -370,9 +371,7 @@ export async function accessTokenFor(row: ConnectionRow): Promise<string> {
   }
   const patch: Record<string, unknown> = {
     access_token_ciphertext: await encryptSecret(token.access_token),
-    access_token_expires_at: new Date(
-      Date.now() + (token.expires_in ?? 3600) * 1000,
-    ).toISOString(),
+    access_token_expires_at: new Date(Date.now() + (token.expires_in ?? 3600) * 1000).toISOString(),
     status: "connected",
     last_error: null,
   };
@@ -380,7 +379,10 @@ export async function accessTokenFor(row: ConnectionRow): Promise<string> {
   if (token.refresh_token && token.refresh_token !== refresh) {
     patch.refresh_token_ciphertext = await encryptSecret(token.refresh_token);
   }
-  await supabaseAdmin.from("google_drive_connections").update(patch as never).eq("id", row.id);
+  await supabaseAdmin
+    .from("google_drive_connections")
+    .update(patch as never)
+    .eq("id", row.id);
   return token.access_token;
 }
 
@@ -553,7 +555,10 @@ export async function readSharing(
     url.searchParams.set("supportsAllDrives", "true");
     url.searchParams.set("useDomainAdminAccess", "false");
     url.searchParams.set("pageSize", "100");
-    url.searchParams.set("fields", "nextPageToken,permissions(id,type,role,allowFileDiscovery,deleted)");
+    url.searchParams.set(
+      "fields",
+      "nextPageToken,permissions(id,type,role,allowFileDiscovery,deleted)",
+    );
     if (pageToken) url.searchParams.set("pageToken", pageToken);
     const res = await driveFetch(accessToken, url.toString());
     if (!res.ok) {

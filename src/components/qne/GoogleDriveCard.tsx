@@ -202,10 +202,10 @@ export function GoogleDriveCard({
             Google Drive — Company Storage Connection
           </h2>
           <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            Your company connects and owns its own Google Drive. MUGS operates the
-            Google application; your files stay in your Drive. Only the{" "}
-            <span className="font-mono">drive.file</span> permission is requested, so
-            ServiceHub can only see folders and files you choose or it creates.
+            Your company connects and owns its own Google Drive. MUGS operates the Google
+            application; your files stay in your Drive. Only the{" "}
+            <span className="font-mono">drive.file</span> permission is requested, so ServiceHub can
+            only see folders and files you choose or it creates.
           </p>
         </div>
         <span
@@ -233,13 +233,11 @@ export function GoogleDriveCard({
 
       {state && !state.configured && (
         <div className="mt-3 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">
-            Not configured for this deployment yet.
-          </p>
+          <p className="font-medium text-foreground">Not configured for this deployment yet.</p>
           <p className="mt-1">
             Missing server-only settings:{" "}
-            <span className="font-mono">{state.missingEnv.join(", ")}</span>. Google Cloud
-            must also allow this exact redirect URI:{" "}
+            <span className="font-mono">{state.missingEnv.join(", ")}</span>. Google Cloud must also
+            allow this exact redirect URI:{" "}
             <span className="font-mono break-all">{state.redirectUri}</span>
           </p>
         </div>
@@ -328,9 +326,7 @@ export function GoogleDriveCard({
         <button
           onClick={() =>
             void post({ action: "test" }, "test")
-              .then((b) =>
-                onNotify(b.ok ? "ok" : "err", String(b.message ?? "Test completed.")),
-              )
+              .then((b) => onNotify(b.ok ? "ok" : "err", String(b.message ?? "Test completed.")))
               .catch((e) => onNotify("err", e instanceof Error ? e.message : String(e)))
           }
           disabled={!connected || busy !== null}
@@ -340,7 +336,12 @@ export function GoogleDriveCard({
         </button>
         <button
           onClick={() => {
-            if (!window.confirm("Disconnect Google Drive? Your Drive folder and files are NOT deleted.")) return;
+            if (
+              !window.confirm(
+                "Disconnect Google Drive? Your Drive folder and files are NOT deleted.",
+              )
+            )
+              return;
             void post({ action: "disconnect", confirm: true }, "disconnect")
               .then((b) => onNotify("ok", String(b.message ?? "Disconnected.")))
               .catch((e) => onNotify("err", e instanceof Error ? e.message : String(e)));
@@ -406,8 +407,8 @@ export function GoogleDriveCard({
           <ul className="mt-2 space-y-1">
             {state.audit.map((a, i) => (
               <li key={i} className="text-muted-foreground">
-                <span className="font-mono">{a.created_at.slice(0, 19).replace("T", " ")}</span>{" "}
-                — {a.action} {a.actor_name ? `by ${a.actor_name}` : ""}
+                <span className="font-mono">{a.created_at.slice(0, 19).replace("T", " ")}</span> —{" "}
+                {a.action} {a.actor_name ? `by ${a.actor_name}` : ""}
               </li>
             ))}
           </ul>

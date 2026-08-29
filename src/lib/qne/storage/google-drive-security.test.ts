@@ -38,8 +38,7 @@ const H = vi.hoisted(() => {
     },
   };
 
-  const uid = () =>
-    `id-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  const uid = () => `id-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 
   const tableOf = (t: string): Row[] =>
     t === "google_drive_connections"
@@ -243,7 +242,8 @@ vi.mock("@/lib/qne/session/current-user.server", () => ({
   guardResponse: (err: unknown) => {
     if (err instanceof UnauthorizedError)
       return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if (err instanceof ForbiddenError) return Response.json({ error: "Forbidden" }, { status: 403 });
+    if (err instanceof ForbiddenError)
+      return Response.json({ error: "Forbidden" }, { status: 403 });
     return null;
   },
 }));
@@ -285,7 +285,13 @@ function json(body: unknown, status = 200) {
 
 beforeEach(() => {
   H.db.reset();
-  session = { tenantCode: "TCT", isAdministrator: true, userId: "U1", displayName: "Owner", email: "owner@tct.com" };
+  session = {
+    tenantCode: "TCT",
+    isAdministrator: true,
+    userId: "U1",
+    displayName: "Owner",
+    email: "owner@tct.com",
+  };
   calls = [];
   google = {
     token: {
@@ -311,7 +317,9 @@ beforeEach(() => {
   process.env["GOOGLE_DRIVE_REDIRECT_URI"] =
     "https://servicehub22.lovable.app/api/integrations/google-drive/callback";
   // Test-only AES key material; never a live credential.
-  process.env["GOOGLE_DRIVE_TOKEN_ENC_KEY"] = Buffer.from(new Uint8Array(32).fill(7)).toString("base64");
+  process.env["GOOGLE_DRIVE_TOKEN_ENC_KEY"] = Buffer.from(new Uint8Array(32).fill(7)).toString(
+    "base64",
+  );
   process.env["GOOGLE_PICKER_API_KEY"] = "picker-key-test";
 
   let permPage = 0;
@@ -495,11 +503,15 @@ describe("OAuth state: forgery, expiry, replay, cross-tenant", () => {
 
 describe("Authority: Owner/Admin only", () => {
   it("denies a Normal User / Technician with 403 on every management surface", async () => {
-    session = { tenantCode: "TCT", isAdministrator: false, userId: "U9", displayName: "Tech", email: "t@tct.com" };
+    session = {
+      tenantCode: "TCT",
+      isAdministrator: false,
+      userId: "U9",
+      displayName: "Tech",
+      email: "t@tct.com",
+    };
     const conn = await handlers(CONNECT);
-    expect(
-      (await conn.POST!({ request: req("https://x/api", {}), params: {} })).status,
-    ).toBe(403);
+    expect((await conn.POST!({ request: req("https://x/api", {}), params: {} })).status).toBe(403);
     const c = await handlers(CONNECTION);
     expect((await c.GET!({ request: req("https://x/api"), params: {} })).status).toBe(403);
     expect((await connectionPost({ action: "test" })).status).toBe(403);
@@ -614,9 +626,7 @@ describe("P1-3 reconnect and folder truth", () => {
     };
     expect(validateFolderMeta(base).ok).toBe(false);
     expect(validateFolderMeta({ ...base, capabilities: {} }).ok).toBe(false);
-    expect(
-      validateFolderMeta({ ...base, capabilities: { canAddChildren: true } }).ok,
-    ).toBe(false);
+    expect(validateFolderMeta({ ...base, capabilities: { canAddChildren: true } }).ok).toBe(false);
     expect(
       validateFolderMeta({
         ...base,
@@ -769,7 +779,9 @@ describe("One active connection and Root Folder per tenant", () => {
     session = { ...session!, tenantCode: "TENANT-B" };
     const h = await handlers(CONNECTION);
     const res = await h.GET!({ request: req("https://x/api"), params: {} });
-    const body = (await res.json()) as { connection: { rootFolderId: string | null; status: string } };
+    const body = (await res.json()) as {
+      connection: { rootFolderId: string | null; status: string };
+    };
     expect(body.connection.rootFolderId).toBeNull();
     expect(body.connection.status).toBe("not_connected");
   });
