@@ -328,7 +328,7 @@ export async function accessTokenFor(row: ConnectionRow): Promise<string> {
   if (token.refresh_token && token.refresh_token !== refresh) {
     patch.refresh_token_ciphertext = await encryptSecret(token.refresh_token);
   }
-  await supabaseAdmin.from("google_drive_connections").update(patch).eq("id", row.id);
+  await supabaseAdmin.from("google_drive_connections").update(patch as never).eq("id", row.id);
   return token.access_token;
 }
 
