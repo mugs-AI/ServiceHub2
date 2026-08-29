@@ -116,25 +116,33 @@ export const Route = createFileRoute("/api/integrations/google-drive/callback")(
             sharing_confirmed_at: null,
           };
 
+          const CLEAR_ACK = {
+            public_sharing_acknowledged: false,
+            sharing_confirmed_by_user_id: null,
+            sharing_confirmed_by_name: null,
+            sharing_confirmed_at: null,
+          };
+
           // ---- 2a. Different / unprovable account: clear the mapping --------
           if (!sameAccount) {
-            const mustClear = hadFolder || Boolean(previous);
-            const changed = hadFolder;
+            // Account-change truth does not depend on whether a folder existed:
+            // a KNOWN previous identity that differs is an account change.
+            const changed = Boolean(previousId) || hadFolder;
             await applyConnection(
               actor,
               {
                 ...credentials,
                 status: "connected",
-                last_error: changed
-                  ? "The saved Root Folder was cleared because a different Google account is now connected."
+                last_error: hadFolder
+                  ? "The saved Root Folder was cleared because the Google account behind this connection is not the same one."
                   : null,
-                ...(mustClear ? CLEARED : {}),
+                ...(previous ? CLEARED : {}),
               },
               changed ? "account_changed" : "connected",
               {
                 account: account.email,
                 previousIdentityKnown: Boolean(previousId),
-                rootFolderCleared: changed,
+                rootFolderCleared: hadFolder,
               },
             );
             return back(changed ? "account_changed" : "connected");
