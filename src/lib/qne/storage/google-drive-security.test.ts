@@ -193,8 +193,13 @@ const H = vi.hoisted(() => {
           }
         } catch (e) {
           // Roll the whole transaction back — no silent partial success.
-          if (created) db.connections = db.connections.filter((r) => r !== row);
-          else Object.assign(row, before);
+          if (created) {
+            db.connections = db.connections.filter((r) => r !== row);
+          } else {
+            // Full row rollback, as a real transaction would do.
+            for (const k of Object.keys(row)) delete row[k];
+            Object.assign(row, before);
+          }
           throw e;
         }
         return Promise.resolve({ data: { ...row }, error: null });
