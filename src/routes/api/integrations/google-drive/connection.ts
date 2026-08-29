@@ -177,6 +177,15 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
             );
           }
 
+          // Clearing a stale public-sharing acknowledgement is one shape used
+          // everywhere the current sharing truth is not a proven public risk.
+          const CLEAR_ACK = {
+            public_sharing_acknowledged: false,
+            sharing_confirmed_by_user_id: null,
+            sharing_confirmed_by_name: null,
+            sharing_confirmed_at: null,
+          } as const;
+
           if (action === "test" || action === "refresh_sharing") {
             const about = await gd.driveAbout(accessToken);
             let ok = about.ok;
@@ -184,15 +193,20 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
             const patch: Record<string, unknown> = {};
 
             // P1-3: reconnect truth — the live account decides folder validity.
+            // A missing live OR missing stored permissionId is NOT proof of the
+            // same account; identity must be positively proven.
             const sameAccount =
-              !about.account.permissionId ||
-              !row.google_account_permission_id ||
+              Boolean(about.account.permissionId) &&
+              Boolean(row.google_account_permission_id) &&
               about.account.permissionId === row.google_account_permission_id;
             if (ok && !sameAccount) {
               ok = false;
-              message =
-                "Google Drive is now authorised by a different Google account. The saved Root Folder no longer applies — select a Root Folder again.";
+              message = row.google_account_permission_id
+                ? "Google Drive is now authorised by a different Google account. The saved Root Folder no longer applies — select a Root Folder again."
+                : "The Google account behind this connection cannot be proven, so the saved Root Folder no longer applies — reconnect Google Drive and select a Root Folder again.";
               Object.assign(patch, {
+                google_account_email: about.account.email,
+                google_account_permission_id: about.account.permissionId,
                 root_folder_id: null,
                 root_folder_name: null,
                 drive_id: null,
@@ -200,27 +214,47 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
                 detected_sharing_status: "unknown",
                 sharing_detail: null,
                 sharing_checked_at: null,
-                public_sharing_acknowledged: false,
+                ...CLEAR_ACK,
               });
             } else if (ok) {
               patch.google_account_email = about.account.email;
-              patch.google_account_permission_id = about.account.permissionId;
+              // Never overwrite a known stable identity with null.
+              if (about.account.permissionId) {
+                patch.google_account_permission_id = about.account.permissionId;
+              }
               if (row.root_folder_id) {
                 const folder = await gd.revalidateFolder(accessToken, row.root_folder_id);
-                if (!folder.ok) {
+                if (!folder.ok || !folder.folder) {
                   ok = false;
                   message = `${folder.reason} ${folder.recovery}`;
+                  Object.assign(patch, {
+                    detected_sharing_status: "unknown",
+                    sharing_detail: null,
+                    sharing_checked_at: null,
+                    ...CLEAR_ACK,
+                  });
                 } else {
                   const sharing = await gd.readSharing(accessToken, row.root_folder_id);
                   Object.assign(patch, {
-                    root_folder_name: folder.folder!.name,
-                    drive_id: folder.folder!.driveId,
-                    drive_context: folder.folder!.driveContext,
+                    root_folder_name: folder.folder.name,
+                    drive_id: folder.folder.driveId,
+                    drive_context: folder.folder.driveContext,
                     detected_sharing_status: sharing.status,
                     sharing_detail: sharing.detail,
                     sharing_checked_at: new Date().toISOString(),
                   });
-                  message = `${about.message} Root folder "${folder.folder!.name}" is usable. Sharing: ${sharing.detail}`;
+                  if (sharing.status === "error" || sharing.status === "unknown") {
+                    // Sharing truth is unavailable: the folder is NOT usable.
+                    ok = false;
+                    message = `The folder "${folder.folder.name}" was found, but its sharing status could not be read, so it cannot be reported as safe. ${sharing.detail}`;
+                    Object.assign(patch, CLEAR_ACK);
+                  } else {
+                    if (sharing.status !== "anyone_with_link") {
+                      // The public risk is gone: a prior acknowledgement is stale.
+                      Object.assign(patch, CLEAR_ACK);
+                    }
+                    message = `${about.message} Root folder "${folder.folder.name}" is usable. Sharing: ${sharing.detail}`;
+                  }
                 }
               } else {
                 message = `${about.message} No Root Folder is selected yet.`;
@@ -242,6 +276,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
             return Response.json({
               ok,
               message,
+              recovery: ok ? undefined : "Reselect or check the Root Folder in Google Drive.",
               connection: toPublicConnection(saved),
             });
           }
