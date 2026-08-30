@@ -70,11 +70,10 @@ export function GoogleDriveCard({
   const [busy, setBusy] = useState<string | null>(null);
   const [folderName, setFolderName] = useState(DEFAULT_ROOT_FOLDER_NAME);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Picker token lives ONLY here, in memory, for the life of the picker.
-  const pickerToken = useRef<string | null>(null);
-  // Exactly one Picker instance may exist at a time.
-  const pickerInstance = useRef<PickerInstance | null>(null);
+  // The Picker token and instance live only inside the session controller
+  // below (memory only, cleared on every terminal path and on unmount).
   const [pickerOpen, setPickerOpen] = useState(false);
+
 
   const load = useCallback(async () => {
     try {
