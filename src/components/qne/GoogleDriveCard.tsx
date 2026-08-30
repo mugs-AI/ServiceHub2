@@ -344,10 +344,11 @@ export function GoogleDriveCard({
         </button>
         <button
           onClick={() => void openPicker()}
-          disabled={!connected || busy !== null}
+          disabled={!connected || busy !== null || pickerOpen}
+          aria-busy={pickerOpen}
           className="rounded-md border px-3 py-2 text-xs font-medium disabled:opacity-50"
         >
-          Select Existing Folder
+          {pickerOpen ? "Selecting folder…" : "Select Existing Folder"}
         </button>
         <button
           onClick={() =>
