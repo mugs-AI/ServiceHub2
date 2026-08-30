@@ -7,12 +7,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  createPickerController,
   loadGoogleApi,
-  openFolderPicker,
   PICKER_ACCOUNT_GUIDANCE,
   type GoogleNamespace,
-  type PickerInstance,
+  type PickerController,
 } from "@/lib/qne/storage/drive-picker";
+
 import {
   ATTACHMENTS_NOT_IMPLEMENTED_NOTICE,
   DEFAULT_ROOT_FOLDER_NAME,
@@ -69,10 +70,8 @@ export function GoogleDriveCard({
   const [busy, setBusy] = useState<string | null>(null);
   const [folderName, setFolderName] = useState(DEFAULT_ROOT_FOLDER_NAME);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Picker token lives ONLY here, in memory, for the life of the picker.
-  const pickerToken = useRef<string | null>(null);
-  // Exactly one Picker instance may exist at a time.
-  const pickerInstance = useRef<PickerInstance | null>(null);
+  // The Picker token and instance live only inside the session controller
+  // below (memory only, cleared on every terminal path and on unmount).
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -151,70 +150,52 @@ export function GoogleDriveCard({
     }
   }
 
-  const endPickerSession = useCallback(() => {
-    try {
-      pickerInstance.current?.setVisible(false);
-    } catch {
-      /* ignore */
-    }
-    pickerInstance.current = null;
-    pickerToken.current = null; // token discarded on every terminal path
-  }, []);
+  // Latest handlers, so the controller (created once) never goes stale.
+  const handlersRef = useRef({ post, onNotify });
+  handlersRef.current = { post, onNotify };
 
-  // Unmount: hide any live Picker and drop the token.
-  useEffect(() => endPickerSession, [endPickerSession]);
+  const controllerRef = useRef<PickerController | null>(null);
+  if (!controllerRef.current) {
+    controllerRef.current = createPickerController({
+      fetchToken: async () => {
+        const res = await fetch("/api/integrations/google-drive/connection", {
+          method: "POST",
+          headers: authHeaders(true),
+          body: JSON.stringify({ action: "picker_token" }),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          accessToken?: string;
+          apiKey?: string;
+          appId?: string | null;
+          error?: string;
+          recovery?: string;
+        };
+        if (!res.ok || !body.accessToken || !body.apiKey) {
+          throw new Error([body.error, body.recovery].filter(Boolean).join(" "));
+        }
+        return { accessToken: body.accessToken, apiKey: body.apiKey, appId: body.appId ?? null };
+      },
+      loadApi: loadGoogleApi,
+      getGoogle: () => (window as unknown as { google?: GoogleNamespace }).google,
+      getOrigin: () => window.location.origin,
+      onPicked: async (folderId) => {
+        await handlersRef.current.post({ action: "select_folder", folderId }, "select");
+        handlersRef.current.onNotify("ok", "Root Folder saved after Google revalidation.");
+      },
+      onError: (e) =>
+        handlersRef.current.onNotify(
+          "err",
+          e instanceof Error ? e.message : e ? String(e) : "Google Picker failed",
+        ),
+      onBusyChange: setPickerOpen,
+    });
+  }
 
-  async function openPicker() {
-    // Exactly one Picker per component: repeated clicks are ignored.
-    if (pickerOpen || pickerInstance.current) return;
-    setPickerOpen(true);
-    try {
-      const res = await fetch("/api/integrations/google-drive/connection", {
-        method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ action: "picker_token" }),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        accessToken?: string;
-        apiKey?: string;
-        appId?: string | null;
-        error?: string;
-        recovery?: string;
-      };
-      if (!res.ok || !body.accessToken || !body.apiKey) {
-        throw new Error([body.error, body.recovery].filter(Boolean).join(" "));
-      }
-      pickerToken.current = body.accessToken;
-      await loadGoogleApi();
-      const g = (window as unknown as { google?: GoogleNamespace }).google;
-      if (!g?.picker) throw new Error("Google Picker could not be loaded.");
-      pickerInstance.current = openFolderPicker({
-        google: g,
-        accessToken: pickerToken.current,
-        apiKey: body.apiKey,
-        appId: body.appId ?? null,
-        origin: window.location.origin,
-        onPicked: async (folderId) => {
-          endPickerSession();
-          try {
-            await post({ action: "select_folder", folderId }, "select");
-            onNotify("ok", "Root Folder saved after Google revalidation.");
-          } catch (e) {
-            onNotify("err", e instanceof Error ? e.message : String(e));
-          } finally {
-            setPickerOpen(false);
-          }
-        },
-        onCancel: () => {
-          endPickerSession();
-          setPickerOpen(false);
-        },
-      });
-    } catch (e) {
-      endPickerSession();
-      setPickerOpen(false);
-      onNotify("err", e instanceof Error ? e.message : "Google Picker failed");
-    }
+  // Unmount: invalidate the session, hide any live Picker and drop the token.
+  useEffect(() => () => controllerRef.current?.dispose(), []);
+
+  function openPicker() {
+    void controllerRef.current?.open();
   }
 
   const conn = state?.connection ?? NOT_CONNECTED;

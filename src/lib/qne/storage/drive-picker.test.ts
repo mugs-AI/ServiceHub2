@@ -219,3 +219,186 @@ describe("WP2A Google Picker folder selector", () => {
     expect(PICKER_ACCOUNT_GUIDANCE).not.toMatch(/token|secret/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Picker session controller lifecycle (double-click, duplicate terminal
+// events, and unmount during pending awaits).
+// ---------------------------------------------------------------------------
+
+import { createPickerController, type OpenFolderPickerOptions } from "./drive-picker";
+
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function controllerHarness(over: Partial<Parameters<typeof createPickerController>[0]> = {}) {
+  const tokenGate = deferred<void>();
+  const apiGate = deferred<void>();
+  const visibility: boolean[] = [];
+  const built: OpenFolderPickerOptions[] = [];
+  const fetchToken = vi.fn(async () => {
+    await tokenGate.promise;
+    return { accessToken: "tok", apiKey: "key", appId: "app" };
+  });
+  const loadApi = vi.fn(async () => {
+    await apiGate.promise;
+  });
+  const onPicked = vi.fn(async () => {});
+  const onCancel = vi.fn();
+  const onError = vi.fn();
+  const busy: boolean[] = [];
+  const controller = createPickerController({
+    fetchToken,
+    loadApi,
+    getGoogle: () => harness().google,
+    getOrigin: () => "https://servicehub.example",
+    onPicked,
+    onCancel,
+    onError,
+    onBusyChange: (b) => busy.push(b),
+    buildPicker: (opts) => {
+      built.push(opts);
+      visibility.push(true);
+      return { setVisible: (v: boolean) => visibility.push(v) };
+    },
+    ...over,
+  });
+  return {
+    controller,
+    tokenGate,
+    apiGate,
+    fetchToken,
+    loadApi,
+    onPicked,
+    onCancel,
+    onError,
+    busy,
+    built,
+    visibility,
+  };
+}
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe("WP2A Picker session controller", () => {
+  it("ignores a second open while the first token request is pending", async () => {
+    const h = controllerHarness();
+    const first = h.controller.open();
+    const second = h.controller.open();
+    expect(h.fetchToken).toHaveBeenCalledTimes(1);
+    h.tokenGate.resolve();
+    h.apiGate.resolve();
+    await Promise.all([first, second]);
+    expect(h.fetchToken).toHaveBeenCalledTimes(1);
+    expect(h.built).toHaveLength(1);
+  });
+
+  it("submits exactly one select_folder for duplicate picked events", async () => {
+    const h = controllerHarness();
+    const run = h.controller.open();
+    h.tokenGate.resolve();
+    h.apiGate.resolve();
+    await run;
+    const opts = h.built[0];
+    void opts.onPicked("folder-1");
+    void opts.onPicked("folder-1");
+    await flush();
+    expect(h.onPicked).toHaveBeenCalledTimes(1);
+    expect(h.onPicked).toHaveBeenCalledWith("folder-1");
+  });
+
+  it("latches the terminal event exactly once for picked→cancel, cancel→picked and duplicate cancel", async () => {
+    const a = controllerHarness();
+    let run = a.controller.open();
+    a.tokenGate.resolve();
+    a.apiGate.resolve();
+    await run;
+    void a.built[0].onPicked("f1");
+    a.built[0].onCancel();
+    await flush();
+    expect(a.onPicked).toHaveBeenCalledTimes(1);
+    expect(a.onCancel).not.toHaveBeenCalled();
+
+    const b = controllerHarness();
+    run = b.controller.open();
+    b.tokenGate.resolve();
+    b.apiGate.resolve();
+    await run;
+    b.built[0].onCancel();
+    b.built[0].onCancel();
+    void b.built[0].onPicked("f1");
+    await flush();
+    expect(b.onCancel).toHaveBeenCalledTimes(1);
+    expect(b.onPicked).not.toHaveBeenCalled();
+  });
+
+  it("allows a new session after a terminal cancel and releases busy state", async () => {
+    const h = controllerHarness();
+    const run = h.controller.open();
+    h.tokenGate.resolve();
+    h.apiGate.resolve();
+    await run;
+    h.built[0].onCancel();
+    expect(h.controller.isActive()).toBe(false);
+    expect(h.busy).toEqual([true, false]);
+    await h.controller.open();
+    expect(h.fetchToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not build a Picker when unmounted during the pending token fetch", async () => {
+    const h = controllerHarness();
+    const run = h.controller.open();
+    h.controller.dispose();
+    h.tokenGate.resolve();
+    h.apiGate.resolve();
+    await run;
+    await flush();
+    expect(h.built).toHaveLength(0);
+    expect(h.loadApi).not.toHaveBeenCalled();
+    expect(h.controller.isActive()).toBe(false);
+  });
+
+  it("does not build a Picker when unmounted during the pending Google API load", async () => {
+    const h = controllerHarness();
+    const run = h.controller.open();
+    h.tokenGate.resolve();
+    await flush();
+    h.controller.dispose();
+    h.apiGate.resolve();
+    await run;
+    await flush();
+    expect(h.loadApi).toHaveBeenCalledTimes(1);
+    expect(h.built).toHaveLength(0);
+    expect(h.onError).not.toHaveBeenCalled();
+  });
+
+  it("reports a launch failure once, clears the session and posts nothing", async () => {
+    const h = controllerHarness({
+      fetchToken: vi.fn(async () => {
+        throw new Error("picker_token failed");
+      }),
+    });
+    await h.controller.open();
+    expect(h.onError).toHaveBeenCalledTimes(1);
+    expect(h.onPicked).not.toHaveBeenCalled();
+    expect(h.controller.isActive()).toBe(false);
+  });
+
+  it("hides the picker and clears the session on dispose", async () => {
+    const h = controllerHarness();
+    const run = h.controller.open();
+    h.tokenGate.resolve();
+    h.apiGate.resolve();
+    await run;
+    h.controller.dispose();
+    expect(h.visibility).toEqual([true, false]);
+    await h.controller.open();
+    expect(h.fetchToken).toHaveBeenCalledTimes(1); // disposed controller never relaunches
+  });
+});
