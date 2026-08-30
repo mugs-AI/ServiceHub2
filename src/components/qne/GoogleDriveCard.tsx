@@ -7,12 +7,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  createPickerController,
   loadGoogleApi,
-  openFolderPicker,
   PICKER_ACCOUNT_GUIDANCE,
   type GoogleNamespace,
-  type PickerInstance,
+  type PickerController,
 } from "@/lib/qne/storage/drive-picker";
+
 import {
   ATTACHMENTS_NOT_IMPLEMENTED_NOTICE,
   DEFAULT_ROOT_FOLDER_NAME,
