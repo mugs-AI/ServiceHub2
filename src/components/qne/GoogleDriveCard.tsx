@@ -71,6 +71,9 @@ export function GoogleDriveCard({
   const [loadError, setLoadError] = useState<string | null>(null);
   // Picker token lives ONLY here, in memory, for the life of the picker.
   const pickerToken = useRef<string | null>(null);
+  // Exactly one Picker instance may exist at a time.
+  const pickerInstance = useRef<PickerInstance | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
