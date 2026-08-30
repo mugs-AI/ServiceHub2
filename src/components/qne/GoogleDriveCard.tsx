@@ -148,8 +148,23 @@ export function GoogleDriveCard({
     }
   }
 
+  const endPickerSession = useCallback(() => {
+    try {
+      pickerInstance.current?.setVisible(false);
+    } catch {
+      /* ignore */
+    }
+    pickerInstance.current = null;
+    pickerToken.current = null; // token discarded on every terminal path
+  }, []);
+
+  // Unmount: hide any live Picker and drop the token.
+  useEffect(() => endPickerSession, [endPickerSession]);
+
   async function openPicker() {
-    setBusy("picker");
+    // Exactly one Picker per component: repeated clicks are ignored.
+    if (pickerOpen || pickerInstance.current) return;
+    setPickerOpen(true);
     try {
       const res = await fetch("/api/integrations/google-drive/connection", {
         method: "POST",
@@ -170,31 +185,32 @@ export function GoogleDriveCard({
       await loadGoogleApi();
       const g = (window as unknown as { google?: GoogleNamespace }).google;
       if (!g?.picker) throw new Error("Google Picker could not be loaded.");
-      const view = new g.picker.DocsView(g.picker.ViewId.FOLDERS)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(true);
-      const builder = new g.picker.PickerBuilder()
-        .setOAuthToken(pickerToken.current)
-        .setDeveloperKey(body.apiKey)
-        .addView(view)
-        .enableFeature(g.picker.Feature.SUPPORT_DRIVES)
-        .setCallback((data: PickerData) => {
-          if (data.action === "picked" && data.docs?.[0]?.id) {
-            const folderId = data.docs[0].id;
-            pickerToken.current = null; // token discarded immediately
-            void post({ action: "select_folder", folderId }, "select")
-              .then(() => onNotify("ok", "Root Folder saved after Google revalidation."))
-              .catch((e) => onNotify("err", e instanceof Error ? e.message : String(e)));
+      pickerInstance.current = openFolderPicker({
+        google: g,
+        accessToken: pickerToken.current,
+        apiKey: body.apiKey,
+        appId: body.appId ?? null,
+        origin: window.location.origin,
+        onPicked: async (folderId) => {
+          endPickerSession();
+          try {
+            await post({ action: "select_folder", folderId }, "select");
+            onNotify("ok", "Root Folder saved after Google revalidation.");
+          } catch (e) {
+            onNotify("err", e instanceof Error ? e.message : String(e));
+          } finally {
+            setPickerOpen(false);
           }
-          if (data.action === "cancel") pickerToken.current = null;
-        });
-      if (body.appId) builder.setAppId(body.appId);
-      builder.build().setVisible(true);
+        },
+        onCancel: () => {
+          endPickerSession();
+          setPickerOpen(false);
+        },
+      });
     } catch (e) {
-      pickerToken.current = null;
+      endPickerSession();
+      setPickerOpen(false);
       onNotify("err", e instanceof Error ? e.message : "Google Picker failed");
-    } finally {
-      setBusy(null);
     }
   }
 
