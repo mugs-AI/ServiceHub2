@@ -257,4 +257,3 @@ export function createPickerController(deps: PickerControllerDeps): PickerContro
     isActive: () => active,
   };
 }
-

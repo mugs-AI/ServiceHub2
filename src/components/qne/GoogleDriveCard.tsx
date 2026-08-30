@@ -74,7 +74,6 @@ export function GoogleDriveCard({
   // below (memory only, cleared on every terminal path and on unmount).
   const [pickerOpen, setPickerOpen] = useState(false);
 
-
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/integrations/google-drive/connection", {
@@ -198,7 +197,6 @@ export function GoogleDriveCard({
   function openPicker() {
     void controllerRef.current?.open();
   }
-
 
   const conn = state?.connection ?? NOT_CONNECTED;
   const connected = conn.status === "connected" || conn.status === "needs_reconnect";
