@@ -126,7 +126,11 @@ export function GoogleDriveCard({
       return body;
     } finally {
       setBusy(null);
-      void load();
+      // Await the connection-state refresh so callers (including the Picker
+      // session) only resolve / notify / release after the server-revalidated
+      // state has landed. load() catches its own errors, so it can never mask
+      // the original POST result.
+      await load();
     }
   }
 
