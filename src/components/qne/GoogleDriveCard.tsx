@@ -380,6 +380,12 @@ export function GoogleDriveCard({
         </button>
       </div>
 
+      <p className="mt-2 text-xs text-muted-foreground">
+        Select Existing Folder shows only folders owned by the connected Google account in My Drive
+        (Shared Drives and shared-with-me folders are excluded). {PICKER_ACCOUNT_GUIDANCE} Connected
+        account: <span className="font-medium text-foreground">{conn.accountEmail ?? "—"}</span>
+      </p>
+
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <label className="text-muted-foreground" htmlFor="gd-folder-name">
           New folder name
