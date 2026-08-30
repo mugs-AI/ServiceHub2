@@ -313,6 +313,31 @@ describe("WP2A Picker session controller", () => {
     expect(h.onPicked).toHaveBeenCalledWith("folder-1");
   });
 
+  it("keeps the session busy until the picked save/refresh promise resolves", async () => {
+    const saveGate = deferred<void>();
+    const h = controllerHarness({ onPicked: vi.fn(() => saveGate.promise) });
+    const run = h.controller.open();
+    h.tokenGate.resolve();
+    h.apiGate.resolve();
+    await run;
+    expect(h.controller.isActive()).toBe(true);
+    expect(h.busy).toEqual([true]);
+
+    // Picked: Picker hidden immediately, but the session must stay busy while
+    // the deferred save/refresh (select_folder POST + connection reload) runs.
+    void h.built[0].onPicked("folder-1");
+    await flush();
+    expect(h.visibility).toEqual([true, false]);
+    expect(h.controller.isActive()).toBe(true);
+    expect(h.busy).toEqual([true]);
+
+    // Only after the save/refresh resolves may the session release.
+    saveGate.resolve();
+    await flush();
+    expect(h.controller.isActive()).toBe(false);
+    expect(h.busy).toEqual([true, false]);
+  });
+
   it("latches the terminal event exactly once for picked→cancel, cancel→picked and duplicate cancel", async () => {
     const a = controllerHarness();
     let run = a.controller.open();
