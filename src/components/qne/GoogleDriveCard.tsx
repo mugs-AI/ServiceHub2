@@ -7,6 +7,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  loadGoogleApi,
+  openFolderPicker,
+  PICKER_ACCOUNT_GUIDANCE,
+  type GoogleNamespace,
+  type PickerInstance,
+} from "@/lib/qne/storage/drive-picker";
+import {
   ATTACHMENTS_NOT_IMPLEMENTED_NOTICE,
   DEFAULT_ROOT_FOLDER_NAME,
   NOT_CONNECTED,
@@ -64,6 +71,9 @@ export function GoogleDriveCard({
   const [loadError, setLoadError] = useState<string | null>(null);
   // Picker token lives ONLY here, in memory, for the life of the picker.
   const pickerToken = useRef<string | null>(null);
+  // Exactly one Picker instance may exist at a time.
+  const pickerInstance = useRef<PickerInstance | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -141,8 +151,23 @@ export function GoogleDriveCard({
     }
   }
 
+  const endPickerSession = useCallback(() => {
+    try {
+      pickerInstance.current?.setVisible(false);
+    } catch {
+      /* ignore */
+    }
+    pickerInstance.current = null;
+    pickerToken.current = null; // token discarded on every terminal path
+  }, []);
+
+  // Unmount: hide any live Picker and drop the token.
+  useEffect(() => endPickerSession, [endPickerSession]);
+
   async function openPicker() {
-    setBusy("picker");
+    // Exactly one Picker per component: repeated clicks are ignored.
+    if (pickerOpen || pickerInstance.current) return;
+    setPickerOpen(true);
     try {
       const res = await fetch("/api/integrations/google-drive/connection", {
         method: "POST",
@@ -163,31 +188,32 @@ export function GoogleDriveCard({
       await loadGoogleApi();
       const g = (window as unknown as { google?: GoogleNamespace }).google;
       if (!g?.picker) throw new Error("Google Picker could not be loaded.");
-      const view = new g.picker.DocsView(g.picker.ViewId.FOLDERS)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(true);
-      const builder = new g.picker.PickerBuilder()
-        .setOAuthToken(pickerToken.current)
-        .setDeveloperKey(body.apiKey)
-        .addView(view)
-        .enableFeature(g.picker.Feature.SUPPORT_DRIVES)
-        .setCallback((data: PickerData) => {
-          if (data.action === "picked" && data.docs?.[0]?.id) {
-            const folderId = data.docs[0].id;
-            pickerToken.current = null; // token discarded immediately
-            void post({ action: "select_folder", folderId }, "select")
-              .then(() => onNotify("ok", "Root Folder saved after Google revalidation."))
-              .catch((e) => onNotify("err", e instanceof Error ? e.message : String(e)));
+      pickerInstance.current = openFolderPicker({
+        google: g,
+        accessToken: pickerToken.current,
+        apiKey: body.apiKey,
+        appId: body.appId ?? null,
+        origin: window.location.origin,
+        onPicked: async (folderId) => {
+          endPickerSession();
+          try {
+            await post({ action: "select_folder", folderId }, "select");
+            onNotify("ok", "Root Folder saved after Google revalidation.");
+          } catch (e) {
+            onNotify("err", e instanceof Error ? e.message : String(e));
+          } finally {
+            setPickerOpen(false);
           }
-          if (data.action === "cancel") pickerToken.current = null;
-        });
-      if (body.appId) builder.setAppId(body.appId);
-      builder.build().setVisible(true);
+        },
+        onCancel: () => {
+          endPickerSession();
+          setPickerOpen(false);
+        },
+      });
     } catch (e) {
-      pickerToken.current = null;
+      endPickerSession();
+      setPickerOpen(false);
       onNotify("err", e instanceof Error ? e.message : "Google Picker failed");
-    } finally {
-      setBusy(null);
     }
   }
 
@@ -318,10 +344,11 @@ export function GoogleDriveCard({
         </button>
         <button
           onClick={() => void openPicker()}
-          disabled={!connected || busy !== null}
+          disabled={!connected || busy !== null || pickerOpen}
+          aria-busy={pickerOpen}
           className="rounded-md border px-3 py-2 text-xs font-medium disabled:opacity-50"
         >
-          Select Existing Folder
+          {pickerOpen ? "Selecting folder…" : "Select Existing Folder"}
         </button>
         <button
           onClick={() =>
@@ -352,6 +379,12 @@ export function GoogleDriveCard({
           Disconnect
         </button>
       </div>
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        Select Existing Folder shows only folders owned by the connected Google account in My Drive
+        (Shared Drives and shared-with-me folders are excluded). {PICKER_ACCOUNT_GUIDANCE} Connected
+        account: <span className="font-medium text-foreground">{conn.accountEmail ?? "—"}</span>
+      </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <label className="text-muted-foreground" htmlFor="gd-folder-name">
@@ -416,49 +449,4 @@ export function GoogleDriveCard({
       ) : null}
     </section>
   );
-}
-
-// ------------------------------------------------------- Google Picker ----
-
-interface PickerData {
-  action: string;
-  docs?: { id?: string }[];
-}
-
-interface GoogleNamespace {
-  picker?: {
-    DocsView: new (viewId: unknown) => {
-      setIncludeFolders: (v: boolean) => {
-        setSelectFolderEnabled: (v: boolean) => unknown;
-      };
-    };
-    ViewId: { FOLDERS: unknown };
-    Feature: { SUPPORT_DRIVES: unknown };
-    PickerBuilder: new () => PickerBuilder;
-  };
-}
-
-interface PickerBuilder {
-  setOAuthToken: (t: string) => PickerBuilder;
-  setDeveloperKey: (k: string) => PickerBuilder;
-  addView: (v: unknown) => PickerBuilder;
-  enableFeature: (f: unknown) => PickerBuilder;
-  setCallback: (cb: (data: PickerData) => void) => PickerBuilder;
-  setAppId: (id: string) => PickerBuilder;
-  build: () => { setVisible: (v: boolean) => void };
-}
-
-function loadGoogleApi(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const w = window as unknown as {
-      gapi?: { load: (m: string, cb: () => void) => void };
-    };
-    const start = () => w.gapi!.load("picker", () => resolve());
-    if (w.gapi) return start();
-    const script = document.createElement("script");
-    script.src = "https://apis.google.com/js/api.js";
-    script.onload = start;
-    script.onerror = () => reject(new Error("Could not load the Google Picker script."));
-    document.head.appendChild(script);
-  });
 }
