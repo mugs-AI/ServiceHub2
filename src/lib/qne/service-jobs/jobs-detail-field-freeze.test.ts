@@ -19,9 +19,27 @@ describe("Field Operations UI freeze on /jobs/$jobId", () => {
     expect(source).not.toMatch(/Field Operations/i);
   });
 
-  it("does not mount any field-ops JSX", () => {
+  it("does not mount the FieldOperationsPanel component", () => {
     expect(source).not.toMatch(/<FieldOperationsPanel/);
-    expect(source).not.toMatch(/support_mode/i);
-    expect(source).not.toMatch(/Start Travel|Arrived|Start Work|Ready for Completion/i);
+  });
+
+  it("does not render field-ops action button labels", () => {
+    // These labels previously appeared inside FieldOperationsPanel JSX.
+    // Field property names such as arrived_on_site_at may remain in interfaces.
+    const actionLabels = [
+      "Start Travel",
+      "Arrived On Site",
+      "Start Work",
+      "Pause Work",
+      "Resume Work",
+      "Stop Work",
+      "Ready for Completion",
+      "Waiting for Customer",
+      "Waiting for Vendor",
+      "Support Mode",
+    ];
+    for (const label of actionLabels) {
+      expect(source).not.toContain(label);
+    }
   });
 });
