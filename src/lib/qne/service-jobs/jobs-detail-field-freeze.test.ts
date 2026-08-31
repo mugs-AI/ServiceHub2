@@ -25,11 +25,11 @@ describe("Field Operations UI freeze on /jobs/$jobId", () => {
 
   it("does not render field-ops action button labels", () => {
     // These labels previously appeared inside FieldOperationsPanel JSX.
-    // Field property names such as arrived_on_site_at may remain in interfaces.
+    // "Start Work" is intentionally excluded because it is also the
+    // workflow transition label for moving a Job into "In Progress".
     const actionLabels = [
       "Start Travel",
       "Arrived On Site",
-      "Start Work",
       "Pause Work",
       "Resume Work",
       "Stop Work",
