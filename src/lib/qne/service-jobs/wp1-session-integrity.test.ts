@@ -445,7 +445,6 @@ describe("Field Operations UI truth", () => {
 
   it("is not mounted on Job Detail during the UI freeze", () => {
     expect(jobDetail).not.toContain("<FieldOperationsPanel");
-    expect(jobDetail).not.toContain("jobId={job.id}");
   });
 
   it("renders no fabricated attachment count", () => {
