@@ -443,9 +443,8 @@ describe("Field Operations UI truth", () => {
   );
   const jobDetail = readFileSync(join(process.cwd(), "src", "routes", "jobs.$jobId.tsx"), "utf8");
 
-  it("remains mounted on Job Detail", () => {
-    expect(jobDetail).toContain("<FieldOperationsPanel");
-    expect(jobDetail).toContain("jobId={job.id}");
+  it("is not mounted on Job Detail during the UI freeze", () => {
+    expect(jobDetail).not.toContain("<FieldOperationsPanel");
   });
 
   it("renders no fabricated attachment count", () => {
