@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const ROUTE_FILE = join(process.cwd(), "src", "routes", "jobs.$jobId.tsx");
+const ROUTE_FILE = join(process.cwd(), "src", "routes", "jobs.\$jobId.tsx");
 const source = readFileSync(ROUTE_FILE, "utf8");
 
 describe("Field Operations UI freeze on /jobs/$jobId", () => {
