@@ -208,11 +208,11 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
   const remove = useCallback(
     async (att: Attachment) => {
       if (deleting) return;
-      if (
-        !window.confirm(
-          `Delete "${att.fileName}"? The file will be moved to Trash in Google Drive.`,
-        )
-      ) {
+      // Provider-specific wording: a legacy attachment was never in Drive.
+      const consequence = att.contentPath
+        ? "The file will be moved to Trash in Google Drive."
+        : "This legacy attachment's record will be removed from ServiceHub; the previously stored file is left untouched.";
+      if (!window.confirm(`Delete "${att.fileName}"? ${consequence}`)) {
         return;
       }
       setDeleting(att.id);
