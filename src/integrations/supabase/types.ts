@@ -984,6 +984,9 @@ export type Database = {
           id: string
           is_deleted: boolean
           mime_type: string
+          remote_delete_error: string | null
+          remote_delete_status: string
+          remote_deleted_at: string | null
           service_job_id: string
           storage_connection_id: string | null
           storage_container: string | null
@@ -1008,6 +1011,9 @@ export type Database = {
           id?: string
           is_deleted?: boolean
           mime_type: string
+          remote_delete_error?: string | null
+          remote_delete_status?: string
+          remote_deleted_at?: string | null
           service_job_id: string
           storage_connection_id?: string | null
           storage_container?: string | null
@@ -1032,6 +1038,9 @@ export type Database = {
           id?: string
           is_deleted?: boolean
           mime_type?: string
+          remote_delete_error?: string | null
+          remote_delete_status?: string
+          remote_deleted_at?: string | null
           service_job_id?: string
           storage_connection_id?: string | null
           storage_container?: string | null
@@ -1280,6 +1289,50 @@ export type Database = {
             columns: ["signature_attachment_id"]
             isOneToOne: false
             referencedRelation: "service_job_attachments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_job_job_folders: {
+        Row: {
+          connection_id: string
+          container_folder_id: string | null
+          created_at: string
+          drive_folder_id: string
+          id: string
+          job_number: string | null
+          service_job_id: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          connection_id: string
+          container_folder_id?: string | null
+          created_at?: string
+          drive_folder_id: string
+          id?: string
+          job_number?: string | null
+          service_job_id: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          connection_id?: string
+          container_folder_id?: string | null
+          created_at?: string
+          drive_folder_id?: string
+          id?: string
+          job_number?: string | null
+          service_job_id?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_job_folders_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
         ]
