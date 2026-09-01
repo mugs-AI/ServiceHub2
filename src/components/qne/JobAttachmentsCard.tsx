@@ -141,7 +141,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
   );
 
   const runQueue = useCallback(
-    async (pending: QueueItem[]) => {
+    async (pending: QueueItem[], isRetry = false) => {
       setBusy(true);
       // Sequential: the server enforces per-Job count and total limits, and
       // parallel uploads would race those checks.
@@ -149,7 +149,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
         setQueue((q) =>
           q.map((x) => (x.key === item.key ? { ...x, state: "uploading", error: null } : x)),
         );
-        const result = await uploadOne(item);
+        const result = await uploadOne(item, isRetry);
         if (!alive.current) return;
         setQueue((q) =>
           q.map((x) =>
