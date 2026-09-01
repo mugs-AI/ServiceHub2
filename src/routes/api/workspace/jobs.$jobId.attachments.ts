@@ -58,12 +58,16 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           }
 
           const canDeleteFor = (uploaderId: string | null) =>
-            policy.canDeleteAttachment({
-              actorUserId: user.userCode ?? null,
-              isAdministrator: Boolean(user.isAdministrator),
-              uploaderUserId: uploaderId,
-              primaryPicUserId: job.assigned_user_id,
-            });
+            policy.canDeleteAttachment(
+              {
+                actorUserId: user.userCode ?? null,
+                isAdministrator: Boolean(user.isAdministrator),
+              },
+              {
+                uploadedByUserId: uploaderId,
+                assignedUserId: job.assigned_user_id,
+              },
+            );
 
           const quota = {
             activeCount: rows.length,
@@ -125,13 +129,13 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           }
 
           const displayName = policy.sanitizeDisplayName(file.name);
-          const mime = policy.effectiveMime(file.type, displayName);
+          // HEIC/HEIF and some CSV/LOG files arrive with an empty MIME type;
+          // the policy module derives one from the extension rather than
+          // trusting or rejecting the blank value.
+          const candidate = { name: displayName, type: file.type, size: file.size };
+          const mime = policy.effectiveMime(candidate);
 
-          const verdict = policy.validateCandidate({
-            fileName: displayName,
-            mimeType: mime,
-            size: file.size,
-          });
+          const verdict = policy.validateCandidate(candidate);
           if (!verdict.ok) {
             return Response.json({ error: verdict.error }, { status: 400 });
           }
@@ -139,11 +143,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           // Server-side quota, re-read inside the request so a stale browser
           // count cannot be used to exceed the limits.
           const { activeCount, activeBytes } = await svc.quotaFor(user.tenantCode, params.jobId);
-          const quotaVerdict = policy.validateQuota({
-            activeCount,
-            activeBytes,
-            incomingBytes: file.size,
-          });
+          const quotaVerdict = policy.validateQuota({ activeCount, activeBytes }, file.size);
           if (!quotaVerdict.ok) {
             return Response.json({ error: quotaVerdict.error }, { status: 409 });
           }
@@ -175,13 +175,13 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
               rootFolderId: drive.context.rootFolderId,
               accessToken: drive.context.accessToken,
             });
-            uploaded = await files.uploadFileToFolder({
-              accessToken: drive.context.accessToken,
+            uploaded = await files.uploadFileToFolder(
+              drive.context.accessToken,
               folderId,
-              name: displayName,
-              mimeType: mime,
-              body: await file.arrayBuffer(),
-            });
+              displayName,
+              mime,
+              await file.arrayBuffer(),
+            );
           } catch (e) {
             const detail = e instanceof Error ? e.message : "Unknown Google Drive error.";
             await svc
@@ -284,12 +284,13 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
 
           // Independent server-side authority check — the UI hiding the button
           // is convenience, this is the control.
-          const allowed = policy.canDeleteAttachment({
-            actorUserId: actor.userId,
-            isAdministrator: actor.isAdmin,
-            uploaderUserId: row.uploaded_by_user_id,
-            primaryPicUserId: job.assigned_user_id,
-          });
+          const allowed = policy.canDeleteAttachment(
+            { actorUserId: actor.userId, isAdministrator: actor.isAdmin },
+            {
+              uploadedByUserId: row.uploaded_by_user_id,
+              assignedUserId: job.assigned_user_id,
+            },
+          );
           if (!allowed) {
             return Response.json(
               {
@@ -317,13 +318,17 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
               );
             }
             const files = await import("@/lib/qne/storage/drive-files.server");
-            try {
-              await files.trashDriveFile(
-                drive.context.accessToken,
-                row.external_file_id ?? "",
-              );
-            } catch (e) {
-              const detail = e instanceof Error ? e.message : "Unknown Google Drive error.";
+            const trashed = await files
+              .trashDriveFile(drive.context.accessToken, row.external_file_id ?? "")
+              .catch((e: unknown) => ({
+                ok: false as const,
+                reason: e instanceof Error ? e.message : "Unknown Google Drive error.",
+              }));
+
+            if (!trashed.ok) {
+              const detail = trashed.reason ?? "Unknown Google Drive error.";
+              // The row stays ACTIVE and visible: we must never report a
+              // delete that the provider did not perform.
               await svc.setRemoteDeleteState(user.tenantCode, row.id, {
                 status: "failed",
                 error: detail,
