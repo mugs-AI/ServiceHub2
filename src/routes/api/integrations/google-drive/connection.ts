@@ -120,6 +120,19 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
             if (body.confirm !== true) {
               return Response.json({ error: "Disconnect must be confirmed." }, { status: 400 });
             }
+            // WP2B — refuse while live Job attachments point at this Drive.
+            const guard = await import("@/lib/qne/storage/attachment-guard.server");
+            const verdict = await guard.guardProviderChange(actor.tenantCode, "disconnect");
+            if (verdict.blocked) {
+              return Response.json(
+                {
+                  error: verdict.error,
+                  recovery: verdict.recovery,
+                  activeAttachments: verdict.count,
+                },
+                { status: 409 },
+              );
+            }
             let revoked = false;
             let revokeError: string | null = null;
             try {
@@ -302,6 +315,31 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
           }
 
           if (action === "create_folder" || action === "select_folder") {
+            // WP2B — changing the Root Folder re-homes every future upload and
+            // orphans nothing automatically, so it is refused while active
+            // Drive attachments exist. Re-selecting the SAME folder (a
+            // same-account revalidation) stays allowed.
+            const changesRoot =
+              action === "create_folder" ||
+              String(body.folderId ?? "") !== String(row.root_folder_id ?? "");
+            if (changesRoot) {
+              const guard = await import("@/lib/qne/storage/attachment-guard.server");
+              const verdict = await guard.guardProviderChange(
+                actor.tenantCode,
+                "change_root_folder",
+              );
+              if (verdict.blocked) {
+                return Response.json(
+                  {
+                    error: verdict.error,
+                    recovery: verdict.recovery,
+                    activeAttachments: verdict.count,
+                  },
+                  { status: 409 },
+                );
+              }
+            }
+
             const validated =
               action === "create_folder"
                 ? await gd.createRootFolder(
