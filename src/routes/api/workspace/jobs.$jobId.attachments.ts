@@ -264,11 +264,41 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             );
           }
 
-          await svc.logAttachmentEvent(actor, job.id, "attachment_uploaded", {
-            newValue: displayName,
-            note: `Attached "${displayName}" (${policy.formatBytes(file.size)}) to Google Drive.`,
-            metadata: { attachment_id: inserted.id, size: file.size, mime_type: mime },
-          });
+          try {
+            await svc.logAttachmentEvent(actor, job.id, "attachment_uploaded", {
+              newValue: displayName,
+              note: `Attached "${displayName}" (${policy.formatBytes(file.size)}) to Google Drive.`,
+              metadata: { attachment_id: inserted.id, size: file.size, mime_type: mime },
+            });
+          } catch (auditError) {
+            // The bytes and the row exist but the mandatory Job-history record
+            // does not. Leaving the attachment apparently-successful would show
+            // the user a file we cannot account for AND duplicate it on Retry,
+            // so the whole upload is rolled back and reported as failed.
+            await files
+              .trashDriveFile(drive.context.accessToken, uploaded.id)
+              .catch(() => undefined);
+            await supabaseAdmin
+              .from("service_job_attachments")
+              .update({
+                is_deleted: true,
+                deleted_at: new Date().toISOString(),
+                deleted_by_user_id: actor.userId,
+                deleted_by_name_snapshot: actor.name,
+                availability_status: "unavailable",
+              })
+              .eq("tenant_code", user.tenantCode)
+              .eq("id", inserted.id)
+              .then(() => undefined, () => undefined);
+            console.error("[attachments POST] audit rollback", auditError);
+            return Response.json(
+              {
+                error: `"${displayName}" was NOT attached: its Job history record could not be saved, so the upload was rolled back.`,
+                recovery: "Please retry the upload.",
+              },
+              { status: 500 },
+            );
+          }
 
           return Response.json({ ok: true, id: inserted.id, fileName: displayName });
         } catch (err) {
