@@ -124,6 +124,7 @@ vi.mock("@/lib/qne/storage/google-drive.server", () => ({
 const driveCalls: string[] = [];
 let uploadFails = false;
 let trashResult: { ok: boolean; reason?: string } = { ok: true };
+let streamStatus = 200;
 
 vi.mock("@/lib/qne/storage/drive-files.server", () => ({
   ensureJobFolder: async () => {
@@ -141,6 +142,9 @@ vi.mock("@/lib/qne/storage/drive-files.server", () => ({
   },
   fetchDriveFileStream: async () => {
     driveCalls.push("stream");
+    if (streamStatus !== 200) {
+      return new Response("Google error body with credential detail", { status: streamStatus });
+    }
     return new Response("bytes", { status: 200 });
   },
 }));
@@ -238,6 +242,7 @@ beforeEach(() => {
   uploadFails = false;
   tokenFails = false;
   trashResult = { ok: true };
+  streamStatus = 200;
   connection = {
     id: "conn-1",
     status: "connected",
