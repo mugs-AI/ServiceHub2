@@ -60,7 +60,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const canDeleteFor = (uploaderId: string | null) =>
             policy.canDeleteAttachment(
               {
-                actorUserId: user.userCode ?? null,
+                actorUserId: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
                 isAdministrator: Boolean(user.isAdministrator),
               },
               {
@@ -159,7 +159,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const files = await import("@/lib/qne/storage/drive-files.server");
           const actor = {
             tenantCode: user.tenantCode,
-            userId: user.userCode ?? null,
+            userId: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
             name: user.displayName ?? null,
             isAdmin: Boolean(user.isAdministrator),
           };
@@ -218,7 +218,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
               external_file_id: uploaded.id,
               visibility: policy.FORCED_VISIBILITY,
               availability_status: "available",
-              uploaded_by_user_id: user.userCode ?? null,
+              uploaded_by_user_id: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
               uploaded_by_name_snapshot: user.displayName ?? null,
             })
             .select("id")
@@ -277,7 +277,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
 
           const actor = {
             tenantCode: user.tenantCode,
-            userId: user.userCode ?? null,
+            userId: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
             name: user.displayName ?? null,
             isAdmin: Boolean(user.isAdministrator),
           };

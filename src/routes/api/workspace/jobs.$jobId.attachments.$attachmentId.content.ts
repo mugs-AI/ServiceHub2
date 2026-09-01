@@ -53,7 +53,7 @@ export const Route = createFileRoute(
           await svc.logAttachmentEvent(
             {
               tenantCode: user.tenantCode,
-              userId: user.userCode ?? null,
+              userId: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
               name: user.displayName ?? null,
               isAdmin: Boolean(user.isAdministrator),
             },
