@@ -95,7 +95,7 @@ vi.mock("@/lib/qne/storage/attachment-guard.server", () => ({
 type Handler = (arg: { request: Request }) => Promise<Response>;
 
 async function post(body: unknown): Promise<Response> {
-  const mod = (await import("@/routes/api/settings/storage")) as {
+  const mod = (await import("@/routes/api/settings/storage")) as unknown as {
     Route: { options: { server: { handlers: Record<string, Handler> } } };
   };
   return mod.Route.options.server.handlers.POST({
