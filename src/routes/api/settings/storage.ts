@@ -283,7 +283,7 @@ export const Route = createFileRoute("/api/settings/storage")({
               "attachments_storage",
               "root_folder",
               null,
-              { provider, root_folder_name: body.root_folder_name },
+              { provider, root_folder_name: nextRoot },
               actor,
             );
             return Response.json({ ok: true });
