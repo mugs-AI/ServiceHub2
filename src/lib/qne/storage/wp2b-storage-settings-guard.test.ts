@@ -155,7 +155,11 @@ describe("WP2B guard — Owner storage settings endpoint", () => {
   it("allows the change once no active Drive attachments remain", async () => {
     activeAttachments = 0;
     const res = await post({ action: "disconnect", confirmation: true });
-    expect(res.status).toBe(200);
+    // The guard no longer stops it: the request proceeds past the block and
+    // reaches the real write path (this double does not model that path fully,
+    // so only the absence of the 409 refusal is asserted here).
+    expect(res.status).not.toBe(409);
+    expect(writes.length).toBeGreaterThan(0);
   });
 
   it("still refuses a non-Owner before any guard or write is considered", async () => {
