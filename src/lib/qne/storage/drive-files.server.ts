@@ -53,6 +53,9 @@ function safeFolderName(name: string): string {
   return (
     String(name ?? "")
       .replace(/[\\/]/g, "-")
+      // Stripping control characters is the point of this rule: they are
+      // invisible in a filename and dangerous in headers.
+      // eslint-disable-next-line no-control-regex
       .replace(/[\u0000-\u001f\u007f]/g, "")
       .trim()
       .slice(0, 120) || "Job"

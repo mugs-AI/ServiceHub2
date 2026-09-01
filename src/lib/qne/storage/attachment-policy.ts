@@ -100,6 +100,9 @@ export function sanitizeDisplayName(raw: string): string {
     .pop()!
     .trim();
   const cleaned = base
+    // Stripping control characters is the point of this rule: they are
+    // invisible in a filename and dangerous in headers.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .replace(/[^\w.\- ]+/g, "_")
     .replace(/_{2,}/g, "_")
