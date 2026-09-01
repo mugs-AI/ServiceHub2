@@ -82,6 +82,14 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
     return url;
   }, []);
 
+  // Revoke exactly once and stop tracking: safe to call twice for the same URL.
+  const releaseUrl = useCallback((url: string | null | undefined) => {
+    if (!url) return;
+    if (!objectUrls.current.includes(url)) return;
+    objectUrls.current = objectUrls.current.filter((u) => u !== url);
+    URL.revokeObjectURL(url);
+  }, []);
+
   const revokeAll = useCallback(() => {
     for (const url of objectUrls.current) URL.revokeObjectURL(url);
     objectUrls.current = [];
@@ -286,8 +294,13 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
           return;
         }
         const url = await fetchBytes(att, false);
-        if (!alive.current || !url) return;
+        if (!alive.current || !url) {
+          // Abandoned result: the blob would otherwise stay pinned forever.
+          releaseUrl(url);
+          return;
+        }
         setErr(null);
+        // Preview keeps its object URL alive until Close (or unmount).
         setPreview({ att, url });
       } catch (e) {
         if (alive.current) {
@@ -297,7 +310,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
         if (alive.current) setOpening(null);
       }
     },
-    [fetchBytes, opening],
+    [fetchBytes, opening, releaseUrl],
   );
 
   const download = useCallback(
@@ -310,7 +323,10 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
           return;
         }
         const url = await fetchBytes(att, true);
-        if (!alive.current || !url) return;
+        if (!alive.current || !url) {
+          releaseUrl(url);
+          return;
+        }
         setErr(null);
         const a = document.createElement("a");
         a.href = url;
@@ -318,6 +334,9 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
         document.body.appendChild(a);
         a.click();
         a.remove();
+        // The click is consumed synchronously by the browser; release the URL
+        // on the next macrotask so the download stream is already started.
+        setTimeout(() => releaseUrl(url), 0);
       } catch (e) {
         if (alive.current) {
           setErr(e instanceof Error ? e.message : "This file could not be downloaded.");
@@ -326,18 +345,16 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
         if (alive.current) setOpening(null);
       }
     },
-    [fetchBytes, opening],
+    [fetchBytes, opening, releaseUrl],
   );
 
   const closePreview = useCallback(() => {
     setPreview((current) => {
-      if (current) {
-        URL.revokeObjectURL(current.url);
-        objectUrls.current = objectUrls.current.filter((u) => u !== current.url);
-      }
+      // releaseUrl is idempotent: exactly one revoke per object URL.
+      releaseUrl(current?.url);
       return null;
     });
-  }, []);
+  }, [releaseUrl]);
 
   const atFileLimit = (quota?.activeCount ?? 0) >= (quota?.maxFiles ?? MAX_ACTIVE_FILES);
 

@@ -247,19 +247,15 @@ export const Route = createFileRoute("/api/settings/storage")({
             const nextRoot = String(body.root_folder_name ?? "").slice(0, 200) || null;
 
             if (provider === "google_drive") {
-              const { data: current } = await supabaseAdmin
-                .from("tenant_storage_connections")
-                .select("root_folder_name")
-                .eq("tenant_code", user.tenantCode)
-                .eq("provider", provider)
-                .maybeSingle();
-              const currentRoot = current?.root_folder_name ?? null;
-              // Re-selecting the SAME Root Folder changes no addressing and is
-              // allowed; repointing it while attachments live there is not.
-              if (currentRoot !== nextRoot) {
-                const blocked = await blockIfActiveDriveAttachments("change_root_folder");
-                if (blocked) return blocked;
-              }
+              // Folder NAMES are not immutable identities: two distinct Drive
+              // folders can share a name, so name equality proves nothing.
+              // This legacy endpoint has no immutable Drive folder ID to
+              // compare, so it fails closed whenever active Drive attachments
+              // exist. Exact same-root revalidation remains available on the
+              // canonical integrations/google-drive/connection.ts route, which
+              // compares the immutable folderId.
+              const blocked = await blockIfActiveDriveAttachments("change_root_folder");
+              if (blocked) return blocked;
             }
 
             await supabaseAdmin.from("tenant_storage_connections").upsert(

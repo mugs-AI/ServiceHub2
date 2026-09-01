@@ -143,13 +143,37 @@ describe("WP2B guard — Owner storage settings endpoint", () => {
     expect(writes).toHaveLength(0);
   });
 
-  it("allows re-selecting the SAME Root Folder, because addressing does not change", async () => {
+  it("fails closed on a SAME-NAME Root Folder request: names are not identities", async () => {
+    // Two distinct Drive folders can share a name and this legacy endpoint has
+    // no immutable folder ID, so name equality must not act as a bypass.
+    const res = await post({
+      action: "set_root_folder",
+      provider: "google_drive",
+      root_folder_name: "ServiceHub Root",
+    });
+    expect(res.status).toBe(409);
+    expect(writes).toHaveLength(0);
+  });
+
+  it("allows a Root Folder change once no active Drive attachments remain", async () => {
+    activeAttachments = 0;
     const res = await post({
       action: "set_root_folder",
       provider: "google_drive",
       root_folder_name: "ServiceHub Root",
     });
     expect(res.status).toBe(200);
+  });
+
+  it("keeps exact same-root revalidation on the canonical connection route, which compares folderId", async () => {
+    // Source evidence: the canonical route addresses the immutable Drive
+    // folder ID, so it can safely allow an identical re-selection.
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("src/routes/api/integrations/google-drive/connection.ts", "utf8");
+    expect(src).toContain("folderId");
+    // The legacy settings endpoint must not compare names to decide.
+    const legacy = await fs.readFile("src/routes/api/settings/storage.ts", "utf8");
+    expect(legacy).not.toContain("currentRoot !== nextRoot");
   });
 
   it("allows the change once no active Drive attachments remain", async () => {
