@@ -1,218 +1,77 @@
-# Phase 1.1.6c — Investigation Report (PLAN / NO CODE CHANGES)
+# WP2B — Google Drive Job Attachments (Preflight Plan)
 
-## Problem 1 — Quantity is ignored in entitlement duration
+Run ID: SH22-WP2B-PREFLIGHT-20260901
+Baseline verified: project `9265adcd-acf6-4fdb-a766-3fc21310ee8f`, repo `ServiceHub2`, SHA `7c56fd3a0ae5071b75fdec2cce3b0a5b3d5c3b57`, clean tree. BASELINE OK.
+Inspection only — nothing was edited, migrated, deployed or published.
 
-### Root cause (confirmed)
+## Current state (verified by reading the code)
 
-The subscription pipeline captures line quantity into
-`sales_invoice_line_snapshots.quantity` /
-`delivery_order_line_snapshots.quantity`, but the renewal-event and expiry
-calculation drop it entirely:
+- `src/routes/api/workspace/jobs.$jobId.attachments.ts` exists with GET/POST/DELETE against the private Supabase bucket `job-attachments`. POST is fail-closed by `ATTACHMENT_BYTES_ENABLED = false` in `src/lib/qne/storage/attachment-bytes.ts`.
+- `src/components/qne/AttachmentsPanel.tsx` exists but is **not mounted** anywhere; `src/routes/jobs.$jobId.tsx` currently mounts neither `AttachmentsPanel` nor `FieldOperationsPanel` (the WP1 freeze removed the latter).
+- `service_job_attachments` already carries `storage_provider`, `storage_connection_id`, `storage_container`, `external_file_id`, `checksum`, `availability_status` (migration `20260802003847_…`), plus soft-delete columns. Google Drive rows fit without a schema rewrite.
+- WP2A Drive engine (`src/lib/qne/storage/google-drive.server.ts`) already provides: `loadConnection`, `accessTokenFor` (refresh + rotation + fail-closed `needs_reconnect`), `revalidateFolder`, `createRootFolder`, `readSharing`, `applyConnection` (atomic mutate+audit), `auditDrive`. It has **no file upload / download / trash** calls yet.
+- `src/lib/qne/storage/provider.server.ts` returns a `pendingAdapter` for `google_drive` — the seam to implement.
+- Validation in `field-ops.ts` (`validateAttachment`) currently caps at 15 MB and has its own MIME/extension lists; limits differ from WP2B (20 MB/file, 10 files, 100 MB/job).
+- Google account/root-folder mutations live in `src/routes/api/integrations/google-drive/connection.ts` (`disconnect`, `create_folder`, `select_folder`) and the OAuth callback — the guard points.
 
-- `subscription_renewal_events` has NO `quantity` column
-  (verified via `information_schema.columns`).
-- `computeInclusiveExpiry(start, value, unit)` in
-  `src/lib/qne/sync/subscription-sync.server.ts` (lines 348–362) uses only the
-  configured cycle. It never multiplies by line qty.
-- The event upsert call (lines 966–999) writes only
-  `renewal_cycle_value`/`renewal_cycle_unit`; no qty is persisted.
-- `rebuildCurrentSnapshots` (lines 1400–1570) reads `expiry_date` back
-  verbatim from the event — so once the event is written without
-  qty-multiplication, the workspace snapshot cannot recover it.
+## 1) Files and migrations to change
 
-So for `M1D2604002`, line `QCA--PRO---` (1 y cycle, qty=2) writes an event
-with `expiry = docDate + 1 y − 1 day = 2027-05-31` on every rerun,
-regardless of whether qty was 1, 2 or 3. That matches the observed
-"expiry stuck at 31/05/2027".
+New:
+- `src/lib/qne/storage/drive-files.server.ts` — Drive file vertical: ensure `Root/ServiceHub Jobs/{job_number}` folder chain (create-or-reuse, cached in a mapping table), resumable/multipart upload, metadata read, `files.update {trashed:true}`, media download stream.
+- `src/lib/qne/storage/attachment-policy.ts` — pure WP2B limits/allowlist (20 MB, 10 active, 100 MB, MIME+extension pairs, blocklist), shared by client and server.
+- `src/routes/api/workspace/jobs.$jobId.attachments.$attachmentId.content.ts` — server-proxied download/preview (no Drive token to the browser).
+- `src/components/qne/JobAttachmentsCard.tsx` — compact card: multi-file queue, per-file progress/error/retry, preview for image/PDF, download otherwise, delete when permitted.
+- Tests (below).
 
-### Pipeline trace (SI + DO, identical shape)
+Modified:
+- `src/lib/qne/storage/attachment-bytes.ts` — enable bytes for Google Drive only; Supabase production writes stay refused (no silent fallback).
+- `src/lib/qne/storage/provider.server.ts` — real `google_drive` adapter delegating to `drive-files.server.ts`; Supabase adapter keeps read/link for legacy rows, loses `put`.
+- `src/routes/api/workspace/jobs.$jobId.attachments.ts` — tenant/job access check, WP2B server-side validation (MIME, extension, size, active count, job total), Drive upload, metadata insert with `external_file_id`/folder mapping, audit; DELETE performs Drive trash first and only soft-deletes on confirmed trash.
+- `src/lib/qne/service-jobs/field-ops.ts` — `validateAttachment` re-pointed at `attachment-policy.ts` (single source of truth).
+- `src/routes/jobs.$jobId.tsx` — mount the compact card only; `FieldOperationsPanel` stays unmounted.
+- `src/routes/api/integrations/google-drive/connection.ts` + `callback.ts` — provider-switch guard.
+- `src/lib/qne/service-jobs/wp1-session-integrity.test.ts` — keep the freeze assertion valid alongside the new card.
 
-| Step | Location | Field |
-|------|----------|-------|
-| N3 detail line | `N3DocLine.qty?: number` (subscription-sync.server.ts:286–298) | `qty` |
-| Line snapshot write | `subscription-sync.server.ts:920` | `quantity: typeof line.qty === "number" ? line.qty : null` |
-| Renewal event insert | `subscription-sync.server.ts:971–999` | qty NOT written |
-| Expiry function | `computeInclusiveExpiry` (lines 348–362) | takes `value, unit` only |
-| Event upsert conflict key | `syncSubscriptionSnapshots` upsert on `(tenant_code, source_type, n3_document_id, n3_line_id)` | qty changes DO overwrite the row on the next full sync — so a fix will backfill naturally |
-| Current-subscription rebuild | `rebuildCurrentSnapshots` (line 1507) | reads `ev.expiry_date` directly |
+Migration (one, additive):
+- `service_job_job_folders` (tenant_code, service_job_id, connection_id, drive_folder_id, job_number, created_at/updated_at, unique per tenant+job+connection) with GRANTs to `service_role` only, RLS enabled, no anon/authenticated policies (server-role access only, matching the existing Drive tables).
+- Add `remote_delete_status text NOT NULL DEFAULT 'n/a'`, `remote_delete_error text`, `remote_deleted_at timestamptz` to `service_job_attachments` for truthful trash retry/reconciliation.
+- Partial index for the active-count/total queries.
 
-### Proposed rule (safe to adopt)
+## 2) Schema compatibility and migration strategy
 
-`effective duration = configured renewal cycle × eligible line quantity`
+Existing legacy rows (`storage_provider='supabase'`) are untouched and remain listable/downloadable through the existing signed-URL path; only new bytes are refused for Supabase. New rows write `storage_provider='google_drive'`, `storage_connection_id` = active connection id, `storage_container` = job folder id, `external_file_id` = Drive file id, `storage_path` = the human path `ServiceHub Jobs/{job_number}/{file}` (kept non-null for compatibility, never used to address Drive). No column is dropped, renamed or backfilled destructively. Generated `src/integrations/supabase/types.ts` regenerates after the migration is approved; code touching the new columns lands after that.
 
-Multiplier applied ONLY when the effective quantity is a finite integer
-≥ 1. All other cases fall back to `qty = 1` so no rounding surprises leak
-into the ledger:
+## 3) Access-control plan
 
-| Case | Effective qty | Rationale |
-|------|---------------|-----------|
-| qty = 1..N (integer) | qty | Normal N3 sales |
-| null / missing | 1 | Preserves current behaviour |
-| 0 | Event SKIPPED (`renewalEventsSkippedZeroQty`) | A zero-qty line grants nothing |
-| Negative (credit note) | Event SKIPPED (`renewalEventsSkippedNegativeQty`) — do NOT auto-subtract days; N3 credit notes are separate documents and are out of scope for 1.1.6c | Prevents silent shortening |
-| Decimal (e.g. 1.5) | `Math.floor(qty)` if ≥ 1, else skipped | N3 renewal SKUs are whole cycles; fractional cycles are ambiguous — document behaviour, keep conservative |
-| Text ("2") | Coerce via `Number()`; require `Number.isFinite && Number.isInteger`; else 1 | qty already typed as `number` on the DTO, but be defensive |
-| Cancelled doc | Event skipped (existing behaviour), qty ignored | Unchanged |
-| Removed line | Existing invalidation flow (existing behaviour), qty ignored | Unchanged |
-| Qty reduced after prior sync | New sync overwrites event on the same conflict key → expiry SHORTENS | Correct |
-| Qty increased after prior sync | Same overwrite → expiry EXTENDS | Correct |
-| Qty changes without doc-date change | Event overwritten, `rebuildCurrentSnapshots` picks the newer `expiry_date` (max by expiry) | Correct |
-| Monthly cycle × qty | `computeInclusiveExpiry(start, cycle*qty, "month")` — calendar arithmetic preserved | Handles 31st→28th/29th and leap years correctly |
-| Yearly cycle × qty | Same, unit "year" | Same |
-| Leap year / month-end | Delegated to existing `setUTCMonth`/`setUTCFullYear` — behaviour unchanged | Already correct |
+- Server always derives tenant from the N3 session (`requireAuthenticatedN3User`); job is loaded by `tenant_code` + `id`, 404 otherwise. No browser-supplied provider path, folder id, or token.
+- List / view / download / upload: any authenticated same-tenant user who can load the Job. Visibility is forced to `internal` for v1; the visibility selector is removed from the new card and the server rejects any other value.
+- Delete: uploader (`uploaded_by_user_id`), current Primary PIC (`assigned_user_id`), or Owner/Admin (`isAdministrator`) — expressed as a pure predicate in `attachment-policy.ts` so UI and server cannot drift, enforced server-side.
+- Preview/download goes through the server proxy route which re-authorizes on every request and streams bytes; Drive access/refresh tokens never reach the browser and no long-lived Drive link is issued.
+- Every upload, view/download, delete, failure and retry writes an audit row with the real actor (`service_job_activity_log` for job history + `google_drive_audit_log` for provider actions); audit failure aborts the operation (existing `AuditWriteError` contract).
 
-### Data model impact
+## 4) Provider-switch guard plan
 
-Preferred: add `quantity_used integer NOT NULL DEFAULT 1` to
-`subscription_renewal_events` and persist the effective quantity, so audit
-history + Document Verifier can explain "why is expiry X". Cycle
-value/unit stay as the configured mapping; the multiplier is a first-class
-column.
+- New server helper `activeDriveAttachmentCount(tenantCode)`.
+- Block, with an explicit message, when active Google Drive attachments exist: `disconnect`, `create_folder`, `select_folder` (root-folder change), the settings `set_mode`/`disconnect`/`set_root_folder` actions, and a callback that returns a **different** Google account (`permissionId` mismatch) — the callback fails closed and revokes the new grant, preserving the known-good connection (WP2A behaviour retained).
+- Allowed unchanged: same-account token refresh and same-account reconnect keeping the identical root folder.
+- No automatic migration of existing bytes in v1; the message names the count and tells the Owner what must happen first.
 
-### Backfill requirement
+## 5) Test plan
 
-Yes. After deploying the fix, one **full subscription sync** must run so
-every existing event is re-derived with qty. No manual SQL backfill is
-required because the upsert overwrites on
-`(tenant_code, source_type, n3_document_id, n3_line_id)` and the line
-snapshots already carry `quantity`. Communicate a one-time expected batch
-of `updated_count` roughly equal to the number of mapped renewal lines.
+Pure/unit: `attachment-policy.test.ts` — size/count/total boundaries (20 MB, 10 active, 100 MB), MIME+extension allow/deny matrix incl. HEIC/WebP/DOCX/XLSX/ZIP and rejection of exe/script/macro/video, MIME-vs-extension mismatch, delete-permission matrix (uploader / PIC / admin / unrelated teammate).
 
----
+Route-level (existing mock-Supabase style, e.g. `wp0e-routes.test.ts`): upload rejects cross-tenant and inaccessible jobs; upload refused when no accepted active connection or `needs_reconnect`; count/total enforced server-side even if the client lies; content route re-authorizes and never returns a Drive token; delete by unauthorized actor is 403; **Drive trash failure returns an error and leaves the row active with truthful `remote_delete_status`**; successful delete soft-deletes and audits.
 
-## Problem 2 — "Mapping could not be saved" for `qca--pro-month`
+Guard tests: disconnect / root-folder change / account change blocked with active Drive attachments; same-account refresh and reconnect allowed.
 
-### Root cause (confirmed)
+Regression: Supabase POST still refused (no new production bytes, no fallback); legacy rows still listed and downloadable; `FieldOperationsPanel` remains unmounted; existing 517-test suite, typecheck, ESLint on changed files, and production build all green.
 
-`POST /api/settings/stock-mappings` performs
+## 6) Risks and blockers
 
-```ts
-supabaseAdmin.from("renewal_stock_mappings").upsert(row, {
-  onConflict: "tenant_code,stock_code",
-});
-```
-
-but the `(tenant_code, stock_code)` unique constraint was DROPPED in
-migration `20260715012509_..._Pass 3 identity migration`:
-
-```
-ALTER TABLE public.renewal_stock_mappings
-  DROP CONSTRAINT IF EXISTS renewal_stock_mappings_tenant_code_stock_code_key;
-DROP INDEX IF EXISTS public.ux_renewal_stock_mappings_tenant_stock;
-```
-
-Current unique indexes on the table (verified live):
-
-- `renewal_stock_mappings_pkey (id)`
-- `renewal_stock_mappings_tenant_n3id_uidx (tenant_code, n3_stock_id) WHERE n3_stock_id IS NOT NULL`
-
-PostgREST therefore rejects the upsert with SQLSTATE **42P10** —
-"there is no unique or exclusion constraint matching the ON CONFLICT
-specification". The catch block masks it as the generic 500
-"Mapping could not be saved. Please try again." (line 339). Every
-first-time save of a new stock code fails identically; existing mappings
-survive only because they were inserted BEFORE the constraint was dropped.
-
-### Evidence
-
-- Stock row exists and has an immutable ID:
-  `tenant=D32-049-4F0, stock_code=qca--pro-month, n3_stock_id=1952748,
-  stock_name="QCA Pro (by month)"`.
-- Tenant-scope check passes (line 296–308).
-- Category check passes if "N3 Subscription" is active for the tenant.
-- No RLS involvement — the route uses `supabaseAdmin` (service_role).
-- `1 Month` is serialized correctly: UI sends
-  `{ renewal_cycle_value: 1, renewal_cycle_unit: "month" }`; server
-  validation at lines 251–267 accepts those.
-- Failure is deterministic at the `.upsert(...)` call.
-
-### Correction plan (Phase 1.1.6c build)
-
-1. Switch upsert to the new canonical identity when it exists:
-   `onConflict: "tenant_code,n3_stock_id"`, writing `n3_stock_id` from the
-   `stock_snapshots` lookup already performed at lines 296–308.
-2. Because `renewal_stock_mappings_tenant_n3id_uidx` is a **partial** index
-   (`WHERE n3_stock_id IS NOT NULL`), rows without an ID cannot use it.
-   Two options; pick one in build:
-   - **A (preferred):** require `n3_stock_id` at write time. If the
-     stock snapshot lookup returns no `n3_stock_id`, refuse with a
-     specific 409 ("Sync Stocks Only, then remap"). Legacy code-only rows
-     already have IDs backfilled by the Pass 3 migration; new writes will
-     always have one.
-   - **B:** additionally recreate a non-partial unique constraint on
-     `(tenant_code, stock_code)` to restore the previous upsert path
-     alongside the ID path. Riskier — reintroduces the mutable-key
-     conflicts Pass 3 removed.
-3. Surface the real Supabase error to the admin toast/log. Return
-   `{ error: err.message, code: err.code }` (still generic to end users,
-   detailed in `console.error`), and add a dedicated 42P10 mapping to a
-   friendly "Mapping table is not indexed on that key — contact support".
-4. Add a targeted unit test / smoke test that this endpoint succeeds for
-   a stock code with no existing mapping.
-
----
-
-## UI-only follow-ups (document, do NOT change here)
-
-1. Two "Sync in progress" panels in
-   `src/routes/admin.snapshots.tsx`:
-   - Live orchestration banner around line 364.
-   - Full-run panel around line 518.
-   Change background/border to a light-red warning tone
-   (`bg-red-50 border-red-200 text-red-900`), keep readable text.
-2. "Running full sync…" button (line 395) — while disabled, apply the same
-   light-red background so it visibly signals in-flight work.
-3. Document Verifier date display uses shared `fmtDate` (line 124), which
-   returns `toLocaleString()` → renders "8:00 AM". For Verifier-only
-   date-only display, introduce a `fmtDateOnly` helper (`toLocaleDateString`)
-   and use it at lines 1464 and 1505. Do NOT touch the stored timestamps or
-   the other `fmtDate` callers.
-
----
-
-## Test matrix
-
-Quantity duration:
-
-- qty=1, 1 y cycle → +1 y − 1 day (regression, current behaviour preserved)
-- qty=2, 1 y cycle → +2 y − 1 day
-- qty=3, 1 y cycle → +3 y − 1 day
-- qty=6, 1 mo cycle → +6 mo − 1 day
-- qty=12, 1 mo cycle → +12 mo − 1 day (calendar, not 365 d)
-- qty=1, 1 mo cycle, start 2027-01-31 → 2027-02-27 (month-end)
-- qty=1, 1 y cycle, start 2028-02-29 → 2029-02-27 (leap-year rollover)
-- qty=null → treated as 1
-- qty=0 → event skipped, counter increments
-- qty=-1 → event skipped, counter increments
-- qty=1.5 → floor to 1
-- Cancelled document → event skipped regardless of qty
-- Removed line → invalidation path unchanged
-- Increase qty and rerun → same event row overwritten, expiry extends,
-  `rebuildCurrentSnapshots` picks new `expiry_date`
-- Decrease qty and rerun → expiry shortens
-
-Mapping save:
-
-- New stock, no prior mapping → succeeds with `n3_stock_id` upsert
-- Same stock, edit cycle 1 mo → 1 y → single row updated
-- Category disabled for tenant → 400 with existing message
-- Stock without `n3_stock_id` (legacy) → deterministic 409 with actionable
-  message
-- Adhoc mapping (no category/cycle) → succeeds
-- Concurrent double-save → second call updates same row (no duplicate)
-
----
-
-## Recommended implementation sequence
-
-1. Migration: add `quantity_used` to `subscription_renewal_events` (nullable,
-   default 1) — cheap and reversible.
-2. Sync engine: compute `effectiveQty`, persist in event, pass
-   `cycle*effectiveQty` into `computeInclusiveExpiry`, add skipped-counters.
-3. Full subscription sync to backfill all events.
-4. Mapping API: switch upsert to `tenant_code,n3_stock_id`, require ID,
-   surface real error code.
-5. UI polish (banners, button, date-only) — cosmetic only.
-6. Add regression tests for qty matrix and for POST mapping success.
-
-READY FOR PHASE 1.1.6c BUILD
+- **Live Google behaviour remains NOT VERIFIED** in this environment — upload, trash, and job-folder creation can only be proven against real credentials (`GOOGLE_DRIVE_CLIENT_ID/SECRET/REDIRECT_URI`, `GOOGLE_DRIVE_TOKEN_ENC_KEY`). Plan assumes these are configured; if absent the vertical stays fail-closed with an explicit message.
+- Cloudflare Worker runtime: large uploads must stream; 20 MB per file is within request limits but the proxy download must stream rather than buffer.
+- `drive.file` scope only reaches files this app created — correct for WP2B, but it means the ServiceHub Jobs subtree must be created by ServiceHub; folders the user made by hand outside the picker are not addressable.
+- HEIC has an unreliable browser MIME (`image/heic` vs empty) — the policy must accept extension-based fallback for HEIC while keeping the blocklist strict.
+- Trash failure handling deliberately leaves the attachment visible; product must accept "delete can fail and say so".
+- Existing generated-types drift and pre-existing Prettier debt in `jobs.$jobId.tsx` are untouched.
+- Two migrations require owner approval before any code that reads the new columns can typecheck.
