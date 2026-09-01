@@ -354,7 +354,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             );
           }
 
-          if (row.storage_provider === svc.GOOGLE_DRIVE_PROVIDER) {
+          const isDriveRow = row.storage_provider === svc.GOOGLE_DRIVE_PROVIDER;
+
+          // Re-attempting a delete that the provider previously refused is a
+          // distinct, auditable act, recorded before Google Drive is called
+          // again. A lost retry record refuses the retry.
+          if (isDriveRow && row.remote_delete_status === "failed") {
+            await svc.logAttachmentEvent(actor, job.id, "attachment_delete_retry", {
+              newValue: row.file_name,
+              note: `Retried deleting "${row.file_name}" after Google Drive previously refused to move it to Trash.`,
+              metadata: { attachment_id: row.id },
+            });
+          }
+
+          if (isDriveRow) {
             const drive = await svc.resolveDriveContext(user.tenantCode);
             if (!drive.ok) {
               await svc.setRemoteDeleteState(user.tenantCode, row.id, {
