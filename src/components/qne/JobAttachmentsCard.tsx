@@ -256,8 +256,88 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
     [deleting, jobId, load],
   );
 
-  const openHref = (att: Attachment, download: boolean) =>
-    att.contentPath ? `${att.contentPath}${download ? "?download=1" : ""}` : (att.legacyUrl ?? "#");
+  // Drive-backed bytes come only from the authenticated proxy. The response is
+  // materialised as a blob URL so <img>/<iframe> and the download anchor never
+  // issue an unauthenticated request.
+  const fetchBytes = useCallback(
+    async (att: Attachment, download: boolean): Promise<string | null> => {
+      if (!att.contentPath) return null;
+      const res = await fetch(`${att.contentPath}${download ? "?download=1" : ""}`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(detail.trim() || "This file could not be opened.");
+      }
+      const blob = await res.blob();
+      return trackUrl(URL.createObjectURL(blob));
+    },
+    [trackUrl],
+  );
+
+  const openPreview = useCallback(
+    async (att: Attachment) => {
+      if (opening) return;
+      setOpening(att.id);
+      try {
+        if (!att.contentPath) {
+          // Legacy attachment: its pre-signed URL is already self-authorising.
+          if (att.legacyUrl) window.open(att.legacyUrl, "_blank", "noopener,noreferrer");
+          return;
+        }
+        const url = await fetchBytes(att, false);
+        if (!alive.current || !url) return;
+        setErr(null);
+        setPreview({ att, url });
+      } catch (e) {
+        if (alive.current) {
+          setErr(e instanceof Error ? e.message : "This file could not be opened.");
+        }
+      } finally {
+        if (alive.current) setOpening(null);
+      }
+    },
+    [fetchBytes, opening],
+  );
+
+  const download = useCallback(
+    async (att: Attachment) => {
+      if (opening) return;
+      setOpening(att.id);
+      try {
+        if (!att.contentPath) {
+          if (att.legacyUrl) window.open(att.legacyUrl, "_blank", "noopener,noreferrer");
+          return;
+        }
+        const url = await fetchBytes(att, true);
+        if (!alive.current || !url) return;
+        setErr(null);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = att.fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        if (alive.current) {
+          setErr(e instanceof Error ? e.message : "This file could not be downloaded.");
+        }
+      } finally {
+        if (alive.current) setOpening(null);
+      }
+    },
+    [fetchBytes, opening],
+  );
+
+  const closePreview = useCallback(() => {
+    setPreview((current) => {
+      if (current) {
+        URL.revokeObjectURL(current.url);
+        objectUrls.current = objectUrls.current.filter((u) => u !== current.url);
+      }
+      return null;
+    });
+  }, []);
 
   const atFileLimit = (quota?.activeCount ?? 0) >= (quota?.maxFiles ?? MAX_ACTIVE_FILES);
 
