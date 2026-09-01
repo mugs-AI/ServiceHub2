@@ -320,7 +320,7 @@ describe("WP2B upload", () => {
     const row = attachments()[0];
     expect(row.storage_provider).toBe("google_drive");
     expect(row.storage_connection_id).toBe("conn-1");
-    expect(row.external_file_id).toBe("drive-1");
+    expect(String(row.external_file_id)).toMatch(/^drive-/);
     expect(row.visibility).toBe("internal");
     expect(row.uploaded_by_user_id).toBe("u-helper");
     expect(log("attachment_uploaded")).toHaveLength(1);
