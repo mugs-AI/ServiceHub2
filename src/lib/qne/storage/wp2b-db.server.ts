@@ -23,8 +23,10 @@ export interface PendingError {
   message: string;
 }
 
-export interface PendingFilter<T>
-  extends PromiseLike<{ data: T[] | null; error: PendingError | null }> {
+export interface PendingFilter<T> extends PromiseLike<{
+  data: T[] | null;
+  error: PendingError | null;
+}> {
   eq(column: string, value: unknown): PendingFilter<T>;
   neq(column: string, value: unknown): PendingFilter<T>;
   order(column: string, opts?: { ascending?: boolean }): PendingFilter<T>;
@@ -38,10 +40,7 @@ export interface PendingTable {
   select<T = PendingRow>(columns?: string): PendingFilter<T>;
   insert<T = PendingRow>(row: PendingRow): PendingFilter<T>;
   update<T = PendingRow>(patch: PendingRow): PendingFilter<T>;
-  upsert<T = PendingRow>(
-    row: PendingRow,
-    opts?: { onConflict?: string },
-  ): PendingFilter<T>;
+  upsert<T = PendingRow>(row: PendingRow, opts?: { onConflict?: string }): PendingFilter<T>;
 }
 
 export interface PendingClient {

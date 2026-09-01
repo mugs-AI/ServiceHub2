@@ -218,8 +218,7 @@ export async function resolveDriveContext(tenantCode: string): Promise<DriveCont
     return {
       ok: false,
       status: 409,
-      error:
-        e instanceof Error ? e.message : "The Google Drive credential could not be refreshed.",
+      error: e instanceof Error ? e.message : "The Google Drive credential could not be refreshed.",
       recovery: "An Owner or Admin must reconnect Google Drive in Settings.",
     };
   }

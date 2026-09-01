@@ -23,8 +23,7 @@ import {
   validateQuota,
 } from "./attachment-policy";
 
-const ok = (name: string, type: string, size = 1024) =>
-  validateCandidate({ name, type, size });
+const ok = (name: string, type: string, size = 1024) => validateCandidate({ name, type, size });
 
 describe("WP2B limits", () => {
   it("uses the approved hard limits", () => {
@@ -59,15 +58,9 @@ describe("WP2B allow / deny matrix", () => {
     ["server.log", "text/plain"],
     ["data.csv", "text/csv"],
     ["letter.doc", "application/msword"],
-    [
-      "letter.docx",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ],
+    ["letter.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
     ["sheet.xls", "application/vnd.ms-excel"],
-    [
-      "sheet.xlsx",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ],
+    ["sheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
     ["bundle.zip", "application/zip"],
   ];
 
@@ -163,9 +156,9 @@ describe("WP2B delete permission matrix", () => {
   const target = { uploadedByUserId: "u-uploader", assignedUserId: "u-pic" };
 
   it("allows the uploader", () => {
-    expect(
-      canDeleteAttachment({ actorUserId: "u-uploader", isAdministrator: false }, target),
-    ).toBe(true);
+    expect(canDeleteAttachment({ actorUserId: "u-uploader", isAdministrator: false }, target)).toBe(
+      true,
+    );
   });
 
   it("allows the current Primary PIC", () => {

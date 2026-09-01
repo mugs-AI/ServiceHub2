@@ -25,9 +25,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
     handlers: {
       // ---------------------------------------------------------------- GET
       GET: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const svc = await import("@/lib/qne/storage/job-attachments.server");
         const policy = await import("@/lib/qne/storage/attachment-policy");
         try {
@@ -44,12 +43,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           let signed: Record<string, string> = {};
           if (legacy.length > 0) {
             const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-            const { data: urls } = await supabaseAdmin.storage
-              .from(LEGACY_BUCKET)
-              .createSignedUrls(
-                legacy.map((r) => r.storage_path),
-                SIGNED_URL_TTL,
-              );
+            const { data: urls } = await supabaseAdmin.storage.from(LEGACY_BUCKET).createSignedUrls(
+              legacy.map((r) => r.storage_path),
+              SIGNED_URL_TTL,
+            );
             signed = Object.fromEntries(
               (urls ?? [])
                 .filter((u) => u.signedUrl && u.path)
@@ -112,9 +109,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
 
       // --------------------------------------------------------------- POST
       POST: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const svc = await import("@/lib/qne/storage/job-attachments.server");
         const policy = await import("@/lib/qne/storage/attachment-policy");
         try {
@@ -261,9 +257,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
 
       // ------------------------------------------------------------- DELETE
       DELETE: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const svc = await import("@/lib/qne/storage/job-attachments.server");
         const policy = await import("@/lib/qne/storage/attachment-policy");
         try {

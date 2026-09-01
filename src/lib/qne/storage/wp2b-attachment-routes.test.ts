@@ -75,9 +75,13 @@ function query(table: string, op: "select" | "update" | "insert" | "upsert", pay
     limit: () => builder,
     eq: (col: string, value: unknown) => (filters.push({ col, value }), builder),
     maybeSingle: async () =>
-      fail ? { data: null, error: { message: "insert refused" } } : { data: run()[0] ?? null, error: null },
+      fail
+        ? { data: null, error: { message: "insert refused" } }
+        : { data: run()[0] ?? null, error: null },
     single: async () =>
-      fail ? { data: null, error: { message: "insert refused" } } : { data: run()[0] ?? null, error: null },
+      fail
+        ? { data: null, error: { message: "insert refused" } }
+        : { data: run()[0] ?? null, error: null },
     then: (resolve: (v: { data: Row[] | null; error: unknown }) => unknown) =>
       Promise.resolve(
         fail ? { data: null, error: { message: "insert refused" } } : { data: run(), error: null },
@@ -363,7 +367,10 @@ describe("WP2B upload", () => {
   it("enforces the per-Job total size", async () => {
     seedAttachment({ id: "att-big", file_size: 100 * 1024 * 1024 - 10 });
     const h = await attachmentsRoute();
-    const res = await h.POST({ request: upload(pdf("report.pdf", 2048)), params: { jobId: JOB_ID } });
+    const res = await h.POST({
+      request: upload(pdf("report.pdf", 2048)),
+      params: { jobId: JOB_ID },
+    });
     expect(res.status).toBe(409);
   });
 

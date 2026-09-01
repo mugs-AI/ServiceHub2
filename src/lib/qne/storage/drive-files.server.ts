@@ -97,15 +97,11 @@ export async function findOrCreateChildFolder(
     );
   }
 
-  const created = await driveFetch(
-    accessToken,
-    `${DRIVE_FILES}?supportsAllDrives=true&fields=id`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
-    },
-  );
+  const created = await driveFetch(accessToken, `${DRIVE_FILES}?supportsAllDrives=true&fields=id`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
+  });
   if (!created.ok) {
     throw new DriveFileError(
       `Google Drive could not create the "${name}" folder (HTTP ${created.status}).`,
@@ -233,7 +229,8 @@ export type TrashResult = { ok: true } | { ok: false; reason: string };
  * Drive, which satisfies the intent, so it is reported as success.
  */
 export async function trashDriveFile(accessToken: string, fileId: string): Promise<TrashResult> {
-  if (!fileId) return { ok: false, reason: "No Google Drive file id is recorded for this attachment." };
+  if (!fileId)
+    return { ok: false, reason: "No Google Drive file id is recorded for this attachment." };
   let res: Response;
   try {
     res = await driveFetch(
@@ -257,10 +254,7 @@ export async function trashDriveFile(accessToken: string, fileId: string): Promi
 }
 
 /** Byte stream for the server-proxied preview/download route. */
-export async function fetchDriveFileStream(
-  accessToken: string,
-  fileId: string,
-): Promise<Response> {
+export async function fetchDriveFileStream(accessToken: string, fileId: string): Promise<Response> {
   return driveFetch(
     accessToken,
     `${DRIVE_FILES}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,

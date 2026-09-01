@@ -16,9 +16,8 @@ export const Route = createFileRoute(
   server: {
     handlers: {
       GET: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const svc = await import("@/lib/qne/storage/job-attachments.server");
         const policy = await import("@/lib/qne/storage/attachment-policy");
         try {
@@ -26,11 +25,7 @@ export const Route = createFileRoute(
           const job = await svc.loadJobForAttachments(user.tenantCode, params.jobId);
           if (!job) return new Response("Not found", { status: 404 });
 
-          const row = await svc.loadAttachment(
-            user.tenantCode,
-            params.jobId,
-            params.attachmentId,
-          );
+          const row = await svc.loadAttachment(user.tenantCode, params.jobId, params.attachmentId);
           if (!row || row.storage_provider !== svc.GOOGLE_DRIVE_PROVIDER) {
             return new Response("Not found", { status: 404 });
           }
