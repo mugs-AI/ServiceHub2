@@ -433,13 +433,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             .eq("id", row.id);
           if (updateError) throw updateError;
 
+          // Provider-specific truth. A legacy Supabase-backed attachment was
+          // never in Google Drive, so its record must not claim otherwise: its
+          // stored bytes are left exactly as they are.
+          const outcomeNote = isDriveRow
+            ? "The file was moved to Trash in Google Drive."
+            : "This is a legacy attachment: its record was removed from ServiceHub and the previously stored file was left untouched.";
+
           await svc.logAttachmentEvent(actor, job.id, "attachment_deleted", {
             newValue: row.file_name,
-            note: `Deleted attachment "${row.file_name}" (${policy.formatBytes(row.file_size)}). The file was moved to Trash in Google Drive.`,
-            metadata: { attachment_id: row.id },
+            note: `Deleted attachment "${row.file_name}" (${policy.formatBytes(row.file_size)}). ${outcomeNote}`,
+            metadata: { attachment_id: row.id, storage_provider: row.storage_provider },
           });
 
-          return Response.json({ ok: true });
+          return Response.json({ ok: true, outcome: outcomeNote });
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;
