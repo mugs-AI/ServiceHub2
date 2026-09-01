@@ -177,6 +177,17 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             isAdmin: Boolean(user.isAdministrator),
           };
 
+          // A retry is a distinct, auditable act. It is recorded BEFORE the
+          // provider is contacted again, and the retry is refused outright if
+          // that mandatory record cannot be written.
+          if (isRetry) {
+            await svc.logAttachmentEvent(actor, job.id, "attachment_upload_retry", {
+              newValue: displayName,
+              note: `Retried the upload of "${displayName}" (${policy.formatBytes(file.size)}) to Google Drive.`,
+              metadata: { file_name: displayName, size: file.size, mime_type: mime },
+            });
+          }
+
           let folderId: string;
           let uploaded: { id: string };
           try {
