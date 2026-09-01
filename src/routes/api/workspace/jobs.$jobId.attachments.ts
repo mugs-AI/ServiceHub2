@@ -118,11 +118,27 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const job = await svc.loadJobForAttachments(user.tenantCode, params.jobId);
           if (!job) return Response.json({ error: "Job not found." }, { status: 404 });
 
+          // A deleted Job accepts no new bytes. Checked before any quota read
+          // or Google Drive call so nothing is created for a dead Job.
+          if (job.is_deleted) {
+            return Response.json(
+              {
+                error: "This Service Job has been deleted, so files can no longer be attached to it.",
+                recovery:
+                  "Existing attachments stay readable. Attach the file to an active Service Job instead.",
+              },
+              { status: 409 },
+            );
+          }
+
           const form = await request.formData();
           const file = form.get("file");
           if (!(file instanceof File)) {
             return Response.json({ error: "No file was received." }, { status: 400 });
           }
+          // Bounded, non-authority-bearing hint from the browser: it only marks
+          // the attempt as a retry in the audit trail. It grants nothing.
+          const isRetry = String(form.get("retry") ?? "") === "1";
 
           const displayName = policy.sanitizeDisplayName(file.name);
           // HEIC/HEIF and some CSV/LOG files arrive with an empty MIME type;
@@ -151,6 +167,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
               { status: drive.status },
             );
           }
+
 
           const files = await import("@/lib/qne/storage/drive-files.server");
           const actor = {
