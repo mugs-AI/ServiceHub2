@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 // WP2A SECURITY CORRECTION — focused security/route coverage.
 //
 // The real route handlers and the real server engine are exercised. Only the
@@ -788,17 +790,29 @@ describe("One active connection and Root Folder per tenant", () => {
   });
 });
 
-describe("No Supabase production-byte fallback while WP2B is pending", () => {
-  it("refuses new attachment bytes and says so truthfully", async () => {
-    const flags = await import("./attachment-bytes");
-    expect(flags.ATTACHMENT_BYTES_ENABLED).toBe(false);
-    const h = await handlers("@/routes/api/workspace/jobs.$jobId.attachments");
-    const res = await h.POST!({
-      request: new Request("https://x/api/workspace/jobs/J1/attachments", { method: "POST" }),
-      params: { jobId: "J1" },
-    });
-    expect(res.status).toBe(503);
-    expect((await res.json()).error).toBe(flags.ATTACHMENT_BYTES_DISABLED_MESSAGE);
+describe("No Supabase production-byte fallback (WP2B: Google Drive only)", () => {
+  // WP2B delivered the attachment vertical, so the blanket refusal is gone —
+  // but the guarantee it protected is unchanged: NEW bytes never land in the
+  // legacy Supabase bucket, and there is no silent fallback when Drive is
+  // unavailable. The route source is the evidence.
+  const routeSource = readFileSync(
+    join(process.cwd(), "src", "routes", "api", "workspace", "jobs.$jobId.attachments.ts"),
+    "utf8",
+  );
+
+  it("never writes new bytes through Supabase Storage", () => {
+    expect(routeSource).not.toMatch(/storage\s*\n?\s*\.from\([^)]*\)\s*\.upload/);
+    expect(routeSource).not.toContain(".upload(");
+  });
+
+  it("only reads legacy Supabase objects, via short-lived signed URLs", () => {
+    expect(routeSource).toContain("createSignedUrls");
+    expect(routeSource).toContain("LEGACY_BUCKET");
+  });
+
+  it("uploads exclusively into the tenant's Google Drive connection", () => {
+    expect(routeSource).toContain("uploadFileToFolder");
+    expect(routeSource).toContain("GOOGLE_DRIVE_PROVIDER");
   });
 });
 

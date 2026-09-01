@@ -447,6 +447,12 @@ describe("Field Operations UI truth", () => {
     expect(jobDetail).not.toContain("<FieldOperationsPanel");
   });
 
+  it("WP2B mounts the compact Job Attachments card without lifting the freeze", () => {
+    expect(jobDetail).toContain("<JobAttachmentsCard");
+    expect(jobDetail).toContain('from "@/components/qne/JobAttachmentsCard"');
+    expect(jobDetail).not.toContain("FieldOperationsPanel");
+  });
+
   it("renders no fabricated attachment count", () => {
     expect(jobDetail).not.toContain("attachmentCount");
     expect(panel).not.toContain("attachmentCount");

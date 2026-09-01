@@ -125,6 +125,22 @@ export const Route = createFileRoute("/api/integrations/google-drive/callback")(
 
           // ---- 2a. Different / unprovable account: clear the mapping --------
           if (!sameAccount) {
+            // WP2B — an account switch would orphan live Job attachments from
+            // their bytes. Keep the KNOWN-GOOD connection untouched, revoke the
+            // grant we just obtained, and say plainly why nothing changed.
+            const { guardProviderChange } = await import(
+              "@/lib/qne/storage/attachment-guard.server"
+            );
+            const verdict = await guardProviderChange(outcome.tenantCode, "change_account");
+            if (verdict.blocked) {
+              await revokeToken(token.refresh_token);
+              await auditDrive(actor, "account_change_blocked", {
+                attemptedAccount: account.email,
+                activeAttachments: verdict.count,
+              });
+              return back("account_change_blocked");
+            }
+
             // Account-change truth does not depend on whether a folder existed:
             // a KNOWN previous identity that differs is an account change.
             const changed = Boolean(previousId) || hadFolder;
