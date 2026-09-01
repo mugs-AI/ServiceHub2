@@ -484,33 +484,33 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           role="dialog"
-          aria-label={`Preview of ${preview.fileName}`}
-          onClick={() => setPreview(null)}
+          aria-label={`Preview of ${preview.att.fileName}`}
+          onClick={closePreview}
         >
           <div
             className="flex h-full w-full max-w-3xl flex-col rounded-lg bg-card p-3"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-2 pb-2">
-              <span className="truncate text-sm font-medium">{preview.fileName}</span>
+              <span className="truncate text-sm font-medium">{preview.att.fileName}</span>
               <button
                 type="button"
                 className="rounded border border-border px-2 py-0.5 text-xs"
-                onClick={() => setPreview(null)}
+                onClick={closePreview}
               >
                 Close
               </button>
             </div>
-            {preview.mimeType.startsWith("image/") ? (
+            {preview.att.mimeType.startsWith("image/") ? (
               <img
-                src={openHref(preview, false)}
-                alt={preview.fileName}
+                src={preview.url}
+                alt={preview.att.fileName}
                 className="min-h-0 flex-1 object-contain"
               />
             ) : (
               <iframe
-                src={openHref(preview, false)}
-                title={preview.fileName}
+                src={preview.url}
+                title={preview.att.fileName}
                 className="min-h-0 flex-1 rounded border border-border"
               />
             )}
