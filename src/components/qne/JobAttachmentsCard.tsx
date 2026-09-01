@@ -200,7 +200,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
     (key: string) => {
       const item = queue.find((x) => x.key === key);
       if (!item || busy) return;
-      void runQueue([{ ...item, state: "queued", error: null }]);
+      void runQueue([{ ...item, state: "queued", error: null }], true);
     },
     [busy, queue, runQueue],
   );
