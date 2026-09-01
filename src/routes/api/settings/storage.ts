@@ -9,13 +9,11 @@ export const Route = createFileRoute("/api/settings/storage")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { loadTenantSettings } = await import(
-          "@/lib/qne/service-jobs/tenant-settings.server"
-        );
+        const { loadTenantSettings } =
+          await import("@/lib/qne/service-jobs/tenant-settings.server");
         const {
           googleDriveConfigured,
           GOOGLE_DRIVE_REQUIREMENT,
@@ -77,13 +75,11 @@ export const Route = createFileRoute("/api/settings/storage")({
       },
 
       POST: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { loadTenantSettings, saveTenantSettings, auditSettings } = await import(
-          "@/lib/qne/service-jobs/tenant-settings.server"
-        );
+        const { loadTenantSettings, saveTenantSettings, auditSettings } =
+          await import("@/lib/qne/service-jobs/tenant-settings.server");
         const { STORAGE_MODES } = await import("@/lib/qne/service-jobs/tenant-settings");
         const {
           getAdapter,
@@ -108,18 +104,16 @@ export const Route = createFileRoute("/api/settings/storage")({
           if (action === "test") {
             const provider = String(body.provider ?? settings.attachments.storageMode);
             const result = await getAdapter(provider as never).testConnection();
-            await supabaseAdmin
-              .from("tenant_storage_connections")
-              .upsert(
-                {
-                  tenant_code: user.tenantCode,
-                  provider,
-                  status: result.ok ? "connected" : "not_connected",
-                  last_tested_at: new Date().toISOString(),
-                  last_test_result: result.message,
-                },
-                { onConflict: "tenant_code,provider" },
-              );
+            await supabaseAdmin.from("tenant_storage_connections").upsert(
+              {
+                tenant_code: user.tenantCode,
+                provider,
+                status: result.ok ? "connected" : "not_connected",
+                last_tested_at: new Date().toISOString(),
+                last_test_result: result.message,
+              },
+              { onConflict: "tenant_code,provider" },
+            );
             return Response.json(result);
           }
 
@@ -146,6 +140,27 @@ export const Route = createFileRoute("/api/settings/storage")({
             return Response.json({ ok: true, authorizationUrl: url.toString() });
           }
 
+          // WP2B — this endpoint can disable/leave Google Drive or repoint its
+          // Root Folder, so it carries the SAME guard as the Google Drive
+          // connection and OAuth callback routes. It runs before any
+          // storage_change_log write, availability change, connection status
+          // change or settings mutation.
+          const guard = await import("@/lib/qne/storage/attachment-guard.server");
+          const blockIfActiveDriveAttachments = async (
+            guardedAction: Parameters<typeof guard.guardProviderChange>[1],
+          ) => {
+            const outcome = await guard.guardProviderChange(user.tenantCode, guardedAction);
+            if (!outcome.blocked) return null;
+            return Response.json(
+              {
+                error: outcome.error,
+                recovery: outcome.recovery,
+                activeAttachments: outcome.count,
+              },
+              { status: 409 },
+            );
+          };
+
           if (action === "set_mode" || action === "disconnect") {
             const nextMode =
               action === "disconnect" ? "disabled" : String(body.storageMode ?? "disabled");
@@ -153,6 +168,14 @@ export const Route = createFileRoute("/api/settings/storage")({
               return Response.json({ error: "Unknown storage mode." }, { status: 400 });
             }
             const oldMode = settings.attachments.storageMode;
+            // Leaving Google Drive orphans live attachment metadata from its
+            // bytes. A same-mode no-op changes no addressing and is allowed.
+            if (oldMode === "google_drive" && nextMode !== oldMode) {
+              const blocked = await blockIfActiveDriveAttachments(
+                action === "disconnect" ? "disconnect" : "change_storage_provider",
+              );
+              if (blocked) return blocked;
+            }
             if (nextMode !== oldMode) {
               if (body.confirmation !== true) {
                 return Response.json(
@@ -180,17 +203,15 @@ export const Route = createFileRoute("/api/settings/storage")({
                 .eq("tenant_code", user.tenantCode)
                 .eq("storage_provider", oldMode)
                 .neq("storage_provider", nextMode);
-              await supabaseAdmin
-                .from("tenant_storage_connections")
-                .upsert(
-                  {
-                    tenant_code: user.tenantCode,
-                    provider: oldMode,
-                    is_active: false,
-                    status: "disconnected",
-                  },
-                  { onConflict: "tenant_code,provider" },
-                );
+              await supabaseAdmin.from("tenant_storage_connections").upsert(
+                {
+                  tenant_code: user.tenantCode,
+                  provider: oldMode,
+                  is_active: false,
+                  status: "disconnected",
+                },
+                { onConflict: "tenant_code,provider" },
+              );
             }
             const saved = await saveTenantSettings(
               user.tenantCode,
@@ -223,11 +244,29 @@ export const Route = createFileRoute("/api/settings/storage")({
 
           if (action === "set_root_folder") {
             const provider = String(body.provider ?? "google_drive");
+            const nextRoot = String(body.root_folder_name ?? "").slice(0, 200) || null;
+
+            if (provider === "google_drive") {
+              const { data: current } = await supabaseAdmin
+                .from("tenant_storage_connections")
+                .select("root_folder_name")
+                .eq("tenant_code", user.tenantCode)
+                .eq("provider", provider)
+                .maybeSingle();
+              const currentRoot = current?.root_folder_name ?? null;
+              // Re-selecting the SAME Root Folder changes no addressing and is
+              // allowed; repointing it while attachments live there is not.
+              if (currentRoot !== nextRoot) {
+                const blocked = await blockIfActiveDriveAttachments("change_root_folder");
+                if (blocked) return blocked;
+              }
+            }
+
             await supabaseAdmin.from("tenant_storage_connections").upsert(
               {
                 tenant_code: user.tenantCode,
                 provider,
-                root_folder_name: String(body.root_folder_name ?? "").slice(0, 200) || null,
+                root_folder_name: nextRoot,
               },
               { onConflict: "tenant_code,provider" },
             );
@@ -236,7 +275,7 @@ export const Route = createFileRoute("/api/settings/storage")({
               "attachments_storage",
               "root_folder",
               null,
-              { provider, root_folder_name: body.root_folder_name },
+              { provider, root_folder_name: nextRoot },
               actor,
             );
             return Response.json({ ok: true });

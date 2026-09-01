@@ -118,11 +118,28 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const job = await svc.loadJobForAttachments(user.tenantCode, params.jobId);
           if (!job) return Response.json({ error: "Job not found." }, { status: 404 });
 
+          // A deleted Job accepts no new bytes. Checked before any quota read
+          // or Google Drive call so nothing is created for a dead Job.
+          if (job.is_deleted) {
+            return Response.json(
+              {
+                error:
+                  "This Service Job has been deleted, so files can no longer be attached to it.",
+                recovery:
+                  "Existing attachments stay readable. Attach the file to an active Service Job instead.",
+              },
+              { status: 409 },
+            );
+          }
+
           const form = await request.formData();
           const file = form.get("file");
           if (!(file instanceof File)) {
             return Response.json({ error: "No file was received." }, { status: 400 });
           }
+          // Bounded, non-authority-bearing hint from the browser: it only marks
+          // the attempt as a retry in the audit trail. It grants nothing.
+          const isRetry = String(form.get("retry") ?? "") === "1";
 
           const displayName = policy.sanitizeDisplayName(file.name);
           // HEIC/HEIF and some CSV/LOG files arrive with an empty MIME type;
@@ -159,6 +176,17 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             name: user.displayName ?? null,
             isAdmin: Boolean(user.isAdministrator),
           };
+
+          // A retry is a distinct, auditable act. It is recorded BEFORE the
+          // provider is contacted again, and the retry is refused outright if
+          // that mandatory record cannot be written.
+          if (isRetry) {
+            await svc.logAttachmentEvent(actor, job.id, "attachment_upload_retry", {
+              newValue: displayName,
+              note: `Retried the upload of "${displayName}" (${policy.formatBytes(file.size)}) to Google Drive.`,
+              metadata: { file_name: displayName, size: file.size, mime_type: mime },
+            });
+          }
 
           let folderId: string;
           let uploaded: { id: string };
@@ -236,11 +264,44 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             );
           }
 
-          await svc.logAttachmentEvent(actor, job.id, "attachment_uploaded", {
-            newValue: displayName,
-            note: `Attached "${displayName}" (${policy.formatBytes(file.size)}) to Google Drive.`,
-            metadata: { attachment_id: inserted.id, size: file.size, mime_type: mime },
-          });
+          try {
+            await svc.logAttachmentEvent(actor, job.id, "attachment_uploaded", {
+              newValue: displayName,
+              note: `Attached "${displayName}" (${policy.formatBytes(file.size)}) to Google Drive.`,
+              metadata: { attachment_id: inserted.id, size: file.size, mime_type: mime },
+            });
+          } catch (auditError) {
+            // The bytes and the row exist but the mandatory Job-history record
+            // does not. Leaving the attachment apparently-successful would show
+            // the user a file we cannot account for AND duplicate it on Retry,
+            // so the whole upload is rolled back and reported as failed.
+            await files
+              .trashDriveFile(drive.context.accessToken, uploaded.id)
+              .catch(() => undefined);
+            await supabaseAdmin
+              .from("service_job_attachments")
+              .update({
+                is_deleted: true,
+                deleted_at: new Date().toISOString(),
+                deleted_by_user_id: actor.userId,
+                deleted_by_name_snapshot: actor.name,
+                availability_status: "unavailable",
+              })
+              .eq("tenant_code", user.tenantCode)
+              .eq("id", inserted.id)
+              .then(
+                () => undefined,
+                () => undefined,
+              );
+            console.error("[attachments POST] audit rollback", auditError);
+            return Response.json(
+              {
+                error: `"${displayName}" was NOT attached: its Job history record could not be saved, so the upload was rolled back.`,
+                recovery: "Please retry the upload.",
+              },
+              { status: 500 },
+            );
+          }
 
           return Response.json({ ok: true, id: inserted.id, fileName: displayName });
         } catch (err) {
@@ -296,7 +357,20 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             );
           }
 
-          if (row.storage_provider === svc.GOOGLE_DRIVE_PROVIDER) {
+          const isDriveRow = row.storage_provider === svc.GOOGLE_DRIVE_PROVIDER;
+
+          // Re-attempting a delete that the provider previously refused is a
+          // distinct, auditable act, recorded before Google Drive is called
+          // again. A lost retry record refuses the retry.
+          if (isDriveRow && row.remote_delete_status === "failed") {
+            await svc.logAttachmentEvent(actor, job.id, "attachment_delete_retry", {
+              newValue: row.file_name,
+              note: `Retried deleting "${row.file_name}" after Google Drive previously refused to move it to Trash.`,
+              metadata: { attachment_id: row.id },
+            });
+          }
+
+          if (isDriveRow) {
             const drive = await svc.resolveDriveContext(user.tenantCode);
             if (!drive.ok) {
               await svc.setRemoteDeleteState(user.tenantCode, row.id, {
@@ -362,22 +436,29 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
             .eq("id", row.id);
           if (updateError) throw updateError;
 
+          // Provider-specific truth. A legacy Supabase-backed attachment was
+          // never in Google Drive, so its record must not claim otherwise: its
+          // stored bytes are left exactly as they are.
+          const outcomeNote = isDriveRow
+            ? "The file was moved to Trash in Google Drive."
+            : "This is a legacy attachment: its record was removed from ServiceHub and the previously stored file was left untouched.";
+
           await svc.logAttachmentEvent(actor, job.id, "attachment_deleted", {
             newValue: row.file_name,
-            note: `Deleted attachment "${row.file_name}" (${policy.formatBytes(row.file_size)}). The file was moved to Trash in Google Drive.`,
-            metadata: { attachment_id: row.id },
+            note: `Deleted attachment "${row.file_name}" (${policy.formatBytes(row.file_size)}). ${outcomeNote}`,
+            metadata: { attachment_id: row.id, storage_provider: row.storage_provider },
           });
 
-          return Response.json({ ok: true });
+          return Response.json({ ok: true, outcome: outcomeNote });
         } catch (err) {
           const resp = guardResponse(err);
           if (resp) return resp;
           console.error("[attachments DELETE] failed", err);
-          const message =
-            err instanceof Error && err.name === "AttachmentAuditError"
-              ? err.message
-              : "The attachment could not be deleted.";
-          return Response.json({ error: message }, { status: 500 });
+          const named =
+            err instanceof Error &&
+            (err.name === "AttachmentAuditError" || err.name === "RemoteDeleteStateError");
+          const message = named ? (err as Error).message : "The attachment could not be deleted.";
+          return Response.json({ error: message, stillActive: true }, { status: 500 });
         }
       },
     },

@@ -69,16 +69,32 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [preview, setPreview] = useState<Attachment | null>(null);
+  // The content route is Bearer-authenticated, so bytes are fetched with the
+  // session token and held as a short-lived object URL — never as a raw src.
+  const [preview, setPreview] = useState<{ att: Attachment; url: string } | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const alive = useRef(true);
+  const objectUrls = useRef<string[]>([]);
+
+  const trackUrl = useCallback((url: string) => {
+    objectUrls.current.push(url);
+    return url;
+  }, []);
+
+  const revokeAll = useCallback(() => {
+    for (const url of objectUrls.current) URL.revokeObjectURL(url);
+    objectUrls.current = [];
+  }, []);
 
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
+      // Object URLs pin the blob in memory until revoked; unmount releases them.
+      revokeAll();
     };
-  }, []);
+  }, [revokeAll]);
 
   const load = useCallback(async () => {
     try {
@@ -110,9 +126,12 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
   }, [load]);
 
   const uploadOne = useCallback(
-    async (item: QueueItem): Promise<{ ok: boolean; error?: string }> => {
+    async (item: QueueItem, isRetry: boolean): Promise<{ ok: boolean; error?: string }> => {
       const form = new FormData();
       form.append("file", item.file, item.displayName);
+      // Bounded, non-authority-bearing marker so the server can audit the
+      // retry. It grants nothing: every check is repeated server-side.
+      if (isRetry) form.append("retry", "1");
       try {
         const res = await fetch(`/api/workspace/jobs/${jobId}/attachments`, {
           method: "POST",
@@ -138,7 +157,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
   );
 
   const runQueue = useCallback(
-    async (pending: QueueItem[]) => {
+    async (pending: QueueItem[], isRetry = false) => {
       setBusy(true);
       // Sequential: the server enforces per-Job count and total limits, and
       // parallel uploads would race those checks.
@@ -146,7 +165,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
         setQueue((q) =>
           q.map((x) => (x.key === item.key ? { ...x, state: "uploading", error: null } : x)),
         );
-        const result = await uploadOne(item);
+        const result = await uploadOne(item, isRetry);
         if (!alive.current) return;
         setQueue((q) =>
           q.map((x) =>
@@ -197,7 +216,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
     (key: string) => {
       const item = queue.find((x) => x.key === key);
       if (!item || busy) return;
-      void runQueue([{ ...item, state: "queued", error: null }]);
+      void runQueue([{ ...item, state: "queued", error: null }], true);
     },
     [busy, queue, runQueue],
   );
@@ -205,11 +224,11 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
   const remove = useCallback(
     async (att: Attachment) => {
       if (deleting) return;
-      if (
-        !window.confirm(
-          `Delete "${att.fileName}"? The file will be moved to Trash in Google Drive.`,
-        )
-      ) {
+      // Provider-specific wording: a legacy attachment was never in Drive.
+      const consequence = att.contentPath
+        ? "The file will be moved to Trash in Google Drive."
+        : "This legacy attachment's record will be removed from ServiceHub; the previously stored file is left untouched.";
+      if (!window.confirm(`Delete "${att.fileName}"? ${consequence}`)) {
         return;
       }
       setDeleting(att.id);
@@ -237,8 +256,88 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
     [deleting, jobId, load],
   );
 
-  const openHref = (att: Attachment, download: boolean) =>
-    att.contentPath ? `${att.contentPath}${download ? "?download=1" : ""}` : (att.legacyUrl ?? "#");
+  // Drive-backed bytes come only from the authenticated proxy. The response is
+  // materialised as a blob URL so <img>/<iframe> and the download anchor never
+  // issue an unauthenticated request.
+  const fetchBytes = useCallback(
+    async (att: Attachment, download: boolean): Promise<string | null> => {
+      if (!att.contentPath) return null;
+      const res = await fetch(`${att.contentPath}${download ? "?download=1" : ""}`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(detail.trim() || "This file could not be opened.");
+      }
+      const blob = await res.blob();
+      return trackUrl(URL.createObjectURL(blob));
+    },
+    [trackUrl],
+  );
+
+  const openPreview = useCallback(
+    async (att: Attachment) => {
+      if (opening) return;
+      setOpening(att.id);
+      try {
+        if (!att.contentPath) {
+          // Legacy attachment: its pre-signed URL is already self-authorising.
+          if (att.legacyUrl) window.open(att.legacyUrl, "_blank", "noopener,noreferrer");
+          return;
+        }
+        const url = await fetchBytes(att, false);
+        if (!alive.current || !url) return;
+        setErr(null);
+        setPreview({ att, url });
+      } catch (e) {
+        if (alive.current) {
+          setErr(e instanceof Error ? e.message : "This file could not be opened.");
+        }
+      } finally {
+        if (alive.current) setOpening(null);
+      }
+    },
+    [fetchBytes, opening],
+  );
+
+  const download = useCallback(
+    async (att: Attachment) => {
+      if (opening) return;
+      setOpening(att.id);
+      try {
+        if (!att.contentPath) {
+          if (att.legacyUrl) window.open(att.legacyUrl, "_blank", "noopener,noreferrer");
+          return;
+        }
+        const url = await fetchBytes(att, true);
+        if (!alive.current || !url) return;
+        setErr(null);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = att.fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        if (alive.current) {
+          setErr(e instanceof Error ? e.message : "This file could not be downloaded.");
+        }
+      } finally {
+        if (alive.current) setOpening(null);
+      }
+    },
+    [fetchBytes, opening],
+  );
+
+  const closePreview = useCallback(() => {
+    setPreview((current) => {
+      if (current) {
+        URL.revokeObjectURL(current.url);
+        objectUrls.current = objectUrls.current.filter((u) => u !== current.url);
+      }
+      return null;
+    });
+  }, []);
 
   const atFileLimit = (quota?.activeCount ?? 0) >= (quota?.maxFiles ?? MAX_ACTIVE_FILES);
 
@@ -345,20 +444,21 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
               {att.previewable && (
                 <button
                   type="button"
-                  className="rounded border border-border px-2 py-0.5"
-                  onClick={() => setPreview(att)}
+                  className="rounded border border-border px-2 py-0.5 disabled:opacity-50"
+                  disabled={opening === att.id}
+                  onClick={() => void openPreview(att)}
                 >
-                  Preview
+                  {opening === att.id ? "Opening…" : "Preview"}
                 </button>
               )}
-              <a
-                className="rounded border border-border px-2 py-0.5"
-                href={openHref(att, true)}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                className="rounded border border-border px-2 py-0.5 disabled:opacity-50"
+                disabled={opening === att.id}
+                onClick={() => void download(att)}
               >
                 Download
-              </a>
+              </button>
               {att.canDelete && (
                 <button
                   type="button"
@@ -384,33 +484,33 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           role="dialog"
-          aria-label={`Preview of ${preview.fileName}`}
-          onClick={() => setPreview(null)}
+          aria-label={`Preview of ${preview.att.fileName}`}
+          onClick={closePreview}
         >
           <div
             className="flex h-full w-full max-w-3xl flex-col rounded-lg bg-card p-3"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-2 pb-2">
-              <span className="truncate text-sm font-medium">{preview.fileName}</span>
+              <span className="truncate text-sm font-medium">{preview.att.fileName}</span>
               <button
                 type="button"
                 className="rounded border border-border px-2 py-0.5 text-xs"
-                onClick={() => setPreview(null)}
+                onClick={closePreview}
               >
                 Close
               </button>
             </div>
-            {preview.mimeType.startsWith("image/") ? (
+            {preview.att.mimeType.startsWith("image/") ? (
               <img
-                src={openHref(preview, false)}
-                alt={preview.fileName}
+                src={preview.url}
+                alt={preview.att.fileName}
                 className="min-h-0 flex-1 object-contain"
               />
             ) : (
               <iframe
-                src={openHref(preview, false)}
-                title={preview.fileName}
+                src={preview.url}
+                title={preview.att.fileName}
                 className="min-h-0 flex-1 rounded border border-border"
               />
             )}

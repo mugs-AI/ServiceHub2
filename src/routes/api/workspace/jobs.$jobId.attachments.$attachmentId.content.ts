@@ -40,18 +40,56 @@ export const Route = createFileRoute(
               : "inline";
 
           const files = await import("@/lib/qne/storage/drive-files.server");
-          const upstream = await files.fetchDriveFileStream(
-            drive.context.accessToken,
-            row.external_file_id ?? "",
-          );
+          const actor = {
+            tenantCode: user.tenantCode,
+            userId: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
+            name: user.displayName ?? null,
+            isAdmin: Boolean(user.isAdministrator),
+          };
 
+          let upstream: Response;
+          try {
+            upstream = await files.fetchDriveFileStream(
+              drive.context.accessToken,
+              row.external_file_id ?? "",
+            );
+          } catch {
+            upstream = new Response(null, { status: 502 });
+          }
+
+          // Provider success must be ESTABLISHED before anything is audited or
+          // released. Google's own error body is never handed back as if it
+          // were the attachment, and its text (which can carry provider and
+          // credential detail) is never forwarded to the browser or logged.
+          if (!upstream.ok || !upstream.body) {
+            await upstream.body?.cancel().catch(() => undefined);
+            await svc
+              .logAttachmentEvent(actor, job.id, "attachment_content_failed", {
+                newValue: row.file_name,
+                note: `"${row.file_name}" could not be opened: the storage provider did not return the file (HTTP ${upstream.status}).`,
+                metadata: { attachment_id: row.id, upstream_status: upstream.status },
+              })
+              .catch(() => undefined);
+            const status = upstream.status === 404 ? 404 : upstream.status >= 500 ? 502 : 409;
+            return new Response(
+              status === 404
+                ? "This file is no longer available in the connected Google Drive account."
+                : "ServiceHub could not open this file from the connected Google Drive account. Nothing was changed — please try again.",
+              {
+                status,
+                headers: {
+                  "Content-Type": "text/plain; charset=utf-8",
+                  "Cache-Control": "private, no-store",
+                  "X-Content-Type-Options": "nosniff",
+                },
+              },
+            );
+          }
+
+          // Only now — provider success proven — is the access audited. A lost
+          // audit throws, and the bytes are not released.
           await svc.logAttachmentEvent(
-            {
-              tenantCode: user.tenantCode,
-              userId: user.diagnostics.matchedN3UserId ?? user.userCode ?? null,
-              name: user.displayName ?? null,
-              isAdmin: Boolean(user.isAdministrator),
-            },
+            actor,
             job.id,
             disposition === "attachment" ? "attachment_downloaded" : "attachment_viewed",
             {

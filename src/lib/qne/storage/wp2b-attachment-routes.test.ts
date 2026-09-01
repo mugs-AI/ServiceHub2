@@ -124,6 +124,7 @@ vi.mock("@/lib/qne/storage/google-drive.server", () => ({
 const driveCalls: string[] = [];
 let uploadFails = false;
 let trashResult: { ok: boolean; reason?: string } = { ok: true };
+let streamStatus = 200;
 
 vi.mock("@/lib/qne/storage/drive-files.server", () => ({
   ensureJobFolder: async () => {
@@ -141,6 +142,9 @@ vi.mock("@/lib/qne/storage/drive-files.server", () => ({
   },
   fetchDriveFileStream: async () => {
     driveCalls.push("stream");
+    if (streamStatus !== 200) {
+      return new Response("Google error body with credential detail", { status: streamStatus });
+    }
     return new Response("bytes", { status: 200 });
   },
 }));
@@ -238,6 +242,7 @@ beforeEach(() => {
   uploadFails = false;
   tokenFails = false;
   trashResult = { ok: true };
+  streamStatus = 200;
   connection = {
     id: "conn-1",
     status: "connected",
@@ -592,5 +597,89 @@ describe("WP2B provider / account / root guard", () => {
     seedAttachment({ tenant_code: "T2" });
     const guard = await import("./attachment-guard.server");
     expect((await guard.guardProviderChange("T1", "disconnect")).blocked).toBe(false);
+  });
+});
+
+/* ---------------- correction evidence ---------------- */
+
+describe("WP2B correction — mandatory upload audit is not optional", () => {
+  it("rolls the upload back and reports failure when the Job history record cannot be written", async () => {
+    insertFailsFor = "service_job_activity_log";
+    const h = await attachmentsRoute();
+    const res = await h.POST({ request: upload(pdf()), params: { jobId: JOB_ID } });
+
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("was NOT attached");
+    // The Drive object is trashed and the row is soft-deleted, so nothing is
+    // left that the user can see but ServiceHub cannot account for.
+    expect(driveCalls).toContain("trash");
+    expect(attachments().every((r) => r.is_deleted === true)).toBe(true);
+  });
+});
+
+describe("WP2B correction — content route only releases proven bytes", () => {
+  it("does not pass a Google error body off as the attachment, and does not audit a view", async () => {
+    seedAttachment();
+    streamStatus = 500;
+    const h = await contentRoute();
+    const res = await h.GET({
+      request: new Request("https://app.test/api"),
+      params: { jobId: JOB_ID, attachmentId: "att-1" },
+    });
+
+    expect(res.status).toBe(502);
+    const text = await res.text();
+    expect(text).not.toContain("credential detail");
+    expect(log("attachment_viewed")).toHaveLength(0);
+    expect(log("attachment_content_failed")).toHaveLength(1);
+  });
+
+  it("reports a file that is gone from Drive as unavailable rather than as an empty download", async () => {
+    seedAttachment();
+    streamStatus = 404;
+    const h = await contentRoute();
+    const res = await h.GET({
+      request: new Request("https://app.test/api"),
+      params: { jobId: JOB_ID, attachmentId: "att-1" },
+    });
+    expect(res.status).toBe(404);
+    expect(log("attachment_downloaded")).toHaveLength(0);
+  });
+});
+
+describe("WP2B correction — delete truthfulness", () => {
+  it("audits a retry of a delete that Google Drive previously refused", async () => {
+    seedAttachment({ remote_delete_status: "failed", remote_delete_error: "boom" });
+    const h = await attachmentsRoute();
+    session = { ...HELPER, isAdministrator: true };
+    const res = await h.DELETE({
+      request: new Request("https://app.test/api?id=att-1", { method: "DELETE" }),
+      params: { jobId: JOB_ID },
+    });
+    expect(res.status).toBe(200);
+    expect(log("attachment_delete_retry")).toHaveLength(1);
+  });
+
+  it("does not claim a legacy attachment was moved to Google Drive Trash", async () => {
+    seedAttachment({
+      storage_provider: "supabase",
+      external_file_id: null,
+      storage_path: "legacy/report.pdf",
+    });
+    session = { ...HELPER, isAdministrator: true };
+    const h = await attachmentsRoute();
+    const res = await h.DELETE({
+      request: new Request("https://app.test/api?id=att-1", { method: "DELETE" }),
+      params: { jobId: JOB_ID },
+    });
+    expect(res.status).toBe(200);
+    // No Drive call at all, and the record must not mention Drive Trash.
+    expect(driveCalls).not.toContain("trash");
+    const note =
+      String(log("attachment_deleted")[0]?.metadata_json ?? "") +
+      JSON.stringify(log("attachment_deleted")[0] ?? {});
+    expect(note).not.toContain("Trash in Google Drive");
+    expect(note).toContain("legacy");
   });
 });
