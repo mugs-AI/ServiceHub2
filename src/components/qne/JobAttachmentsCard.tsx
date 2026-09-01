@@ -69,16 +69,32 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [preview, setPreview] = useState<Attachment | null>(null);
+  // The content route is Bearer-authenticated, so bytes are fetched with the
+  // session token and held as a short-lived object URL — never as a raw src.
+  const [preview, setPreview] = useState<{ att: Attachment; url: string } | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const alive = useRef(true);
+  const objectUrls = useRef<string[]>([]);
+
+  const trackUrl = useCallback((url: string) => {
+    objectUrls.current.push(url);
+    return url;
+  }, []);
+
+  const revokeAll = useCallback(() => {
+    for (const url of objectUrls.current) URL.revokeObjectURL(url);
+    objectUrls.current = [];
+  }, []);
 
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
+      // Object URLs pin the blob in memory until revoked; unmount releases them.
+      revokeAll();
     };
-  }, []);
+  }, [revokeAll]);
 
   const load = useCallback(async () => {
     try {
