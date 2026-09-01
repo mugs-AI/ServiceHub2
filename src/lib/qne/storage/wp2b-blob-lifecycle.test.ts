@@ -22,7 +22,9 @@ describe("WP2B — blob URL lifecycle (source evidence)", () => {
   });
 
   it("revokes an abandoned fetch result immediately", () => {
-    const abandoned = SRC.match(/if \(!alive\.current \|\| !url\) \{\s*(\/\/[^\n]*\n\s*)*releaseUrl\(url\);/g);
+    const abandoned = SRC.match(
+      /if \(!alive\.current \|\| !url\) \{\s*(\/\/[^\n]*\n\s*)*releaseUrl\(url\);/g,
+    );
     expect(abandoned?.length).toBe(2); // preview + download paths
   });
 
