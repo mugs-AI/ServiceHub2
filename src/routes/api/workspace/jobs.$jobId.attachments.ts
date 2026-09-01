@@ -451,11 +451,16 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const resp = guardResponse(err);
           if (resp) return resp;
           console.error("[attachments DELETE] failed", err);
-          const message =
-            err instanceof Error && err.name === "AttachmentAuditError"
-              ? err.message
-              : "The attachment could not be deleted.";
-          return Response.json({ error: message }, { status: 500 });
+          const named =
+            err instanceof Error &&
+            (err.name === "AttachmentAuditError" || err.name === "RemoteDeleteStateError");
+          const message = named
+            ? (err as Error).message
+            : "The attachment could not be deleted.";
+          return Response.json(
+            { error: message, stillActive: true },
+            { status: 500 },
+          );
         }
       },
     },
