@@ -82,6 +82,14 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
     return url;
   }, []);
 
+  // Revoke exactly once and stop tracking: safe to call twice for the same URL.
+  const releaseUrl = useCallback((url: string | null | undefined) => {
+    if (!url) return;
+    if (!objectUrls.current.includes(url)) return;
+    objectUrls.current = objectUrls.current.filter((u) => u !== url);
+    URL.revokeObjectURL(url);
+  }, []);
+
   const revokeAll = useCallback(() => {
     for (const url of objectUrls.current) URL.revokeObjectURL(url);
     objectUrls.current = [];
