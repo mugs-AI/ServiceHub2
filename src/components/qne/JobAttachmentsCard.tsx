@@ -110,9 +110,12 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
   }, [load]);
 
   const uploadOne = useCallback(
-    async (item: QueueItem): Promise<{ ok: boolean; error?: string }> => {
+    async (item: QueueItem, isRetry: boolean): Promise<{ ok: boolean; error?: string }> => {
       const form = new FormData();
       form.append("file", item.file, item.displayName);
+      // Bounded, non-authority-bearing marker so the server can audit the
+      // retry. It grants nothing: every check is repeated server-side.
+      if (isRetry) form.append("retry", "1");
       try {
         const res = await fetch(`/api/workspace/jobs/${jobId}/attachments`, {
           method: "POST",
