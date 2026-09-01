@@ -146,6 +146,27 @@ export const Route = createFileRoute("/api/settings/storage")({
             return Response.json({ ok: true, authorizationUrl: url.toString() });
           }
 
+          // WP2B — this endpoint can disable/leave Google Drive or repoint its
+          // Root Folder, so it carries the SAME guard as the Google Drive
+          // connection and OAuth callback routes. It runs before any
+          // storage_change_log write, availability change, connection status
+          // change or settings mutation.
+          const guard = await import("@/lib/qne/storage/attachment-guard.server");
+          const blockIfActiveDriveAttachments = async (
+            guardedAction: Parameters<typeof guard.guardProviderChange>[1],
+          ) => {
+            const outcome = await guard.guardProviderChange(user.tenantCode, guardedAction);
+            if (!outcome.blocked) return null;
+            return Response.json(
+              {
+                error: outcome.error,
+                recovery: outcome.recovery,
+                activeAttachments: outcome.count,
+              },
+              { status: 409 },
+            );
+          };
+
           if (action === "set_mode" || action === "disconnect") {
             const nextMode =
               action === "disconnect" ? "disabled" : String(body.storageMode ?? "disabled");
@@ -153,6 +174,14 @@ export const Route = createFileRoute("/api/settings/storage")({
               return Response.json({ error: "Unknown storage mode." }, { status: 400 });
             }
             const oldMode = settings.attachments.storageMode;
+            // Leaving Google Drive orphans live attachment metadata from its
+            // bytes. A same-mode no-op changes no addressing and is allowed.
+            if (oldMode === "google_drive" && nextMode !== oldMode) {
+              const blocked = await blockIfActiveDriveAttachments(
+                action === "disconnect" ? "disconnect" : "change_storage_provider",
+              );
+              if (blocked) return blocked;
+            }
             if (nextMode !== oldMode) {
               if (body.confirmation !== true) {
                 return Response.json(
