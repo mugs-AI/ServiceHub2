@@ -297,6 +297,7 @@ export function redirectUriFor(origin: string): string {
 export type CallbackOutcome =
   | "connected"
   | "account_changed"
+  | "account_change_blocked"
   | "identity_failed"
   | "folder_recheck_required"
   | "state_invalid"
@@ -311,6 +312,8 @@ export const CALLBACK_MESSAGE: Record<CallbackOutcome, string> = {
   connected: "Google Drive connected.",
   account_changed:
     "Google Drive connected with a different Google account. Select the Root Folder again.",
+  account_change_blocked:
+    "That is a different Google account, and this company still has Job attachments stored in the current Google Drive. Nothing was changed and the new access was revoked. Delete the remaining attachments before switching accounts.",
   identity_failed:
     "Google did not confirm which Google account authorised the connection, so nothing was connected and the new access was revoked. Start the connection again.",
   folder_recheck_required:
