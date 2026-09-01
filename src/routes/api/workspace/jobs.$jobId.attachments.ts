@@ -123,7 +123,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           if (job.is_deleted) {
             return Response.json(
               {
-                error: "This Service Job has been deleted, so files can no longer be attached to it.",
+                error:
+                  "This Service Job has been deleted, so files can no longer be attached to it.",
                 recovery:
                   "Existing attachments stay readable. Attach the file to an active Service Job instead.",
               },
@@ -167,7 +168,6 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
               { status: drive.status },
             );
           }
-
 
           const files = await import("@/lib/qne/storage/drive-files.server");
           const actor = {
@@ -289,7 +289,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
               })
               .eq("tenant_code", user.tenantCode)
               .eq("id", inserted.id)
-              .then(() => undefined, () => undefined);
+              .then(
+                () => undefined,
+                () => undefined,
+              );
             console.error("[attachments POST] audit rollback", auditError);
             return Response.json(
               {
@@ -454,13 +457,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const named =
             err instanceof Error &&
             (err.name === "AttachmentAuditError" || err.name === "RemoteDeleteStateError");
-          const message = named
-            ? (err as Error).message
-            : "The attachment could not be deleted.";
-          return Response.json(
-            { error: message, stillActive: true },
-            { status: 500 },
-          );
+          const message = named ? (err as Error).message : "The attachment could not be deleted.";
+          return Response.json({ error: message, stillActive: true }, { status: 500 });
         }
       },
     },

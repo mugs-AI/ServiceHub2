@@ -9,13 +9,11 @@ export const Route = createFileRoute("/api/settings/storage")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { loadTenantSettings } = await import(
-          "@/lib/qne/service-jobs/tenant-settings.server"
-        );
+        const { loadTenantSettings } =
+          await import("@/lib/qne/service-jobs/tenant-settings.server");
         const {
           googleDriveConfigured,
           GOOGLE_DRIVE_REQUIREMENT,
@@ -77,13 +75,11 @@ export const Route = createFileRoute("/api/settings/storage")({
       },
 
       POST: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { loadTenantSettings, saveTenantSettings, auditSettings } = await import(
-          "@/lib/qne/service-jobs/tenant-settings.server"
-        );
+        const { loadTenantSettings, saveTenantSettings, auditSettings } =
+          await import("@/lib/qne/service-jobs/tenant-settings.server");
         const { STORAGE_MODES } = await import("@/lib/qne/service-jobs/tenant-settings");
         const {
           getAdapter,
@@ -108,18 +104,16 @@ export const Route = createFileRoute("/api/settings/storage")({
           if (action === "test") {
             const provider = String(body.provider ?? settings.attachments.storageMode);
             const result = await getAdapter(provider as never).testConnection();
-            await supabaseAdmin
-              .from("tenant_storage_connections")
-              .upsert(
-                {
-                  tenant_code: user.tenantCode,
-                  provider,
-                  status: result.ok ? "connected" : "not_connected",
-                  last_tested_at: new Date().toISOString(),
-                  last_test_result: result.message,
-                },
-                { onConflict: "tenant_code,provider" },
-              );
+            await supabaseAdmin.from("tenant_storage_connections").upsert(
+              {
+                tenant_code: user.tenantCode,
+                provider,
+                status: result.ok ? "connected" : "not_connected",
+                last_tested_at: new Date().toISOString(),
+                last_test_result: result.message,
+              },
+              { onConflict: "tenant_code,provider" },
+            );
             return Response.json(result);
           }
 
@@ -209,17 +203,15 @@ export const Route = createFileRoute("/api/settings/storage")({
                 .eq("tenant_code", user.tenantCode)
                 .eq("storage_provider", oldMode)
                 .neq("storage_provider", nextMode);
-              await supabaseAdmin
-                .from("tenant_storage_connections")
-                .upsert(
-                  {
-                    tenant_code: user.tenantCode,
-                    provider: oldMode,
-                    is_active: false,
-                    status: "disconnected",
-                  },
-                  { onConflict: "tenant_code,provider" },
-                );
+              await supabaseAdmin.from("tenant_storage_connections").upsert(
+                {
+                  tenant_code: user.tenantCode,
+                  provider: oldMode,
+                  is_active: false,
+                  status: "disconnected",
+                },
+                { onConflict: "tenant_code,provider" },
+              );
             }
             const saved = await saveTenantSettings(
               user.tenantCode,

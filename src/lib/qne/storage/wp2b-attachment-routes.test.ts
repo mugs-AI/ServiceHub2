@@ -676,7 +676,9 @@ describe("WP2B correction — delete truthfulness", () => {
     expect(res.status).toBe(200);
     // No Drive call at all, and the record must not mention Drive Trash.
     expect(driveCalls).not.toContain("trash");
-    const note = String(log("attachment_deleted")[0]?.metadata_json ?? "") + JSON.stringify(log("attachment_deleted")[0] ?? {});
+    const note =
+      String(log("attachment_deleted")[0]?.metadata_json ?? "") +
+      JSON.stringify(log("attachment_deleted")[0] ?? {});
     expect(note).not.toContain("Trash in Google Drive");
     expect(note).toContain("legacy");
   });
