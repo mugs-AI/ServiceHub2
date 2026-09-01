@@ -14,7 +14,7 @@
 //  • Folder mapping is persisted per tenant + job + connection so a Job folder
 //    is created once and reused.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { pendingSchema, type JobFolderRow } from "./wp2b-db.server";
 
 const DRIVE_FILES = "https://www.googleapis.com/drive/v3/files";
 const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
@@ -133,9 +133,9 @@ export interface JobFolderInput {
  * cache; Drive itself is the authority when the mapping is missing.
  */
 export async function ensureJobFolder(input: JobFolderInput): Promise<string> {
-  const { data: mapped } = await supabaseAdmin
+  const { data: mapped } = await pendingSchema
     .from("service_job_job_folders")
-    .select("drive_folder_id")
+    .select<JobFolderRow>("drive_folder_id")
     .eq("tenant_code", input.tenantCode)
     .eq("service_job_id", input.jobId)
     .eq("connection_id", input.connectionId)
@@ -153,7 +153,7 @@ export async function ensureJobFolder(input: JobFolderInput): Promise<string> {
     input.jobNumber || input.jobId,
   );
 
-  const { error } = await supabaseAdmin.from("service_job_job_folders").upsert(
+  const { error } = await pendingSchema.from("service_job_job_folders").upsert(
     {
       tenant_code: input.tenantCode,
       service_job_id: input.jobId,
