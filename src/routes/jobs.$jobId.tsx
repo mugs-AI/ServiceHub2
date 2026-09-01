@@ -321,6 +321,9 @@ function JobDetailPage() {
         onDone={reloadAll}
       />
 
+      {/* WP2B — compact Job Attachments card (Google Drive, internal-only). */}
+      <JobAttachmentsCard jobId={job.id} />
+
       <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
         <Section title="Job details">
           <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
