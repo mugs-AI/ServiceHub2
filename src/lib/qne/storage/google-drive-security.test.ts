@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 // WP2A SECURITY CORRECTION — focused security/route coverage.
 //
 // The real route handlers and the real server engine are exercised. Only the
