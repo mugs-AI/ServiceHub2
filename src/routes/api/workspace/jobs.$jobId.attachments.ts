@@ -59,7 +59,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
 
           const canDeleteFor = (uploaderId: string | null) =>
             policy.canDeleteAttachment({
-              actorUserId: user.userId ?? null,
+              actorUserId: user.userCode ?? null,
               isAdministrator: Boolean(user.isAdministrator),
               uploaderUserId: uploaderId,
               primaryPicUserId: job.assigned_user_id,
@@ -83,7 +83,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
               provider: r.storage_provider,
               uploadedByName: r.uploaded_by_name_snapshot,
               uploadedAt: r.created_at,
-              previewable: policy.isPreviewableMime(r.mime_type, r.file_name),
+              previewable: policy.isPreviewableMime(r.mime_type),
               canDelete: canDeleteFor(r.uploaded_by_user_id),
               remoteDeleteStatus: r.remote_delete_status ?? null,
               remoteDeleteError: r.remote_delete_error ?? null,
@@ -157,9 +157,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           }
 
           const files = await import("@/lib/qne/storage/drive-files.server");
-          const actor: svc.AttachmentActor = {
+          const actor = {
             tenantCode: user.tenantCode,
-            userId: user.userId ?? null,
+            userId: user.userCode ?? null,
             name: user.displayName ?? null,
             isAdmin: Boolean(user.isAdministrator),
           };
@@ -218,7 +218,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
               external_file_id: uploaded.id,
               visibility: policy.FORCED_VISIBILITY,
               availability_status: "available",
-              uploaded_by_user_id: user.userId ?? null,
+              uploaded_by_user_id: user.userCode ?? null,
               uploaded_by_name_snapshot: user.displayName ?? null,
             })
             .select("id")
@@ -275,9 +275,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const row = await svc.loadAttachment(user.tenantCode, params.jobId, attachmentId);
           if (!row) return Response.json({ error: "Attachment not found." }, { status: 404 });
 
-          const actor: svc.AttachmentActor = {
+          const actor = {
             tenantCode: user.tenantCode,
-            userId: user.userId ?? null,
+            userId: user.userCode ?? null,
             name: user.displayName ?? null,
             isAdmin: Boolean(user.isAdministrator),
           };

@@ -40,7 +40,7 @@ export const Route = createFileRoute(
 
           const disposition =
             new URL(request.url).searchParams.get("download") === "1" ||
-            !policy.isPreviewableMime(row.mime_type, row.file_name)
+            !policy.isPreviewableMime(row.mime_type)
               ? "attachment"
               : "inline";
 
@@ -53,7 +53,7 @@ export const Route = createFileRoute(
           await svc.logAttachmentEvent(
             {
               tenantCode: user.tenantCode,
-              userId: user.userId ?? null,
+              userId: user.userCode ?? null,
               name: user.displayName ?? null,
               isAdmin: Boolean(user.isAdministrator),
             },
