@@ -252,11 +252,29 @@ export const Route = createFileRoute("/api/settings/storage")({
 
           if (action === "set_root_folder") {
             const provider = String(body.provider ?? "google_drive");
+            const nextRoot = String(body.root_folder_name ?? "").slice(0, 200) || null;
+
+            if (provider === "google_drive") {
+              const { data: current } = await supabaseAdmin
+                .from("tenant_storage_connections")
+                .select("root_folder_name")
+                .eq("tenant_code", user.tenantCode)
+                .eq("provider", provider)
+                .maybeSingle();
+              const currentRoot = current?.root_folder_name ?? null;
+              // Re-selecting the SAME Root Folder changes no addressing and is
+              // allowed; repointing it while attachments live there is not.
+              if (currentRoot !== nextRoot) {
+                const blocked = await blockIfActiveDriveAttachments("change_root_folder");
+                if (blocked) return blocked;
+              }
+            }
+
             await supabaseAdmin.from("tenant_storage_connections").upsert(
               {
                 tenant_code: user.tenantCode,
                 provider,
-                root_folder_name: String(body.root_folder_name ?? "").slice(0, 200) || null,
+                root_folder_name: nextRoot,
               },
               { onConflict: "tenant_code,provider" },
             );
