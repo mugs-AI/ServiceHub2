@@ -4,7 +4,7 @@
 // Google Drive, so these tests exercise the server's own enforcement rather
 // than the UI's.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /* ---------------- session double ---------------- */
 
@@ -218,6 +218,13 @@ const HELPER: FakeUser = {
   displayName: "Helper",
   email: "helper@t1.test",
 };
+
+// Warm the route modules once: the first dynamic import compiles the whole
+// route graph and can exceed the default per-test timeout under load.
+beforeAll(async () => {
+  await attachmentsRoute();
+  await contentRoute();
+}, 60_000);
 
 beforeEach(() => {
   for (const k of Object.keys(db)) delete db[k];
