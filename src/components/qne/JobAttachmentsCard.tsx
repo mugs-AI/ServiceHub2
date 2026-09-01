@@ -444,20 +444,21 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
               {att.previewable && (
                 <button
                   type="button"
-                  className="rounded border border-border px-2 py-0.5"
-                  onClick={() => setPreview(att)}
+                  className="rounded border border-border px-2 py-0.5 disabled:opacity-50"
+                  disabled={opening === att.id}
+                  onClick={() => void openPreview(att)}
                 >
-                  Preview
+                  {opening === att.id ? "Opening…" : "Preview"}
                 </button>
               )}
-              <a
-                className="rounded border border-border px-2 py-0.5"
-                href={openHref(att, true)}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                className="rounded border border-border px-2 py-0.5 disabled:opacity-50"
+                disabled={opening === att.id}
+                onClick={() => void download(att)}
               >
                 Download
-              </a>
+              </button>
               {att.canDelete && (
                 <button
                   type="button"
