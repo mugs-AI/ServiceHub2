@@ -139,13 +139,26 @@ export async function logAttachmentEvent(
   if (error) throw new AttachmentAuditError(eventType);
 }
 
-/** Persist remote-delete truth on an attachment row (pending WP2B columns). */
+export class RemoteDeleteStateError extends Error {
+  constructor(status: string) {
+    super(
+      `The attachment's Google Drive delete state ("${status}") could not be saved, so the delete was not reported as successful.`,
+    );
+    this.name = "RemoteDeleteStateError";
+  }
+}
+
+/**
+ * Persist remote-delete truth on an attachment row (pending WP2B columns).
+ * THROWS on a database error: a caller must never continue as though the
+ * failed/trashed state was recorded when it was not.
+ */
 export async function setRemoteDeleteState(
   tenantCode: string,
   attachmentId: string,
   patch: { status: string; error?: string | null; deletedAt?: string | null },
 ): Promise<void> {
-  await pendingSchema
+  const { error } = await pendingSchema
     .from("service_job_attachments")
     .update({
       remote_delete_status: patch.status,
@@ -154,6 +167,7 @@ export async function setRemoteDeleteState(
     })
     .eq("tenant_code", tenantCode)
     .eq("id", attachmentId);
+  if (error) throw new RemoteDeleteStateError(patch.status);
 }
 
 export interface DriveContext {
