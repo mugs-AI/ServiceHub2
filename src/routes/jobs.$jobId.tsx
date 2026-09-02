@@ -123,6 +123,9 @@ function JobDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
+  // Timeline is a right-hand drawer; always closed on load.
+  const [showTimeline, setShowTimeline] = useState(false);
+
 
   // Progressive loading:
   // - reload()   loads main job details first (blocks initial render),
@@ -225,12 +228,22 @@ function JobDetailPage() {
               Deleted
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => setShowTimeline(true)}
+            aria-haspopup="dialog"
+            aria-expanded={showTimeline}
+            className="min-h-9 rounded-md border bg-background px-3 text-xs font-semibold text-foreground hover:bg-accent"
+          >
+            Timeline
+          </button>
           <Link
             to="/support"
             className="text-sm text-muted-foreground hover:text-foreground"
           >
             ← Workspace
           </Link>
+
         </div>
       </header>
 
@@ -265,19 +278,19 @@ function JobDetailPage() {
         <ApprovalPanel job={job} isAdmin={isAdmin} onDone={reloadAll} />
       )}
 
-      {/* Top summary row — Job Info | Workflow | Assigned Technician.
-          Equal-height via grid; stacks on mobile. */}
-      <div className="grid grid-cols-1 items-stretch gap-3 md:grid-cols-3">
+      {/* Top summary row — Job Info | Workflow | Primary PIC.
+          Compact: cards size to their content and stack on mobile. */}
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-3">
         <JobInfoCard job={job} />
         <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
           {!job.is_deleted ? (
             <WorkflowActions job={job} onDone={reloadAll} />
           ) : (
-            <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <section className="rounded-xl border bg-card p-3 shadow-sm">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Workflow
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-1.5 text-sm text-muted-foreground">
                 No actions available for a deleted job.
               </p>
             </section>
@@ -295,14 +308,6 @@ function JobDetailPage() {
         </div>
       </div>
 
-      <div className={pendingLock ? "pointer-events-none opacity-60" : ""}>
-        <CancellationPanel
-          jobId={job.id}
-          jobStatus={job.status}
-          isDeleted={job.is_deleted}
-          onDone={reloadAll}
-        />
-      </div>
 
       {(job.subscription_category_snapshot ||
         job.stock_code_snapshot ||
@@ -329,8 +334,23 @@ function JobDetailPage() {
         <Section title="Job details">
           <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
           <Kv k="Problem" v={job.problem_description} multiline />
-          <PriorityEditor job={job} onDone={reloadAll} />
+          {/* SH2.2-JOB-UI-01 — Priority and Cancellation share one action row. */}
+          <div className="flex flex-col gap-3 border-t pt-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <PriorityEditor job={job} onDone={reloadAll} />
+            </div>
+            <div className="min-w-0 lg:max-w-md lg:flex-1">
+              <CancellationPanel
+                jobId={job.id}
+                jobStatus={job.status}
+                isDeleted={job.is_deleted}
+                onDone={reloadAll}
+                embedded
+              />
+            </div>
+          </div>
         </Section>
+
 
         <InternalNoteSection
           job={job}
@@ -346,7 +366,7 @@ function JobDetailPage() {
         />
       </div>
 
-      <TimelineSection items={timeline} />
+      {/* SH2.2-JOB-UI-01 — Timeline lives in a right drawer, closed by default. */}
 
       <Section title="Contact">
         <Kv k="Customer code" v={job.customer_code_snapshot} />
@@ -371,6 +391,11 @@ function JobDetailPage() {
           }}
         />
       )}
+
+      {showTimeline && (
+        <TimelineDrawer items={timeline} onClose={() => setShowTimeline(false)} />
+      )}
+
     </div>
   );
 }
@@ -740,7 +765,7 @@ function priorityTone(p: string): string {
 
 function JobInfoCard({ job }: { job: JobDetail }) {
   return (
-    <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+    <section className="rounded-xl border bg-card p-3 shadow-sm">
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Job information
       </h2>
@@ -1021,7 +1046,7 @@ function WorkflowActions({
   }
 
   return (
-    <section className="flex h-full flex-col rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+    <section className="rounded-xl border bg-card p-3 shadow-sm">
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Workflow
       </h2>
@@ -1227,6 +1252,55 @@ function ApprovalPanel({
 
 /* ---------------- assignment ---------------- */
 
+/** Compact [i] balloon carrying the Primary PIC responsibility note. */
+function PrimaryPicInfo() {
+  const [open, setOpen] = useState(false);
+  const id = "primary-pic-info";
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="About Primary PIC"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((v) => !v)}
+        className="grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-bold text-muted-foreground hover:bg-accent"
+      >
+        i
+      </button>
+      {open && (
+        <>
+          <span
+            data-testid="primary-pic-info-backdrop"
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+          <span
+            id={id}
+            role="tooltip"
+            data-testid="primary-pic-info-balloon"
+            className="absolute left-0 top-7 z-50 w-56 max-w-[75vw] rounded-lg border bg-popover p-2 text-[11px] leading-snug text-popover-foreground shadow-lg"
+          >
+            Primary PIC keeps responsibility; teammates may help without taking over.
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+
 function AssignmentSection({
   job,
   canAssign,
@@ -1296,12 +1370,15 @@ function AssignmentSection({
   }
 
   return (
-    <section className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Primary PIC
-      </h2>
+    <section className="rounded-xl border bg-card p-3 shadow-sm">
+      <div className="flex items-center gap-1.5">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Primary PIC
+        </h2>
+        <PrimaryPicInfo />
+      </div>
       {assigned ? (
-        <div className="text-base font-semibold text-foreground">
+        <div className="mt-1 text-sm font-semibold text-foreground">
           {job.assigned_user_name_snapshot}
           {job.assigned_user_id === currentUserId && (
             <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
@@ -1310,21 +1387,18 @@ function AssignmentSection({
           )}
         </div>
       ) : (
-        <div className="text-sm font-medium text-muted-foreground">Unassigned</div>
+        <div className="mt-1 text-sm font-medium text-muted-foreground">Unassigned</div>
       )}
-      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-        Primary PIC keeps responsibility; teammates may help without taking over.
-      </p>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap items-stretch gap-1.5">
         {canClaim && (
           <button
             type="button"
             onClick={() => (assigned ? setTakeoverOpen(true) : void handleClaim())}
             disabled={busy}
-            className="min-h-[44px] rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+            className="min-h-10 flex-1 basis-0 min-w-[7rem] whitespace-nowrap rounded-lg bg-emerald-600 px-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
           >
-            {assigned ? "Take Over as Primary PIC" : "Assign to Me"}
+            {assigned ? "Take as Primary" : "Assign to Me"}
           </button>
         )}
         {canAssign && (
@@ -1333,7 +1407,7 @@ function AssignmentSection({
               type="button"
               onClick={onOpenPicker}
               disabled={busy}
-              className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              className="min-h-10 flex-1 basis-0 min-w-[5rem] whitespace-nowrap rounded-lg bg-primary px-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
             >
               {assigned ? "Change" : "Assign Technician"}
             </button>
@@ -1342,7 +1416,7 @@ function AssignmentSection({
                 type="button"
                 onClick={handleUnassign}
                 disabled={busy}
-                className="min-h-[44px] rounded-lg border border-destructive/40 bg-white px-4 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                className="min-h-10 flex-1 basis-0 min-w-[5rem] whitespace-nowrap rounded-lg border border-destructive/40 bg-white px-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
               >
                 Unassign
               </button>
@@ -1350,6 +1424,7 @@ function AssignmentSection({
           </>
         )}
       </div>
+
       {err && (
         <div className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {err}
@@ -1683,32 +1758,80 @@ function CommentsSection({
 
 /* ---------------- timeline ---------------- */
 
-function TimelineSection({ items }: { items: TimelineItem[] }) {
-  if (items.length === 0) return null;
+function TimelineDrawer({
+  items,
+  onClose,
+}: {
+  items: TimelineItem[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Timeline
-      </h2>
-      <ol className="space-y-2">
-        {items.map((it) => (
-          <li key={it.id} className="rounded-lg border bg-background/50 p-3 text-sm">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-semibold text-foreground">
-                {formatEvent(it)}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {formatMYDateTime(it.performed_at)}
-                {it.performed_by_name ? ` · ${it.performed_by_name}` : ""}
-              </span>
-            </div>
-            <TimelineBody item={it} />
-          </li>
-        ))}
-      </ol>
-    </section>
+    <div
+      data-testid="timeline-drawer"
+      className="fixed inset-0 z-50 flex justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Job timeline"
+    >
+      <div
+        data-testid="timeline-drawer-backdrop"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <aside
+        className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l bg-card shadow-xl sm:w-[26rem]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 flex items-center justify-between gap-2 border-b bg-card px-4 py-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Timeline
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close timeline"
+            className="min-h-10 min-w-10 rounded-md border px-3 text-sm font-semibold hover:bg-accent"
+          >
+            ✕
+          </button>
+        </div>
+        {items.length === 0 ? (
+          <p className="p-4 text-sm text-muted-foreground">No timeline entries yet.</p>
+        ) : (
+          <ol className="space-y-2 p-3 sm:p-4">
+            {items.map((it) => (
+              <li key={it.id} className="rounded-lg border bg-background/50 p-3 text-sm">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-semibold text-foreground">{formatEvent(it)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatMYDateTime(it.performed_at)}
+                    {it.performed_by_name ? ` · ${it.performed_by_name}` : ""}
+                  </span>
+                </div>
+                <TimelineBody item={it} />
+              </li>
+            ))}
+          </ol>
+        )}
+      </aside>
+    </div>
   );
 }
+
 
 function formatEvent(it: TimelineItem): string {
   switch (it.event) {
