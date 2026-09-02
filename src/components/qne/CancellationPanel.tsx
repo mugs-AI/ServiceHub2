@@ -4,7 +4,7 @@
 // Approve/Reject controls all come from GET /api/workspace/jobs/:id/cancellation.
 // Hiding a control is never the authorization boundary — the API re-checks.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { formatMYDateTime } from "@/lib/format-date";
 import {
@@ -46,11 +46,15 @@ export function CancellationPanel({
   jobStatus,
   isDeleted,
   onDone,
+  embedded = false,
 }: {
   jobId: string;
   jobStatus: string;
   isDeleted: boolean;
   onDone: () => Promise<void>;
+  /** When true the panel renders inline (no card chrome) so it can live
+      inside another card — behaviour and API calls are unchanged. */
+  embedded?: boolean;
 }) {
   const [state, setState] = useState<CancellationState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +63,16 @@ export function CancellationPanel({
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
+
+  const wrap = (children: ReactNode) =>
+    embedded ? (
+      <div data-testid="cancellation-embedded" className="min-w-0">
+        {children}
+      </div>
+    ) : (
+      <section className="rounded-xl border bg-card p-3 shadow-sm sm:p-4">{children}</section>
+    );
+
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,18 +142,10 @@ export function CancellationPanel({
 
   if (isDeleted) return null;
   if (loading && !state) {
-    return (
-      <section className="rounded-xl border bg-card p-3 shadow-sm sm:p-4">
-        <p className="text-sm text-muted-foreground">Loading cancellation state…</p>
-      </section>
-    );
+    return wrap(<p className="text-sm text-muted-foreground">Loading cancellation state…</p>);
   }
   if (!state) {
-    return err ? (
-      <section className="rounded-xl border bg-card p-3 shadow-sm sm:p-4">
-        <p className="text-sm text-destructive">{err}</p>
-      </section>
-    ) : null;
+    return err ? wrap(<p className="text-sm text-destructive">{err}</p>) : null;
   }
 
   const active = state.activeRequest;
@@ -149,9 +155,15 @@ export function CancellationPanel({
 
   if (terminal && !active && decided.length === 0) return null;
 
-  return (
-    <section className="rounded-xl border bg-card p-3 shadow-sm sm:p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+  return wrap(
+    <>
+      <div
+        className={
+          embedded
+            ? "flex flex-wrap items-baseline gap-x-2 gap-y-1"
+            : "flex flex-wrap items-baseline justify-between gap-2"
+        }
+      >
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Cancellation
         </h2>
@@ -159,6 +171,7 @@ export function CancellationPanel({
           {CANCEL_APPROVAL_MODE_LABEL[state.settings.approvalMode]}
         </span>
       </div>
+
 
       {active && (
         <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -287,6 +300,7 @@ export function CancellationPanel({
           </div>
         </div>
       )}
-    </section>
+    </>,
   );
+
 }
