@@ -158,3 +158,23 @@ describe("decideAdmin — Owner-based rule", () => {
     expect(d.reason).toBe("matched_not_owner");
   });
 });
+
+// SH2.2-N3-403-UX-01 — a Normal User's permission failures must never widen
+// authority, and each failure mode must stay distinguishable in diagnostics.
+describe("SH2.2-N3-403-UX-01 — /api/Users permission failures", () => {
+  it("/api/Users 403 never grants Administrator and is distinguishable", async () => {
+    const d = await decideAdmin(
+      { users: null, status: "forbidden" },
+      { email: "ct.teh@acme.co" },
+      neverAllow,
+    );
+    expect(d.isAdministrator).toBe(false);
+    expect(d.adminGate).toBe("none");
+    expect(d.reason).toBe("users_endpoint_forbidden");
+  });
+  it("unmatched actor never grants Administrator", async () => {
+    const d = await decideAdmin(ok([jonas]), { email: "ct.teh@acme.co" }, neverAllow);
+    expect(d.isAdministrator).toBe(false);
+    expect(d.reason).toBe("no_matching_user");
+  });
+});
