@@ -65,6 +65,13 @@ export async function qneProxy<T = unknown>(
   } catch {
     throw new Error(`Non-JSON proxy response (${res.status}): ${text.slice(0, 200)}`);
   }
+  if (res.status === 403) {
+    // Preserve the upstream status as a typed error so callers can tell a
+    // genuine permission denial from any other failure.
+    throw new ForbiddenError(
+      typeof json?.message === "string" && json.message ? json.message : undefined,
+    );
+  }
   if (!res.ok && json?.code === undefined) {
     throw new Error(`Proxy HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
