@@ -18,7 +18,9 @@ const base: SessionErrorInput = {
 
 describe("classifyBasicInfoError", () => {
   it("classifies by typed status, not by N3 message prose", () => {
-    expect(classifyBasicInfoError(new ForbiddenError("No permission to View Company Profile"))).toEqual({
+    expect(
+      classifyBasicInfoError(new ForbiddenError("No permission to View Company Profile")),
+    ).toEqual({
       kind: "forbidden",
       message: "No permission to View Company Profile",
     });

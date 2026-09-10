@@ -61,7 +61,9 @@ export async function qneProxy<T = unknown>(
   const text = await res.text();
   let json: ApiEnvelope<T>;
   try {
-    json = text ? (JSON.parse(text) as ApiEnvelope<T>) : ({ code: "9999", message: "Empty response", data: null as unknown as T });
+    json = text
+      ? (JSON.parse(text) as ApiEnvelope<T>)
+      : { code: "9999", message: "Empty response", data: null as unknown as T };
   } catch {
     throw new Error(`Non-JSON proxy response (${res.status}): ${text.slice(0, 200)}`);
   }
@@ -78,7 +80,11 @@ export async function qneProxy<T = unknown>(
   return json;
 }
 
-export async function qneGet<T>(target: ProxyTarget, path: string, query?: ProxyOptions["query"]): Promise<T> {
+export async function qneGet<T>(
+  target: ProxyTarget,
+  path: string,
+  query?: ProxyOptions["query"],
+): Promise<T> {
   return unwrapApiResponse(await qneProxy<T>(target, "GET", path, { query }));
 }
 
