@@ -123,45 +123,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const loadSession = useCallback(async () => {
     setError(null);
-    const activeToken = getStoredToken();
-    let outcome = { kind: "ok" } as ReturnType<typeof classifyBasicInfoError>;
-    try {
-      const raw = await qneGet<unknown>("main", "/api/companyprofile/BasicInfo");
-      setSession(normaliseBasicInfo(raw, activeToken));
-    } catch (err) {
-      outcome = classifyBasicInfoError(err);
-      if (outcome.kind === "unauthorized") {
-        setToken(null);
-        setSession(null);
-        setCurrentUser(null);
-        setCurrentUserReady(true);
-        return;
-      }
-      // Even if BasicInfo failed, we can still derive display fields from JWT.
-      setSession(normaliseBasicInfo({}, activeToken));
-    }
-    if (!activeToken) {
-      setError(
-        resolveSessionError({
-          outcome,
-          jwtTenantCode: null,
-          currentUserResolved: false,
-          currentUserTenantCode: null,
-        }),
-      );
+    const next = await runSessionLoad<SessionInfo, CurrentUserInfo>({
+      getToken: getStoredToken,
+      fetchBasicInfo: () => qneGet<unknown>("main", "/api/companyprofile/BasicInfo"),
+      fetchCurrentUser: loadCurrentUser,
+      buildSession: normaliseBasicInfo,
+      readJwtTenantCode: (tok) => {
+        const claims = decodeJwtPayload(tok);
+        return typeof claims.tenantCode === "string" ? claims.tenantCode.trim() : null;
+      },
+      readUserTenantCode: (user) => user.tenantCode ?? null,
+    });
+    if (!next.tokenValid) {
+      setToken(null);
+      setSession(null);
+      setCurrentUser(null);
+      setCurrentUserReady(true);
+      setError(null);
       return;
     }
-    const user = await loadCurrentUser(activeToken);
-    const claims = decodeJwtPayload(activeToken);
-    const jwtTenantCode = typeof claims.tenantCode === "string" ? claims.tenantCode.trim() : null;
-    setError(
-      resolveSessionError({
-        outcome,
-        jwtTenantCode,
-        currentUserResolved: !!user,
-        currentUserTenantCode: user?.tenantCode ?? null,
-      }),
-    );
+    setSession(next.session);
+    setCurrentUserReady(true);
+    setError(next.error);
   }, [loadCurrentUser]);
 
   useEffect(() => {
