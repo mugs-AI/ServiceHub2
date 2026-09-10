@@ -33,14 +33,45 @@ describe("classifyBasicInfoError", () => {
 });
 
 describe("resolveSessionError", () => {
-  it("Normal User: BasicInfo 403 + JWT tenant + /api/session/me ok => usable, no banner", () => {
+  it("Normal User: 403 + matching JWT and current-user tenant => usable, no banner", () => {
+    const input: SessionErrorInput = {
+      ...base,
+      outcome: { kind: "forbidden", message: "forbidden" },
+      currentUserTenantCode: " ctteh ",
+    };
+    expect(resolveSessionError(input)).toBeNull();
+    expect(isCompanyProfileUnavailable(input)).toBe(true);
+  });
+
+  it("403 with a JWT tenant but no current-user tenant fails closed", () => {
     const input: SessionErrorInput = {
       ...base,
       outcome: { kind: "forbidden", message: "forbidden" },
       currentUserTenantCode: null,
     };
-    expect(resolveSessionError(input)).toBeNull();
-    expect(isCompanyProfileUnavailable(input)).toBe(true);
+    expect(resolveSessionError(input)).toBe(BASIC_INFO_UNRESOLVED_ERROR);
+    expect(isCompanyProfileUnavailable(input)).toBe(false);
+  });
+
+  it("403 with a current-user tenant but no JWT tenant fails closed", () => {
+    expect(
+      resolveSessionError({
+        ...base,
+        outcome: { kind: "forbidden", message: "forbidden" },
+        jwtTenantCode: null,
+      }),
+    ).toBe(BASIC_INFO_UNRESOLVED_ERROR);
+  });
+
+  it("403 with contradictory JWT and current-user tenants fails closed", () => {
+    expect(
+      resolveSessionError({
+        ...base,
+        outcome: { kind: "forbidden", message: "forbidden" },
+        jwtTenantCode: "CTTEH",
+        currentUserTenantCode: "OTHERCO",
+      }),
+    ).toBe(BASIC_INFO_UNRESOLVED_ERROR);
   });
 
   it("Owner/Admin: same 403 case resolves identically (no banner)", () => {

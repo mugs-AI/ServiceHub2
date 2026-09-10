@@ -42,9 +42,13 @@ export interface SessionErrorInput {
 /**
  * The banner-worthy session error, or null when the session is usable.
  */
+/** Tenant-code comparison normalization: whitespace + case only. */
+export function normalizeTenantCode(value: string | null | undefined): string {
+  return (value ?? "").trim().toUpperCase();
+}
+
 export function resolveSessionError(input: SessionErrorInput): string | null {
   const { outcome, jwtTenantCode, currentUserResolved, currentUserTenantCode } = input;
-  const tenant = (jwtTenantCode || currentUserTenantCode || "").trim();
 
   switch (outcome.kind) {
     case "ok":
@@ -52,10 +56,14 @@ export function resolveSessionError(input: SessionErrorInput): string | null {
     case "unauthorized":
       // Handled by the caller: token cleared, secure N3 relaunch required.
       return null;
-    case "forbidden":
-      // Suppress ONLY when the authenticated session is independently proven.
-      if (currentUserResolved && tenant) return null;
+    case "forbidden": {
+      // Suppress ONLY when the authenticated session is independently proven:
+      // JWT tenant present, current user resolved with a tenant, and both match.
+      const jwt = normalizeTenantCode(jwtTenantCode);
+      const server = normalizeTenantCode(currentUserTenantCode);
+      if (currentUserResolved && jwt && server && jwt === server) return null;
       return BASIC_INFO_UNRESOLVED_ERROR;
+    }
     case "failed":
       return outcome.message;
   }
