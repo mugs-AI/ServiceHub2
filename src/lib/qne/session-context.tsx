@@ -1,8 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { qneGet, UnauthorizedError } from "@/lib/qne/client";
+import { qneGet } from "@/lib/qne/client";
 import { decodeJwtPayload } from "@/lib/qne/jwt";
 import { normalizeBasicInfo } from "@/lib/qne/session/basic-info";
+import {
+  classifyBasicInfoError,
+  resolveSessionError,
+} from "@/lib/qne/session/basic-info-availability";
 import {
   clearStoredToken,
   consumeTokenFromUrl,
