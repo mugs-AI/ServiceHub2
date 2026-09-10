@@ -100,19 +100,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadCurrentUser = useCallback(async (tok: string) => {
+  const loadCurrentUser = useCallback(async (tok: string): Promise<CurrentUserInfo | null> => {
     setCurrentUserReady(false);
     try {
       const res = await fetch("/api/session/me", {
         headers: { Authorization: `Bearer ${tok}` },
       });
       if (res.ok) {
-        setCurrentUser((await res.json()) as CurrentUserInfo);
-      } else {
-        setCurrentUser(null);
+        const user = (await res.json()) as CurrentUserInfo;
+        setCurrentUser(user);
+        return user;
       }
+      setCurrentUser(null);
+      return null;
     } catch {
       setCurrentUser(null);
+      return null;
     } finally {
       setCurrentUserReady(true);
     }
@@ -121,23 +124,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const loadSession = useCallback(async () => {
     setError(null);
     const activeToken = getStoredToken();
+    let outcome = { kind: "ok" } as ReturnType<typeof classifyBasicInfoError>;
     try {
       const raw = await qneGet<unknown>("main", "/api/companyprofile/BasicInfo");
       setSession(normaliseBasicInfo(raw, activeToken));
     } catch (err) {
-      if (err instanceof UnauthorizedError) {
+      outcome = classifyBasicInfoError(err);
+      if (outcome.kind === "unauthorized") {
         setToken(null);
         setSession(null);
         setCurrentUser(null);
         setCurrentUserReady(true);
         return;
       }
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
       // Even if BasicInfo failed, we can still derive display fields from JWT.
       setSession(normaliseBasicInfo({}, activeToken));
     }
-    if (activeToken) await loadCurrentUser(activeToken);
+    if (!activeToken) {
+      setError(resolveSessionError({
+        outcome,
+        jwtTenantCode: null,
+        currentUserResolved: false,
+        currentUserTenantCode: null,
+      }));
+      return;
+    }
+    const user = await loadCurrentUser(activeToken);
+    const claims = decodeJwtPayload(activeToken);
+    const jwtTenantCode =
+      typeof claims.tenantCode === "string" ? claims.tenantCode.trim() : null;
+    setError(
+      resolveSessionError({
+        outcome,
+        jwtTenantCode,
+        currentUserResolved: !!user,
+        currentUserTenantCode: user?.tenantCode ?? null,
+      }),
+    );
   }, [loadCurrentUser]);
 
   useEffect(() => {
