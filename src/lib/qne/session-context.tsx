@@ -3,10 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { qneGet } from "@/lib/qne/client";
 import { decodeJwtPayload } from "@/lib/qne/jwt";
 import { normalizeBasicInfo } from "@/lib/qne/session/basic-info";
-import {
-  classifyBasicInfoError,
-  resolveSessionError,
-} from "@/lib/qne/session/basic-info-availability";
+import { runSessionLoad } from "@/lib/qne/session/session-load";
 import {
   clearStoredToken,
   consumeTokenFromUrl,
