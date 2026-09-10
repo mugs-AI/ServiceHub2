@@ -141,18 +141,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSession(normaliseBasicInfo({}, activeToken));
     }
     if (!activeToken) {
-      setError(resolveSessionError({
-        outcome,
-        jwtTenantCode: null,
-        currentUserResolved: false,
-        currentUserTenantCode: null,
-      }));
+      setError(
+        resolveSessionError({
+          outcome,
+          jwtTenantCode: null,
+          currentUserResolved: false,
+          currentUserTenantCode: null,
+        }),
+      );
       return;
     }
     const user = await loadCurrentUser(activeToken);
     const claims = decodeJwtPayload(activeToken);
-    const jwtTenantCode =
-      typeof claims.tenantCode === "string" ? claims.tenantCode.trim() : null;
+    const jwtTenantCode = typeof claims.tenantCode === "string" ? claims.tenantCode.trim() : null;
     setError(
       resolveSessionError({
         outcome,
