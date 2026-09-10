@@ -8,9 +8,22 @@ import { unwrapApiResponse, unwrapPageList } from "./envelope";
 export type ProxyTarget = "main" | "reporting";
 
 export class UnauthorizedError extends Error {
+  readonly httpStatus = 401;
   constructor() {
     super("Unauthorized");
     this.name = "UnauthorizedError";
+  }
+}
+
+/**
+ * Structured 403 from N3, preserved by HTTP status only. Callers must never
+ * classify permission failures by matching N3 error prose.
+ */
+export class ForbiddenError extends Error {
+  readonly httpStatus = 403;
+  constructor(message?: string) {
+    super(message || "Forbidden");
+    this.name = "ForbiddenError";
   }
 }
 
