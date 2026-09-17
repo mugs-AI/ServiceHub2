@@ -151,8 +151,9 @@ export function parseCapturePayload(
     return { ok: false, error: "Longitude is out of range." };
   }
   const accuracy = finiteNumber(body.accuracy);
-  if (accuracy === null || accuracy < 0) {
+  if (accuracy === null || accuracy < 0 || accuracy > MAX_ACCURACY_M) {
     return { ok: false, error: "A valid accuracy value is required for a captured location." };
+
   }
   return { ok: true, capture: { gps_result, latitude, longitude, accuracy, exception_reason } };
 }
