@@ -14,14 +14,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/onsite-attendan
   server: {
     handlers: {
       GET: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const {
-          loadAttendanceJob,
-          loadJobVisits,
-          loadActorOpenVisit,
-        } = await import("@/lib/qne/service-jobs/onsite-attendance.server");
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { loadAttendanceJob, loadJobVisits, loadActorOpenVisit } =
+          await import("@/lib/qne/service-jobs/onsite-attendance.server");
         const { attendanceBlockedReason, visibleVisits, canViewAllVisits, actorState } =
           await import("@/lib/qne/service-jobs/onsite-attendance");
         try {
@@ -65,15 +61,12 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/onsite-attendan
       },
 
       POST: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { loadAttendanceJob, mutateAttendance } = await import(
-          "@/lib/qne/service-jobs/onsite-attendance.server"
-        );
-        const { attendanceBlockedReason, validateCapture, isLocationCaptured } = await import(
-          "@/lib/qne/service-jobs/onsite-attendance"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { loadAttendanceJob, mutateAttendance } =
+          await import("@/lib/qne/service-jobs/onsite-attendance.server");
+        const { attendanceBlockedReason, validateCapture, isLocationCaptured } =
+          await import("@/lib/qne/service-jobs/onsite-attendance");
         try {
           const user = await requireAuthenticatedN3User(request);
           const actor = {

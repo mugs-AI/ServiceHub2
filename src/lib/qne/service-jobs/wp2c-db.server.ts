@@ -16,8 +16,10 @@ export interface PendingError {
   message: string;
 }
 
-export interface PendingFilter<T>
-  extends PromiseLike<{ data: T[] | null; error: PendingError | null }> {
+export interface PendingFilter<T> extends PromiseLike<{
+  data: T[] | null;
+  error: PendingError | null;
+}> {
   eq(column: string, value: unknown): PendingFilter<T>;
   is(column: string, value: unknown): PendingFilter<T>;
   order(column: string, opts?: { ascending?: boolean }): PendingFilter<T>;

@@ -17,7 +17,9 @@ import {
 } from "./onsite-attendance";
 import type { AttendanceVisit } from "./onsite-attendance";
 
-function visit(over: Partial<AttendanceVisit> & { id: string; actor_user_id: string }): AttendanceVisit {
+function visit(
+  over: Partial<AttendanceVisit> & { id: string; actor_user_id: string },
+): AttendanceVisit {
   return {
     service_job_id: "job-1",
     actor_name_snapshot: "Staff",
@@ -73,7 +75,9 @@ describe("location capture and mandatory exception reason", () => {
   it("requires a non-empty reason when location is missing", () => {
     expect(validateCapture({ gps_result: "permission_denied" }).ok).toBe(false);
     expect(validateCapture({ gps_result: "timeout", exception_reason: "   " }).ok).toBe(false);
-    expect(validateCapture({ gps_result: "unsupported", exception_reason: "no gps" }).ok).toBe(true);
+    expect(validateCapture({ gps_result: "unsupported", exception_reason: "no gps" }).ok).toBe(
+      true,
+    );
     expect(validateCapture({ gps_result: "ok", latitude: 3, longitude: 101 }).ok).toBe(true);
   });
 
@@ -89,13 +93,22 @@ describe("visibility", () => {
   const rows = [
     visit({ id: "a", actor_user_id: "u1" }),
     visit({ id: "b", actor_user_id: "u2" }),
-    visit({ id: "c", actor_user_id: "u1", clock_out_at: "2026-09-17T02:00:00.000Z", duration_minutes: 60 }),
+    visit({
+      id: "c",
+      actor_user_id: "u1",
+      clock_out_at: "2026-09-17T02:00:00.000Z",
+      duration_minutes: 60,
+    }),
   ];
 
   it("lets Admin and the current Primary PIC see all visits", () => {
     expect(canViewAllVisits({ actorUserId: "u9", isAdmin: true, assignedUserId: "u1" })).toBe(true);
-    expect(canViewAllVisits({ actorUserId: "u1", isAdmin: false, assignedUserId: "u1" })).toBe(true);
-    expect(visibleVisits(rows, { actorUserId: "u1", isAdmin: false, assignedUserId: "u1" })).toHaveLength(3);
+    expect(canViewAllVisits({ actorUserId: "u1", isAdmin: false, assignedUserId: "u1" })).toBe(
+      true,
+    );
+    expect(
+      visibleVisits(rows, { actorUserId: "u1", isAdmin: false, assignedUserId: "u1" }),
+    ).toHaveLength(3);
   });
 
   it("limits an ordinary teammate to their own visits", () => {
@@ -104,13 +117,20 @@ describe("visibility", () => {
   });
 
   it("returns nothing when the actor cannot be resolved (fail closed)", () => {
-    expect(visibleVisits(rows, { actorUserId: null, isAdmin: false, assignedUserId: "u1" })).toEqual([]);
+    expect(
+      visibleVisits(rows, { actorUserId: null, isAdmin: false, assignedUserId: "u1" }),
+    ).toEqual([]);
   });
 });
 
 describe("multi-visit / multi-staff state", () => {
   const rows = [
-    visit({ id: "a", actor_user_id: "u1", clock_out_at: "2026-09-17T02:00:00.000Z", duration_minutes: 60 }),
+    visit({
+      id: "a",
+      actor_user_id: "u1",
+      clock_out_at: "2026-09-17T02:00:00.000Z",
+      duration_minutes: 60,
+    }),
     visit({ id: "b", actor_user_id: "u1", clock_in_at: "2026-09-17T03:00:00.000Z" }),
     visit({ id: "c", actor_user_id: "u2" }),
   ];

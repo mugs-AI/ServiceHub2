@@ -29,7 +29,7 @@ describe("API authentication, tenant and actor authority", () => {
 
   it("fails closed when the actor cannot be resolved", () => {
     expect(API).toContain('{ error: "Your user could not be resolved." }, { status: 401 }');
-    expect(SERVER).toContain('if (!actor.userId) throw new AttendanceError');
+    expect(SERVER).toContain("if (!actor.userId) throw new AttendanceError");
   });
 
   it("scopes every read by the resolved tenant", () => {
@@ -43,7 +43,9 @@ describe("API authentication, tenant and actor authority", () => {
 
   it("requires an exception reason before committing a missing location", () => {
     expect(API).toContain("validateCapture(capture)");
-    expect(API).toContain("if (!check.ok) return Response.json({ error: check.error }, { status: 400 })");
+    expect(API).toContain(
+      "if (!check.ok) return Response.json({ error: check.error }, { status: 400 })",
+    );
   });
 
   it("is a dedicated endpoint, not an extension of the legacy Field route", () => {
@@ -67,7 +69,9 @@ describe("atomicity and server timestamp authority", () => {
   });
 
   it("enforces one open session per tenant + actor across all Jobs", () => {
-    expect(SQL).toContain("CREATE UNIQUE INDEX IF NOT EXISTS service_job_onsite_attendance_one_open_idx");
+    expect(SQL).toContain(
+      "CREATE UNIQUE INDEX IF NOT EXISTS service_job_onsite_attendance_one_open_idx",
+    );
     expect(SQL).toContain("WHERE clock_out_at IS NULL");
     expect(SQL).toContain("Clock out there first.");
   });
@@ -90,7 +94,9 @@ describe("atomicity and server timestamp authority", () => {
 
 describe("candidate migration is additive and server-only", () => {
   it("lives at the reviewed candidate path and is not applied", () => {
-    expect(existsSync(join(process.cwd(), "docs/migrations/WP2C_onsite_gps_attendance.candidate.sql"))).toBe(true);
+    expect(
+      existsSync(join(process.cwd(), "docs/migrations/WP2C_onsite_gps_attendance.candidate.sql")),
+    ).toBe(true);
     expect(existsSync(join(process.cwd(), "supabase/migrations"))).toBe(true);
   });
 

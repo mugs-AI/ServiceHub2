@@ -186,9 +186,7 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
   }
 
   const open = state?.openVisit ?? null;
-  const elapsed = open
-    ? formatElapsed(Date.now() - new Date(open.clock_in_at).getTime())
-    : null;
+  const elapsed = open ? formatElapsed(Date.now() - new Date(open.clock_in_at).getTime()) : null;
   const disabled = !!state?.blockedReason || !state?.canAct || !!busy;
 
   return (
@@ -315,9 +313,7 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
                   {v.actor_name_snapshot ?? "(unknown)"}
                 </span>
                 <span className="text-muted-foreground">
-                  {v.clock_out_at
-                    ? `${v.duration_minutes ?? 0} min`
-                    : "In progress"}
+                  {v.clock_out_at ? `${v.duration_minutes ?? 0} min` : "In progress"}
                 </span>
               </div>
               <p className="mt-0.5 break-words text-muted-foreground">

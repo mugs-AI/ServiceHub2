@@ -4,11 +4,7 @@
 // in ./field-ops.ts (which stays frozen and unmounted). Nothing here touches
 // Travel / Arrival / Leave Site / Work Sessions / Waiting.
 
-export const ATTENDANCE_BLOCKED_STATUSES = [
-  "Completed",
-  "Cancelled",
-  "Pending Approval",
-] as const;
+export const ATTENDANCE_BLOCKED_STATUSES = ["Completed", "Cancelled", "Pending Approval"] as const;
 
 export type GpsResultCode =
   | "ok"
@@ -68,9 +64,12 @@ export interface AttendanceCapture {
 
 export function isLocationCaptured(c: AttendanceCapture): boolean {
   if (c.gps_result !== "ok" && c.gps_result !== "low_accuracy") return false;
-  return typeof c.latitude === "number" && Number.isFinite(c.latitude)
-    && typeof c.longitude === "number" && Number.isFinite(c.longitude);
-
+  return (
+    typeof c.latitude === "number" &&
+    Number.isFinite(c.latitude) &&
+    typeof c.longitude === "number" &&
+    Number.isFinite(c.longitude)
+  );
 }
 
 /** A missing location may only be committed with a non-empty reason. */

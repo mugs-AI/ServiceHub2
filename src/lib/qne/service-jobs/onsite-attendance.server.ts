@@ -4,11 +4,7 @@
 // authenticated N3 session; request bodies never supply identity.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  ONSITE_ATTENDANCE_RPC,
-  ONSITE_ATTENDANCE_TABLE,
-  wp2cSchema,
-} from "./wp2c-db.server";
+import { ONSITE_ATTENDANCE_RPC, ONSITE_ATTENDANCE_TABLE, wp2cSchema } from "./wp2c-db.server";
 import type { AttendanceVisit } from "./onsite-attendance";
 
 export interface AttendanceActor {
@@ -59,10 +55,7 @@ const VISIT_COLUMNS =
   "id, service_job_id, actor_user_id, actor_name_snapshot, clock_in_at, clock_out_at, duration_minutes, clock_in_latitude, clock_in_longitude, clock_in_accuracy_m, clock_in_gps_result, clock_in_exception_reason, clock_out_latitude, clock_out_longitude, clock_out_accuracy_m, clock_out_gps_result, clock_out_exception_reason, has_gps_exception";
 
 /** Every visit on one Job, tenant-scoped. Visibility filtering is applied by the caller. */
-export async function loadJobVisits(
-  tenantCode: string,
-  jobId: string,
-): Promise<AttendanceVisit[]> {
+export async function loadJobVisits(tenantCode: string, jobId: string): Promise<AttendanceVisit[]> {
   const { data, error } = await wp2cSchema
     .from(ONSITE_ATTENDANCE_TABLE)
     .select<AttendanceVisit>(VISIT_COLUMNS)
@@ -80,9 +73,9 @@ export async function loadActorOpenVisit(
 ): Promise<(AttendanceVisit & { job_number_snapshot?: string | null }) | null> {
   const { data, error } = await wp2cSchema
     .from(ONSITE_ATTENDANCE_TABLE)
-    .select<AttendanceVisit & { job_number_snapshot?: string | null }>(
-      `${VISIT_COLUMNS}, job_number_snapshot`,
-    )
+    .select<
+      AttendanceVisit & { job_number_snapshot?: string | null }
+    >(`${VISIT_COLUMNS}, job_number_snapshot`)
     .eq("tenant_code", tenantCode)
     .eq("actor_user_id", actorUserId)
     .is("clock_out_at", null)
