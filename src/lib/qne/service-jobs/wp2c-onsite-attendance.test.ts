@@ -69,11 +69,16 @@ describe("location capture and mandatory exception reason", () => {
   });
 
   it("treats coordinates as captured only for ok / low accuracy with accuracy evidence", () => {
-    expect(isLocationCaptured({ gps_result: "ok", latitude: 3, longitude: 101, accuracy: 20 })).toBe(
-      true,
-    );
     expect(
-      isLocationCaptured({ gps_result: "low_accuracy", latitude: 3, longitude: 101, accuracy: 400 }),
+      isLocationCaptured({ gps_result: "ok", latitude: 3, longitude: 101, accuracy: 20 }),
+    ).toBe(true);
+    expect(
+      isLocationCaptured({
+        gps_result: "low_accuracy",
+        latitude: 3,
+        longitude: 101,
+        accuracy: 400,
+      }),
     ).toBe(true);
     expect(
       isLocationCaptured({ gps_result: "timeout", latitude: 3, longitude: 101, accuracy: 20 }),
@@ -93,7 +98,6 @@ describe("location capture and mandatory exception reason", () => {
       validateCapture({ gps_result: "ok", latitude: 3, longitude: 101, accuracy: 20 }).ok,
     ).toBe(true);
   });
-
 
   it("shows accuracy or a flagged exception", () => {
     expect(gpsSummary("ok", 25)).toBe("GPS captured · ±25 m");
