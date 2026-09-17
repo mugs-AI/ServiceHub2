@@ -1337,6 +1337,98 @@ export type Database = {
           },
         ]
       }
+      service_job_onsite_attendance: {
+        Row: {
+          actor_code_snapshot: string | null
+          actor_email_snapshot: string | null
+          actor_name_snapshot: string | null
+          actor_user_id: string
+          clock_in_accuracy_m: number | null
+          clock_in_at: string
+          clock_in_exception_reason: string | null
+          clock_in_gps_result: string
+          clock_in_latitude: number | null
+          clock_in_longitude: number | null
+          clock_out_accuracy_m: number | null
+          clock_out_at: string | null
+          clock_out_exception_reason: string | null
+          clock_out_gps_result: string | null
+          clock_out_latitude: number | null
+          clock_out_longitude: number | null
+          created_at: string
+          duration_minutes: number | null
+          has_gps_exception: boolean
+          id: string
+          job_number_snapshot: string | null
+          service_job_id: string
+          support_mode_snapshot: string | null
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          actor_code_snapshot?: string | null
+          actor_email_snapshot?: string | null
+          actor_name_snapshot?: string | null
+          actor_user_id: string
+          clock_in_accuracy_m?: number | null
+          clock_in_at?: string
+          clock_in_exception_reason?: string | null
+          clock_in_gps_result?: string
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_out_accuracy_m?: number | null
+          clock_out_at?: string | null
+          clock_out_exception_reason?: string | null
+          clock_out_gps_result?: string | null
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          created_at?: string
+          duration_minutes?: number | null
+          has_gps_exception?: boolean
+          id?: string
+          job_number_snapshot?: string | null
+          service_job_id: string
+          support_mode_snapshot?: string | null
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          actor_code_snapshot?: string | null
+          actor_email_snapshot?: string | null
+          actor_name_snapshot?: string | null
+          actor_user_id?: string
+          clock_in_accuracy_m?: number | null
+          clock_in_at?: string
+          clock_in_exception_reason?: string | null
+          clock_in_gps_result?: string
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_out_accuracy_m?: number | null
+          clock_out_at?: string | null
+          clock_out_exception_reason?: string | null
+          clock_out_gps_result?: string | null
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          created_at?: string
+          duration_minutes?: number | null
+          has_gps_exception?: boolean
+          id?: string
+          job_number_snapshot?: string | null
+          service_job_id?: string
+          support_mode_snapshot?: string | null
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_onsite_attendance_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_job_schedule_history: {
         Row: {
           action: string
@@ -2499,6 +2591,19 @@ export type Database = {
       sh_next_job_number: {
         Args: { p_date_key: string; p_tenant_code: string }
         Returns: number
+      }
+      sh_onsite_attendance_mutate: {
+        Args: {
+          p_action: string
+          p_actor_code: string
+          p_actor_email: string
+          p_actor_name: string
+          p_actor_user_id: string
+          p_job_id: string
+          p_payload?: Json
+          p_tenant_code: string
+        }
+        Returns: Json
       }
     }
     Enums: {
