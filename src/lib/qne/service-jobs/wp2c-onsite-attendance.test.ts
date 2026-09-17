@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   ATTENDANCE_BLOCKED_STATUSES,
   LOW_ACCURACY_THRESHOLD_M,
+  MAX_ACCURACY_M,
   actorState,
   attendanceBlockedReason,
   canViewAllVisits,
@@ -67,13 +68,24 @@ describe("location capture and mandatory exception reason", () => {
     expect(gpsResultFromError(null)).toBe("unavailable");
   });
 
-  it("treats coordinates as captured only for ok / low accuracy", () => {
-    expect(isLocationCaptured({ gps_result: "ok", latitude: 3, longitude: 101 })).toBe(true);
-    expect(isLocationCaptured({ gps_result: "low_accuracy", latitude: 3, longitude: 101 })).toBe(
-      true,
-    );
-    expect(isLocationCaptured({ gps_result: "timeout", latitude: 3, longitude: 101 })).toBe(false);
+  it("treats coordinates as captured only for ok / low accuracy with accuracy evidence", () => {
+    expect(
+      isLocationCaptured({ gps_result: "ok", latitude: 3, longitude: 101, accuracy: 20 }),
+    ).toBe(true);
+    expect(
+      isLocationCaptured({
+        gps_result: "low_accuracy",
+        latitude: 3,
+        longitude: 101,
+        accuracy: 400,
+      }),
+    ).toBe(true);
+    expect(
+      isLocationCaptured({ gps_result: "timeout", latitude: 3, longitude: 101, accuracy: 20 }),
+    ).toBe(false);
     expect(isLocationCaptured({ gps_result: "ok", latitude: null, longitude: null })).toBe(false);
+    // No accuracy evidence means no captured position.
+    expect(isLocationCaptured({ gps_result: "ok", latitude: 3, longitude: 101 })).toBe(false);
   });
 
   it("requires a non-empty reason when location is missing", () => {
@@ -82,7 +94,9 @@ describe("location capture and mandatory exception reason", () => {
     expect(validateCapture({ gps_result: "unsupported", exception_reason: "no gps" }).ok).toBe(
       true,
     );
-    expect(validateCapture({ gps_result: "ok", latitude: 3, longitude: 101 }).ok).toBe(true);
+    expect(
+      validateCapture({ gps_result: "ok", latitude: 3, longitude: 101, accuracy: 20 }).ok,
+    ).toBe(true);
   });
 
   it("shows accuracy or a flagged exception", () => {
@@ -255,5 +269,42 @@ describe("server-aligned elapsed time", () => {
       serverAlignedElapsedMs("2026-09-17T01:00:00Z", 0, Date.parse("2026-09-17T00:00:00Z")),
     ).toBe(0);
     expect(serverAlignedElapsedMs("nope", 0, 1000)).toBe(0);
+  });
+});
+
+describe("accuracy evidence is never invented", () => {
+  it("omits ±N m unless accuracy is a real finite reading", () => {
+    expect(gpsSummary("ok", null)).toBe("GPS captured");
+    expect(gpsSummary("ok", undefined)).toBe("GPS captured");
+    expect(gpsSummary("ok", Number.NaN)).toBe("GPS captured");
+    expect(gpsSummary("ok", -1)).toBe("GPS captured");
+    expect(gpsSummary("ok", 0)).toBe("GPS captured · ±0 m");
+    expect(gpsSummary("low_accuracy", 480)).toBe("GPS captured (low accuracy) · ±480 m");
+  });
+
+  it("treats out-of-range or accuracy-less positions as not captured", () => {
+    const base = { gps_result: "ok" as const, latitude: 3.1, longitude: 101.6, accuracy: 25 };
+    expect(isLocationCaptured(base)).toBe(true);
+    expect(isLocationCaptured({ ...base, accuracy: null })).toBe(false);
+    expect(isLocationCaptured({ ...base, accuracy: -1 })).toBe(false);
+    expect(isLocationCaptured({ ...base, accuracy: MAX_ACCURACY_M + 1 })).toBe(false);
+    expect(isLocationCaptured({ ...base, latitude: 91 })).toBe(false);
+    expect(isLocationCaptured({ ...base, longitude: -181 })).toBe(false);
+  });
+
+  it("makes validateCapture demand a reason for those same cases", () => {
+    const bad = { gps_result: "ok" as const, latitude: 3.1, longitude: 101.6, accuracy: null };
+    expect(validateCapture(bad).ok).toBe(false);
+    expect(validateCapture({ ...bad, exception_reason: "weak signal" }).ok).toBe(true);
+  });
+
+  it("rejects an absurd accuracy in the strict payload parse", () => {
+    const r = parseCapturePayload({
+      gps_result: "ok",
+      latitude: 3.1,
+      longitude: 101.6,
+      accuracy: MAX_ACCURACY_M + 1,
+    });
+    expect(r.ok).toBe(false);
   });
 });

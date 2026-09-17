@@ -76,10 +76,13 @@ CREATE TABLE IF NOT EXISTS public.service_job_onsite_attendance (
     clock_out_latitude IS NULL OR (clock_out_latitude >= -90 AND clock_out_latitude <= 90)),
   CONSTRAINT service_job_onsite_attendance_out_lng_chk CHECK (
     clock_out_longitude IS NULL OR (clock_out_longitude >= -180 AND clock_out_longitude <= 180)),
+  -- Accuracy must be a finite, physically plausible distance in metres.
   CONSTRAINT service_job_onsite_attendance_in_acc_chk CHECK (
-    clock_in_accuracy_m IS NULL OR clock_in_accuracy_m >= 0),
+    clock_in_accuracy_m IS NULL
+    OR (clock_in_accuracy_m >= 0 AND clock_in_accuracy_m <= 100000000)),
   CONSTRAINT service_job_onsite_attendance_out_acc_chk CHECK (
-    clock_out_accuracy_m IS NULL OR clock_out_accuracy_m >= 0),
+    clock_out_accuracy_m IS NULL
+    OR (clock_out_accuracy_m >= 0 AND clock_out_accuracy_m <= 100000000)),
   -- Coordinates are always stored as a pair.
   CONSTRAINT service_job_onsite_attendance_in_pair_chk CHECK (
     (clock_in_latitude IS NULL) = (clock_in_longitude IS NULL)),
@@ -107,7 +110,25 @@ CREATE TABLE IF NOT EXISTS public.service_job_onsite_attendance (
   CONSTRAINT service_job_onsite_attendance_order_chk CHECK (
     clock_out_at IS NULL OR clock_out_at >= clock_in_at),
   CONSTRAINT service_job_onsite_attendance_duration_chk CHECK (
-    duration_minutes IS NULL OR duration_minutes >= 0)
+    duration_minutes IS NULL OR duration_minutes >= 0),
+  -- An open visit carries no Clock Out evidence; a closed visit must carry it.
+  CONSTRAINT service_job_onsite_attendance_out_lifecycle_chk CHECK (
+    CASE WHEN clock_out_at IS NULL
+         THEN clock_out_gps_result IS NULL
+              AND clock_out_latitude IS NULL
+              AND clock_out_longitude IS NULL
+              AND clock_out_accuracy_m IS NULL
+              AND clock_out_exception_reason IS NULL
+              AND duration_minutes IS NULL
+         ELSE clock_out_gps_result IS NOT NULL
+              AND duration_minutes IS NOT NULL END),
+  -- The WP5 reporting flag must always mirror the stored evidence.
+  CONSTRAINT service_job_onsite_attendance_exception_flag_chk CHECK (
+    has_gps_exception = (
+      clock_in_gps_result NOT IN ('ok','low_accuracy')
+      OR (clock_out_at IS NOT NULL
+          AND clock_out_gps_result NOT IN ('ok','low_accuracy'))))
+
 );
 
 -- Server-only by construction: no browser role may touch the table at all.
@@ -207,7 +228,10 @@ BEGIN
       RETURN jsonb_build_object('outcome', 'error', 'status', 400,
         'error', 'Latitude, longitude and accuracy are required for a captured location.');
     END IF;
-    IF v_lat < -90 OR v_lat > 90 OR v_lng < -180 OR v_lng > 180 OR v_acc < 0 THEN
+    -- 100000000 m is far beyond any real device reading, but rejects
+    -- infinities and absurd values written directly by service_role.
+    IF v_lat < -90 OR v_lat > 90 OR v_lng < -180 OR v_lng > 180
+       OR v_acc < 0 OR v_acc > 100000000 THEN
       RETURN jsonb_build_object('outcome', 'error', 'status', 400,
                                 'error', 'GPS coordinates or accuracy are out of range.');
     END IF;

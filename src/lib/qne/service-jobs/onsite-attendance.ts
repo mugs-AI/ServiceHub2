@@ -62,13 +62,27 @@ export interface AttendanceCapture {
   exception_reason?: string | null;
 }
 
+/** Accuracy above this is not a real device reading — treat it as invalid. */
+export const MAX_ACCURACY_M = 100_000_000;
+
 export function isLocationCaptured(c: AttendanceCapture): boolean {
   if (c.gps_result !== "ok" && c.gps_result !== "low_accuracy") return false;
+  const { latitude: lat, longitude: lng, accuracy: acc } = c;
+  // Same rule as the strict payload parse and the database CHECKs: a captured
+  // position needs in-range coordinates AND usable accuracy evidence.
   return (
-    typeof c.latitude === "number" &&
-    Number.isFinite(c.latitude) &&
-    typeof c.longitude === "number" &&
-    Number.isFinite(c.longitude)
+    typeof lat === "number" &&
+    Number.isFinite(lat) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    typeof lng === "number" &&
+    Number.isFinite(lng) &&
+    lng >= -180 &&
+    lng <= 180 &&
+    typeof acc === "number" &&
+    Number.isFinite(acc) &&
+    acc >= 0 &&
+    acc <= MAX_ACCURACY_M
   );
 }
 
@@ -136,7 +150,7 @@ export function parseCapturePayload(
     return { ok: false, error: "Longitude is out of range." };
   }
   const accuracy = finiteNumber(body.accuracy);
-  if (accuracy === null || accuracy < 0) {
+  if (accuracy === null || accuracy < 0 || accuracy > MAX_ACCURACY_M) {
     return { ok: false, error: "A valid accuracy value is required for a captured location." };
   }
   return { ok: true, capture: { gps_result, latitude, longitude, accuracy, exception_reason } };
@@ -239,7 +253,12 @@ export function gpsSummary(
   result: string | null | undefined,
   accuracy: number | null | undefined,
 ): string {
-  const acc = Number.isFinite(Number(accuracy)) ? ` · ±${Math.round(Number(accuracy))} m` : "";
+  // Only a real finite reading earns an accuracy claim — null must never
+  // render as "±0 m".
+  const acc =
+    typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0
+      ? ` · ±${Math.round(accuracy)} m`
+      : "";
   if (result === "ok") return `GPS captured${acc}`;
   if (result === "low_accuracy") return `GPS captured (low accuracy)${acc}`;
   if (!result) return "No GPS recorded";
