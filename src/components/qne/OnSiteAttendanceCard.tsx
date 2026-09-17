@@ -61,13 +61,36 @@ function capturePosition(): Promise<Capture> {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const acc = pos.coords.accuracy;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const usable =
+          Number.isFinite(lat) &&
+          Number.isFinite(lng) &&
+          Number.isFinite(acc) &&
+          acc >= 0 &&
+          lat >= -90 &&
+          lat <= 90 &&
+          lng >= -180 &&
+          lng <= 180;
+        if (!usable) {
+          // Accuracy evidence is part of the product — an unusable reading is
+          // an exception, not a silent zero.
+          resolve({
+            gps_result: "unavailable",
+            latitude: null,
+            longitude: null,
+            accuracy: null,
+          });
+          return;
+        }
         resolve({
           gps_result: acc > LOW_ACCURACY_THRESHOLD_M ? "low_accuracy" : "ok",
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: Number.isFinite(acc) ? acc : null,
+          latitude: lat,
+          longitude: lng,
+          accuracy: acc,
         });
       },
+
       (err) =>
         resolve({
           gps_result: gpsResultFromError(err),
