@@ -86,7 +86,6 @@ export function isLocationCaptured(c: AttendanceCapture): boolean {
   );
 }
 
-
 /** A missing location may only be committed with a non-empty reason. */
 export function validateCapture(c: AttendanceCapture): { ok: true } | { ok: false; error: string } {
   if (isLocationCaptured(c)) return { ok: true };
@@ -153,7 +152,6 @@ export function parseCapturePayload(
   const accuracy = finiteNumber(body.accuracy);
   if (accuracy === null || accuracy < 0 || accuracy > MAX_ACCURACY_M) {
     return { ok: false, error: "A valid accuracy value is required for a captured location." };
-
   }
   return { ok: true, capture: { gps_result, latitude, longitude, accuracy, exception_reason } };
 }

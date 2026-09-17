@@ -112,11 +112,22 @@ describe("database defence in depth", () => {
       "service_job_onsite_attendance_out_reason_chk",
       "service_job_onsite_attendance_order_chk",
       "service_job_onsite_attendance_duration_chk",
+      "service_job_onsite_attendance_out_lifecycle_chk",
+      "service_job_onsite_attendance_exception_flag_chk",
     ]) {
       expect(SQL).toContain(c);
     }
     expect(SQL).toContain("clock_out_at IS NULL OR clock_out_at >= clock_in_at");
     expect(SQL).toContain("duration_minutes IS NULL OR duration_minutes >= 0");
+    // Clock Out evidence exists exactly when the visit is closed.
+    expect(SQL).toContain(
+      "AND duration_minutes IS NULL\n         ELSE clock_out_gps_result IS NOT NULL",
+    );
+    // The WP5 flag mirrors the stored evidence, and accuracy is bounded.
+    expect(SQL).toContain("has_gps_exception = (");
+    expect(SQL).toContain("clock_in_accuracy_m <= 100000000");
+    expect(SQL).toContain("clock_out_accuracy_m <= 100000000");
+    expect(SQL).toContain("OR v_acc < 0 OR v_acc > 100000000");
   });
 
   it("revokes table access from every browser role before granting service_role", () => {
