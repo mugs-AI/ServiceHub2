@@ -126,8 +126,12 @@ describe("candidate migration is additive and server-only", () => {
 
   it("never drops, renames or backfills legacy Field data", () => {
     expect(SQL).not.toMatch(/DROP TABLE|ALTER TABLE .*RENAME|TRUNCATE|DELETE FROM/i);
-    expect(SQL).not.toContain("service_job_work_sessions");
-    expect(SQL).not.toContain("service_job_waiting_periods");
+    // Legacy Field tables may only be named in explanatory comments.
+    for (const line of SQL.split("\n")) {
+      if (/service_job_work_sessions|service_job_waiting_periods/.test(line)) {
+        expect(line.trim().startsWith("--")).toBe(true);
+      }
+    }
     expect(SQL).not.toContain("CREATE OR REPLACE FUNCTION public.sh_field_mutate");
   });
 });
