@@ -167,17 +167,60 @@ DECLARE
   v_open         public.service_job_onsite_attendance%ROWTYPE;
   v_row          public.service_job_onsite_attendance%ROWTYPE;
   v_now          timestamptz := now();
-  v_gps          text := coalesce(nullif(p_payload->>'gps_result', ''), 'ok');
+  v_gps          text := nullif(btrim(coalesce(p_payload->>'gps_result', '')), '');
   v_reason       text := nullif(btrim(coalesce(p_payload->>'exception_reason', '')), '');
-  v_lat          double precision := nullif(p_payload->>'latitude', '')::double precision;
-  v_lng          double precision := nullif(p_payload->>'longitude', '')::double precision;
-  v_acc          double precision := nullif(p_payload->>'accuracy', '')::double precision;
+  v_lat          double precision;
+  v_lng          double precision;
+  v_acc          double precision;
   v_captured     boolean;
 BEGIN
   IF p_tenant_code IS NULL OR btrim(p_tenant_code) = ''
      OR p_actor_user_id IS NULL OR btrim(p_actor_user_id) = '' THEN
     RETURN jsonb_build_object('outcome', 'error', 'status', 401,
                               'error', 'Unresolved tenant or actor.');
+  END IF;
+
+  -- Validate the action and the GPS payload BEFORE any lock, insert or audit,
+  -- so direct service-role misuse fails safely and writes nothing.
+  IF p_action IS NULL OR p_action NOT IN ('clock_in', 'clock_out') THEN
+    RETURN jsonb_build_object('outcome', 'error', 'status', 400,
+                              'error', 'Unknown attendance action.');
+  END IF;
+  IF v_gps IS NULL OR v_gps NOT IN ('ok','low_accuracy','permission_denied',
+                                    'timeout','unavailable','unsupported') THEN
+    RETURN jsonb_build_object('outcome', 'error', 'status', 400,
+                              'error', 'Unknown GPS result code.');
+  END IF;
+
+  BEGIN
+    v_lat := nullif(p_payload->>'latitude', '')::double precision;
+    v_lng := nullif(p_payload->>'longitude', '')::double precision;
+    v_acc := nullif(p_payload->>'accuracy', '')::double precision;
+  EXCEPTION WHEN others THEN
+    RETURN jsonb_build_object('outcome', 'error', 'status', 400,
+                              'error', 'Invalid GPS payload.');
+  END;
+
+  IF v_gps IN ('ok', 'low_accuracy') THEN
+    IF v_lat IS NULL OR v_lng IS NULL OR v_acc IS NULL
+       OR v_lat <> v_lat OR v_lng <> v_lng OR v_acc <> v_acc THEN
+      RETURN jsonb_build_object('outcome', 'error', 'status', 400,
+        'error', 'Latitude, longitude and accuracy are required for a captured location.');
+    END IF;
+    IF v_lat < -90 OR v_lat > 90 OR v_lng < -180 OR v_lng > 180 OR v_acc < 0 THEN
+      RETURN jsonb_build_object('outcome', 'error', 'status', 400,
+                                'error', 'GPS coordinates or accuracy are out of range.');
+    END IF;
+    v_captured := true;
+  ELSE
+    -- Failure codes never carry a position, whatever the caller supplied.
+    v_lat := NULL; v_lng := NULL; v_acc := NULL;
+    v_captured := false;
+  END IF;
+
+  IF NOT v_captured AND v_reason IS NULL THEN
+    RETURN jsonb_build_object('outcome', 'error', 'status', 400,
+      'error', 'A reason is required when location is not captured.');
   END IF;
 
   -- Serialize every attendance mutation for this person inside the tenant.
@@ -195,15 +238,6 @@ BEGIN
       'error', 'On-site attendance is not available for this Job.');
   END IF;
 
-  v_captured := (v_gps = 'ok' OR v_gps = 'low_accuracy') AND v_lat IS NOT NULL AND v_lng IS NOT NULL;
-  IF NOT v_captured AND v_reason IS NULL THEN
-    RETURN jsonb_build_object('outcome', 'error', 'status', 400,
-      'error', 'A reason is required when location is not captured.');
-  END IF;
-  IF NOT v_captured THEN
-    v_lat := NULL; v_lng := NULL; v_acc := NULL;
-    IF v_gps = 'ok' OR v_gps = 'low_accuracy' THEN v_gps := 'unavailable'; END IF;
-  END IF;
 
   -- Current open session for this actor anywhere in the tenant.
   SELECT * INTO v_open FROM public.service_job_onsite_attendance
