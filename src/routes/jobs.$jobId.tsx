@@ -7,6 +7,8 @@ import { useTabs } from "@/lib/tabs";
 import { allowedTransitionsClient } from "@/lib/qne/service-jobs/workflow";
 import { CancellationPanel } from "@/components/qne/CancellationPanel";
 import { JobAttachmentsCard } from "@/components/qne/JobAttachmentsCard";
+import { OnSiteAttendanceCard } from "@/components/qne/OnSiteAttendanceCard";
+
 import { isTakeoverEligibleStatus } from "@/lib/qne/service-jobs/permissions";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { DateField, TimeField } from "@/components/qne/DateTimeFields";
