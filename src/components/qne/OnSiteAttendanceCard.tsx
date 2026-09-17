@@ -336,14 +336,32 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
                 In {formatMYDateTime(v.clock_in_at)}
                 {v.clock_out_at ? ` · Out ${formatMYDateTime(v.clock_out_at)}` : ""}
               </p>
+              {/* Full GPS evidence: both clock events, plus the stored reason
+                  for anyone the server already authorised to see this row. */}
               <p className="mt-0.5 break-words text-muted-foreground">
-                {gpsSummary(v.clock_in_gps_result, v.clock_in_accuracy_m)}
+                Clock In: {gpsSummary(v.clock_in_gps_result, v.clock_in_accuracy_m)}
               </p>
+              {v.clock_in_exception_reason && (
+                <p className="mt-0.5 break-words text-amber-700">
+                  Clock In reason: {v.clock_in_exception_reason}
+                </p>
+              )}
+              {v.clock_out_at && (
+                <p className="mt-0.5 break-words text-muted-foreground">
+                  Clock Out: {gpsSummary(v.clock_out_gps_result, v.clock_out_accuracy_m)}
+                </p>
+              )}
+              {v.clock_out_at && v.clock_out_exception_reason && (
+                <p className="mt-0.5 break-words text-amber-700">
+                  Clock Out reason: {v.clock_out_exception_reason}
+                </p>
+              )}
               {v.has_gps_exception && (
                 <p className="mt-0.5 break-words font-medium text-amber-700">
                   GPS exception recorded
                 </p>
               )}
+
             </li>
           ))}
         </ul>
