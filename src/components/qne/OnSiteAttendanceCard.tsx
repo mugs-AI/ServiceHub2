@@ -17,7 +17,10 @@ import {
   formatElapsed,
   gpsResultFromError,
   gpsSummary,
+  serverAlignedElapsedMs,
+  serverClockOffsetMs,
 } from "@/lib/qne/service-jobs/onsite-attendance";
+
 import type { AttendanceVisit, GpsResultCode } from "@/lib/qne/service-jobs/onsite-attendance";
 import { getStoredToken } from "@/lib/qne/tokens";
 
