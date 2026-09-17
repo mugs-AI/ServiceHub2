@@ -65,7 +65,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/onsite-attendan
           await import("@/lib/qne/session/current-user.server");
         const { loadAttendanceJob, mutateAttendance } =
           await import("@/lib/qne/service-jobs/onsite-attendance.server");
-        const { attendanceBlockedReason, validateCapture, isLocationCaptured } =
+        const { attendanceBlockedReason, parseCapturePayload, isLocationCaptured } =
           await import("@/lib/qne/service-jobs/onsite-attendance");
         try {
           const user = await requireAuthenticatedN3User(request);
@@ -91,21 +91,19 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/onsite-attendan
           const blocked = attendanceBlockedReason(job);
           if (blocked) return Response.json({ error: blocked }, { status: 409 });
 
-          const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : null);
-          const capture = {
-            gps_result: String(body.gps_result ?? "unavailable") as never,
-            latitude: num(body.latitude),
-            longitude: num(body.longitude),
-            accuracy: num(body.accuracy),
-            exception_reason:
-              typeof body.exception_reason === "string"
-                ? body.exception_reason.trim().slice(0, 500)
-                : "",
-          };
-          const check = validateCapture(capture);
-          if (!check.ok) return Response.json({ error: check.error }, { status: 400 });
+          // Strict payload validation: nothing is coerced, and a captured
+          // position must carry valid in-range coordinates plus accuracy.
+          const parsed = parseCapturePayload(body);
+          if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
+          const capture = parsed.capture;
 
           const captured = isLocationCaptured(capture);
+          if (!captured && !capture.exception_reason) {
+            return Response.json(
+              { error: "A reason is required when location is not captured." },
+              { status: 400 },
+            );
+          }
           const result = await mutateAttendance(actor, params.jobId, action, {
             gps_result: capture.gps_result,
             latitude: captured ? capture.latitude : null,
@@ -113,6 +111,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/onsite-attendan
             accuracy: captured ? capture.accuracy : null,
             exception_reason: capture.exception_reason || null,
           });
+
           if (result.outcome !== "ok") {
             return Response.json(
               {

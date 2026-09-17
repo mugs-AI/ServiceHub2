@@ -17,7 +17,10 @@ import {
   formatElapsed,
   gpsResultFromError,
   gpsSummary,
+  serverAlignedElapsedMs,
+  serverClockOffsetMs,
 } from "@/lib/qne/service-jobs/onsite-attendance";
+
 import type { AttendanceVisit, GpsResultCode } from "@/lib/qne/service-jobs/onsite-attendance";
 import { getStoredToken } from "@/lib/qne/tokens";
 
@@ -58,13 +61,36 @@ function capturePosition(): Promise<Capture> {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const acc = pos.coords.accuracy;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const usable =
+          Number.isFinite(lat) &&
+          Number.isFinite(lng) &&
+          Number.isFinite(acc) &&
+          acc >= 0 &&
+          lat >= -90 &&
+          lat <= 90 &&
+          lng >= -180 &&
+          lng <= 180;
+        if (!usable) {
+          // Accuracy evidence is part of the product — an unusable reading is
+          // an exception, not a silent zero.
+          resolve({
+            gps_result: "unavailable",
+            latitude: null,
+            longitude: null,
+            accuracy: null,
+          });
+          return;
+        }
         resolve({
           gps_result: acc > LOW_ACCURACY_THRESHOLD_M ? "low_accuracy" : "ok",
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: Number.isFinite(acc) ? acc : null,
+          latitude: lat,
+          longitude: lng,
+          accuracy: acc,
         });
       },
+
       (err) =>
         resolve({
           gps_result: gpsResultFromError(err),
@@ -83,6 +109,8 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState<null | "clock_in" | "clock_out">(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [offsetMs, setOffsetMs] = useState(0);
+
   const [pending, setPending] = useState<{
     action: "clock_in" | "clock_out";
     capture: Capture;
@@ -99,6 +127,9 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
       if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
       if (alive.current) {
         setState(body as AttendanceState);
+        // Server time is authoritative — a wrong phone clock must not change
+        // the elapsed time we display.
+        setOffsetMs(serverClockOffsetMs(String(body?.serverNow ?? ""), Date.now()));
         setError(null);
       }
     } catch (e) {
@@ -186,7 +217,10 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
   }
 
   const open = state?.openVisit ?? null;
-  const elapsed = open ? formatElapsed(Date.now() - new Date(open.clock_in_at).getTime()) : null;
+  const elapsed = open
+    ? formatElapsed(serverAlignedElapsedMs(open.clock_in_at, offsetMs, Date.now()))
+    : null;
+  const openElsewhere = !!state?.openOnOtherJob && !open;
   const disabled = !!state?.blockedReason || !state?.canAct || !!busy;
 
   return (
@@ -244,7 +278,9 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
         <button
           type="button"
           onClick={() => void start("clock_in")}
-          disabled={disabled || !!open}
+          /* Open visit elsewhere: don't even ask the device for a location —
+             the server conflict remains the authoritative fallback. */
+          disabled={disabled || !!open || openElsewhere}
           className="min-h-12 w-full rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:flex-1"
         >
           {busy === "clock_in" ? "Locating…" : "GPS Clock In"}
@@ -320,9 +356,26 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
                 In {formatMYDateTime(v.clock_in_at)}
                 {v.clock_out_at ? ` · Out ${formatMYDateTime(v.clock_out_at)}` : ""}
               </p>
+              {/* Full GPS evidence: both clock events, plus the stored reason
+                  for anyone the server already authorised to see this row. */}
               <p className="mt-0.5 break-words text-muted-foreground">
-                {gpsSummary(v.clock_in_gps_result, v.clock_in_accuracy_m)}
+                Clock In: {gpsSummary(v.clock_in_gps_result, v.clock_in_accuracy_m)}
               </p>
+              {v.clock_in_exception_reason && (
+                <p className="mt-0.5 break-words text-amber-700">
+                  Clock In reason: {v.clock_in_exception_reason}
+                </p>
+              )}
+              {v.clock_out_at && (
+                <p className="mt-0.5 break-words text-muted-foreground">
+                  Clock Out: {gpsSummary(v.clock_out_gps_result, v.clock_out_accuracy_m)}
+                </p>
+              )}
+              {v.clock_out_at && v.clock_out_exception_reason && (
+                <p className="mt-0.5 break-words text-amber-700">
+                  Clock Out reason: {v.clock_out_exception_reason}
+                </p>
+              )}
               {v.has_gps_exception && (
                 <p className="mt-0.5 break-words font-medium text-amber-700">
                   GPS exception recorded
