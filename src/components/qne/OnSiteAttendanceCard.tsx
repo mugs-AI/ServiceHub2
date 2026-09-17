@@ -102,12 +102,16 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
       if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
       if (alive.current) {
         setState(body as AttendanceState);
+        // Server time is authoritative — a wrong phone clock must not change
+        // the elapsed time we display.
+        setOffsetMs(serverClockOffsetMs(String(body?.serverNow ?? ""), Date.now()));
         setError(null);
       }
     } catch (e) {
       if (alive.current) setError(e instanceof Error ? e.message : "Failed to load attendance");
     }
   }, [jobId]);
+
 
   useEffect(() => {
     alive.current = true;
