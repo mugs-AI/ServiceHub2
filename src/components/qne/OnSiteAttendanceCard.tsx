@@ -257,7 +257,10 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
         <button
           type="button"
           onClick={() => void start("clock_in")}
-          disabled={disabled || !!open}
+          /* Open visit elsewhere: don't even ask the device for a location —
+             the server conflict remains the authoritative fallback. */
+          disabled={disabled || !!open || openElsewhere}
+
           className="min-h-12 w-full rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:flex-1"
         >
           {busy === "clock_in" ? "Locating…" : "GPS Clock In"}
