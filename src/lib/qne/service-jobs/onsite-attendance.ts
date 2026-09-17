@@ -68,7 +68,9 @@ export interface AttendanceCapture {
 
 export function isLocationCaptured(c: AttendanceCapture): boolean {
   if (c.gps_result !== "ok" && c.gps_result !== "low_accuracy") return false;
-  return Number.isFinite(Number(c.latitude)) && Number.isFinite(Number(c.longitude));
+  return typeof c.latitude === "number" && Number.isFinite(c.latitude)
+    && typeof c.longitude === "number" && Number.isFinite(c.longitude);
+
 }
 
 /** A missing location may only be committed with a non-empty reason. */
