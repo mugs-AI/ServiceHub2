@@ -199,9 +199,9 @@ describe("strict GPS payload validation", () => {
   it("requires a valid non-negative accuracy for a captured position", () => {
     expect(parseCapturePayload({ ...ok, accuracy: -1 }).ok).toBe(false);
     expect(parseCapturePayload({ ...ok, accuracy: Number.NaN }).ok).toBe(false);
-    expect(parseCapturePayload({ gps_result: "low_accuracy", latitude: 3, longitude: 101 }).ok).toBe(
-      false,
-    );
+    expect(
+      parseCapturePayload({ gps_result: "low_accuracy", latitude: 3, longitude: 101 }).ok,
+    ).toBe(false);
   });
 
   it("drops any coordinates sent with a failure code and demands a reason", () => {
@@ -236,9 +236,9 @@ describe("strict GPS payload validation", () => {
 
 describe("server-aligned elapsed time", () => {
   it("derives the offset between server and device clocks", () => {
-    expect(serverClockOffsetMs("2026-09-17T00:00:30.000Z", Date.parse("2026-09-17T00:00:00Z"))).toBe(
-      30_000,
-    );
+    expect(
+      serverClockOffsetMs("2026-09-17T00:00:30.000Z", Date.parse("2026-09-17T00:00:00Z")),
+    ).toBe(30_000);
     expect(serverClockOffsetMs("not-a-date", 1000)).toBe(0);
   });
 
@@ -251,7 +251,9 @@ describe("server-aligned elapsed time", () => {
   });
 
   it("never returns a negative elapsed time or crashes on a bad timestamp", () => {
-    expect(serverAlignedElapsedMs("2026-09-17T01:00:00Z", 0, Date.parse("2026-09-17T00:00:00Z"))).toBe(0);
+    expect(
+      serverAlignedElapsedMs("2026-09-17T01:00:00Z", 0, Date.parse("2026-09-17T00:00:00Z")),
+    ).toBe(0);
     expect(serverAlignedElapsedMs("nope", 0, 1000)).toBe(0);
   });
 });

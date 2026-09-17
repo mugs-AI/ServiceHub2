@@ -42,10 +42,11 @@ describe("API authentication, tenant and actor authority", () => {
   });
 
   it("requires an exception reason before committing a missing location", () => {
-    expect(API).toContain("validateCapture(capture)");
+    expect(API).toContain("parseCapturePayload(body)");
     expect(API).toContain(
-      "if (!check.ok) return Response.json({ error: check.error }, { status: 400 })",
+      "if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 })",
     );
+    expect(API).toContain('error: "A reason is required when location is not captured."');
   });
 
   it("is a dedicated endpoint, not an extension of the legacy Field route", () => {
@@ -89,6 +90,59 @@ describe("atomicity and server timestamp authority", () => {
     expect(SQL).toContain("'onsite_gps_exception'");
     const firstAudit = SQL.indexOf("INSERT INTO public.service_job_activity_log");
     expect(firstAudit).toBeGreaterThan(SQL.indexOf("ELSE\n    RETURN jsonb_build_object"));
+  });
+});
+
+describe("database defence in depth", () => {
+  it("constrains the GPS result enum, bounds, accuracy and pairing", () => {
+    for (const c of [
+      "service_job_onsite_attendance_in_result_chk",
+      "service_job_onsite_attendance_out_result_chk",
+      "service_job_onsite_attendance_in_lat_chk",
+      "service_job_onsite_attendance_in_lng_chk",
+      "service_job_onsite_attendance_out_lat_chk",
+      "service_job_onsite_attendance_out_lng_chk",
+      "service_job_onsite_attendance_in_acc_chk",
+      "service_job_onsite_attendance_out_acc_chk",
+      "service_job_onsite_attendance_in_pair_chk",
+      "service_job_onsite_attendance_out_pair_chk",
+      "service_job_onsite_attendance_in_capture_chk",
+      "service_job_onsite_attendance_out_capture_chk",
+      "service_job_onsite_attendance_in_reason_chk",
+      "service_job_onsite_attendance_out_reason_chk",
+      "service_job_onsite_attendance_order_chk",
+      "service_job_onsite_attendance_duration_chk",
+    ]) {
+      expect(SQL).toContain(c);
+    }
+    expect(SQL).toContain("clock_out_at IS NULL OR clock_out_at >= clock_in_at");
+    expect(SQL).toContain("duration_minutes IS NULL OR duration_minutes >= 0");
+  });
+
+  it("revokes table access from every browser role before granting service_role", () => {
+    const revoke = SQL.indexOf(
+      "REVOKE ALL ON TABLE public.service_job_onsite_attendance FROM PUBLIC, anon, authenticated;",
+    );
+    const grant = SQL.indexOf("GRANT ALL ON public.service_job_onsite_attendance TO service_role;");
+    expect(revoke).toBeGreaterThan(-1);
+    expect(grant).toBeGreaterThan(revoke);
+  });
+
+  it("validates action and GPS payload inside the RPC before any write or lock", () => {
+    expect(SQL).toContain("p_action NOT IN ('clock_in', 'clock_out')");
+    expect(SQL).toContain("v_gps NOT IN ('ok','low_accuracy','permission_denied',");
+    expect(SQL).toContain("'error', 'GPS coordinates or accuracy are out of range.'");
+    const validation = SQL.indexOf("'error', 'Unknown GPS result code.'");
+    const lock = SQL.indexOf("pg_advisory_xact_lock");
+    const insert = SQL.indexOf("INSERT INTO public.service_job_onsite_attendance (");
+    expect(validation).toBeGreaterThan(-1);
+    expect(lock).toBeGreaterThan(validation);
+    expect(insert).toBeGreaterThan(validation);
+  });
+
+  it("keeps the advisory lock, Job row lock and one-open index", () => {
+    expect(SQL).toContain("FOR UPDATE");
+    expect(SQL).toContain("service_job_onsite_attendance_one_open_idx");
   });
 });
 
@@ -177,6 +231,25 @@ describe("card placement and mobile contract", () => {
     expect(CARD).toContain("flex flex-col gap-2 sm:flex-row");
     expect(CARD).toContain("break-words");
     expect(CARD).not.toMatch(/\bw-\[\d{3,}px\]|min-w-\[\d{3,}px\]|overflow-x-auto/);
+  });
+
+  it("renders elapsed time against server-aligned now", () => {
+    expect(CARD).toContain('serverClockOffsetMs(String(body?.serverNow ?? ""), Date.now())');
+    expect(CARD).toContain("serverAlignedElapsedMs(open.clock_in_at, offsetMs, Date.now())");
+  });
+
+  it("shows clock in and clock out GPS evidence and stored reasons", () => {
+    expect(CARD).toContain("Clock In: {gpsSummary(v.clock_in_gps_result, v.clock_in_accuracy_m)}");
+    expect(CARD).toContain(
+      "Clock Out: {gpsSummary(v.clock_out_gps_result, v.clock_out_accuracy_m)}",
+    );
+    expect(CARD).toContain("Clock In reason: {v.clock_in_exception_reason}");
+    expect(CARD).toContain("Clock Out reason: {v.clock_out_exception_reason}");
+  });
+
+  it("disables Clock In while an open visit exists on another Job", () => {
+    expect(CARD).toContain("const openElsewhere = !!state?.openOnOtherJob && !open;");
+    expect(CARD).toContain("disabled={disabled || !!open || openElsewhere}");
   });
 
   it("shows state, Malaysia timestamps, live elapsed and GPS outcome", () => {

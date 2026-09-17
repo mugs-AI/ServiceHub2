@@ -65,9 +65,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/onsite-attendan
           await import("@/lib/qne/session/current-user.server");
         const { loadAttendanceJob, mutateAttendance } =
           await import("@/lib/qne/service-jobs/onsite-attendance.server");
-        const { attendanceBlockedReason, parseCapturePayload, isLocationCaptured } = await import(
-          "@/lib/qne/service-jobs/onsite-attendance"
-        );
+        const { attendanceBlockedReason, parseCapturePayload, isLocationCaptured } =
+          await import("@/lib/qne/service-jobs/onsite-attendance");
         try {
           const user = await requireAuthenticatedN3User(request);
           const actor = {

@@ -162,7 +162,6 @@ export function serverAlignedElapsedMs(
   return Math.max(0, clientNowMs + offsetMs - start);
 }
 
-
 export interface AttendanceVisit {
   id: string;
   service_job_id: string;
