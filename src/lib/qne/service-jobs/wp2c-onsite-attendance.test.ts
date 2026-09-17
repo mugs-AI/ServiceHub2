@@ -10,8 +10,12 @@ import {
   canViewAllVisits,
   formatElapsed,
   gpsResultFromError,
+  GPS_RESULT_CODES,
   gpsSummary,
   isLocationCaptured,
+  parseCapturePayload,
+  serverAlignedElapsedMs,
+  serverClockOffsetMs,
   validateCapture,
   visibleVisits,
 } from "./onsite-attendance";
@@ -152,5 +156,102 @@ describe("elapsed formatting", () => {
   it("never renders a negative elapsed time", () => {
     expect(formatElapsed(-5000)).toBe("00:00:00");
     expect(formatElapsed(3_661_000)).toBe("01:01:01");
+  });
+});
+
+describe("strict GPS payload validation", () => {
+  const ok = { gps_result: "ok", latitude: 3.1, longitude: 101.6, accuracy: 25 };
+
+  it("accepts a valid captured position", () => {
+    const r = parseCapturePayload(ok);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.capture).toMatchObject({ latitude: 3.1, longitude: 101.6, accuracy: 25 });
+  });
+
+  it("accepts valid zero latitude and longitude", () => {
+    const r = parseCapturePayload({ gps_result: "ok", latitude: 0, longitude: 0, accuracy: 0 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.capture.latitude).toBe(0);
+  });
+
+  it("rejects unknown or missing GPS result codes", () => {
+    for (const gps_result of ["", "OK", "captured", undefined, null, 1, true]) {
+      expect(parseCapturePayload({ ...ok, gps_result }).ok).toBe(false);
+    }
+  });
+
+  it("never coerces null, empty string, booleans or arrays to 0", () => {
+    for (const bad of [null, "", " ", true, false, [], [1], {}, "abc", NaN]) {
+      expect(parseCapturePayload({ ...ok, latitude: bad }).ok).toBe(false);
+      expect(parseCapturePayload({ ...ok, longitude: bad }).ok).toBe(false);
+      expect(parseCapturePayload({ ...ok, accuracy: bad }).ok).toBe(false);
+    }
+  });
+
+  it("enforces coordinate bounds", () => {
+    expect(parseCapturePayload({ ...ok, latitude: 90.1 }).ok).toBe(false);
+    expect(parseCapturePayload({ ...ok, latitude: -90.1 }).ok).toBe(false);
+    expect(parseCapturePayload({ ...ok, longitude: 180.1 }).ok).toBe(false);
+    expect(parseCapturePayload({ ...ok, longitude: -180.1 }).ok).toBe(false);
+    expect(parseCapturePayload({ ...ok, latitude: 90, longitude: -180 }).ok).toBe(true);
+  });
+
+  it("requires a valid non-negative accuracy for a captured position", () => {
+    expect(parseCapturePayload({ ...ok, accuracy: -1 }).ok).toBe(false);
+    expect(parseCapturePayload({ ...ok, accuracy: Number.NaN }).ok).toBe(false);
+    expect(parseCapturePayload({ gps_result: "low_accuracy", latitude: 3, longitude: 101 }).ok).toBe(
+      false,
+    );
+  });
+
+  it("drops any coordinates sent with a failure code and demands a reason", () => {
+    expect(parseCapturePayload({ gps_result: "timeout" }).ok).toBe(false);
+    const r = parseCapturePayload({
+      gps_result: "permission_denied",
+      latitude: 3,
+      longitude: 101,
+      accuracy: 5,
+      exception_reason: " no signal ",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.capture.latitude).toBeNull();
+      expect(r.capture.longitude).toBeNull();
+      expect(r.capture.accuracy).toBeNull();
+      expect(r.capture.exception_reason).toBe("no signal");
+    }
+  });
+
+  it("covers every known result code", () => {
+    expect(GPS_RESULT_CODES).toEqual([
+      "ok",
+      "low_accuracy",
+      "permission_denied",
+      "timeout",
+      "unavailable",
+      "unsupported",
+    ]);
+  });
+});
+
+describe("server-aligned elapsed time", () => {
+  it("derives the offset between server and device clocks", () => {
+    expect(serverClockOffsetMs("2026-09-17T00:00:30.000Z", Date.parse("2026-09-17T00:00:00Z"))).toBe(
+      30_000,
+    );
+    expect(serverClockOffsetMs("not-a-date", 1000)).toBe(0);
+  });
+
+  it("measures elapsed time on server time even when the phone clock is wrong", () => {
+    const start = "2026-09-17T00:00:00.000Z";
+    // Device clock is 10 minutes behind the server.
+    const clientNow = Date.parse("2026-09-17T00:05:00Z");
+    const offset = serverClockOffsetMs("2026-09-17T00:15:00.000Z", clientNow);
+    expect(formatElapsed(serverAlignedElapsedMs(start, offset, clientNow))).toBe("00:15:00");
+  });
+
+  it("never returns a negative elapsed time or crashes on a bad timestamp", () => {
+    expect(serverAlignedElapsedMs("2026-09-17T01:00:00Z", 0, Date.parse("2026-09-17T00:00:00Z"))).toBe(0);
+    expect(serverAlignedElapsedMs("nope", 0, 1000)).toBe(0);
   });
 });
