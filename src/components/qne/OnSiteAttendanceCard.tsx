@@ -86,6 +86,8 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState<null | "clock_in" | "clock_out">(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [offsetMs, setOffsetMs] = useState(0);
+
   const [pending, setPending] = useState<{
     action: "clock_in" | "clock_out";
     capture: Capture;
