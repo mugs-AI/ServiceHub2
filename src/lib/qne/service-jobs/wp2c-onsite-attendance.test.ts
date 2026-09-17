@@ -292,10 +292,32 @@ describe("accuracy evidence is never invented", () => {
     expect(isLocationCaptured({ ...base, longitude: -181 })).toBe(false);
   });
 
-  it("makes validateCapture demand a reason for those same cases", () => {
+  it("makes validateCapture reject a broken ok/low_accuracy payload even with a reason", () => {
     const bad = { gps_result: "ok" as const, latitude: 3.1, longitude: 101.6, accuracy: null };
     expect(validateCapture(bad).ok).toBe(false);
-    expect(validateCapture({ ...bad, exception_reason: "weak signal" }).ok).toBe(true);
+    expect(validateCapture({ ...bad, exception_reason: "weak signal" }).ok).toBe(false);
+    expect(
+      validateCapture({
+        gps_result: "low_accuracy",
+        latitude: 91,
+        longitude: 101.6,
+        accuracy: 10,
+        exception_reason: "weak signal",
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateCapture({
+        gps_result: "ok",
+        latitude: null,
+        longitude: null,
+        accuracy: null,
+        exception_reason: "no fix",
+      }).ok,
+    ).toBe(false);
+    expect(validateCapture({ gps_result: "ok", latitude: 3, longitude: 101, accuracy: 20 }).ok).toBe(
+      true,
+    );
+    expect(validateCapture({ gps_result: "timeout", exception_reason: "timed out" }).ok).toBe(true);
   });
 
   it("rejects an absurd accuracy in the strict payload parse", () => {

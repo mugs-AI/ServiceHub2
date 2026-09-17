@@ -86,9 +86,19 @@ export function isLocationCaptured(c: AttendanceCapture): boolean {
   );
 }
 
-/** A missing location may only be committed with a non-empty reason. */
+/**
+ * Same rule as the strict payload parse and the database CHECKs: a successful
+ * result must satisfy isLocationCaptured (in-range finite coordinates and
+ * usable accuracy evidence) — an exception reason can never rescue a broken
+ * ok/low_accuracy payload. A failure result may only be committed with a
+ * non-empty exception reason.
+ */
 export function validateCapture(c: AttendanceCapture): { ok: true } | { ok: false; error: string } {
-  if (isLocationCaptured(c)) return { ok: true };
+  if (c.gps_result === "ok" || c.gps_result === "low_accuracy") {
+    return isLocationCaptured(c)
+      ? { ok: true }
+      : { ok: false, error: "A captured location needs valid coordinates and accuracy." };
+  }
   if (!String(c.exception_reason ?? "").trim()) {
     return { ok: false, error: "A reason is required when location is not captured." };
   }
