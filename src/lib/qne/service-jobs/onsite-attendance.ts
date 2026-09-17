@@ -81,6 +81,88 @@ export function validateCapture(c: AttendanceCapture): { ok: true } | { ok: fals
   return { ok: true };
 }
 
+export const GPS_RESULT_CODES: readonly GpsResultCode[] = [
+  "ok",
+  "low_accuracy",
+  "permission_denied",
+  "timeout",
+  "unavailable",
+  "unsupported",
+];
+
+function finiteNumber(v: unknown): number | null {
+  // Deliberately strict: null, "", booleans, arrays and objects are NOT
+  // coerced to 0 — a bad payload must fail, never silently record 0°/0 m.
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return null;
+}
+
+/**
+ * Strict validation of a browser-supplied GPS payload. Returns the normalised
+ * capture or a user-facing 400 reason. The server never trusts these values
+ * for identity, only for evidence, and stores nothing it cannot validate.
+ */
+export function parseCapturePayload(
+  body: Record<string, unknown>,
+): { ok: true; capture: Required<AttendanceCapture> } | { ok: false; error: string } {
+  const raw = body.gps_result;
+  if (typeof raw !== "string" || !(GPS_RESULT_CODES as readonly string[]).includes(raw)) {
+    return { ok: false, error: "Unknown GPS result code." };
+  }
+  const gps_result = raw as GpsResultCode;
+  const exception_reason =
+    typeof body.exception_reason === "string" ? body.exception_reason.trim().slice(0, 500) : "";
+
+  const successful = gps_result === "ok" || gps_result === "low_accuracy";
+  if (!successful) {
+    // Failure codes never carry a captured position, whatever was posted.
+    if (!exception_reason) {
+      return { ok: false, error: "A reason is required when location is not captured." };
+    }
+    return {
+      ok: true,
+      capture: { gps_result, latitude: null, longitude: null, accuracy: null, exception_reason },
+    };
+  }
+
+  const latitude = finiteNumber(body.latitude);
+  const longitude = finiteNumber(body.longitude);
+  if (latitude === null || longitude === null) {
+    return { ok: false, error: "Latitude and longitude are required for a captured location." };
+  }
+  if (latitude < -90 || latitude > 90) return { ok: false, error: "Latitude is out of range." };
+  if (longitude < -180 || longitude > 180) {
+    return { ok: false, error: "Longitude is out of range." };
+  }
+  const accuracy = finiteNumber(body.accuracy);
+  if (accuracy === null || accuracy < 0) {
+    return { ok: false, error: "A valid accuracy value is required for a captured location." };
+  }
+  return { ok: true, capture: { gps_result, latitude, longitude, accuracy, exception_reason } };
+}
+
+/**
+ * Difference between the server clock and this device's clock. Server
+ * timestamps stay authoritative even when the phone clock is wrong.
+ */
+export function serverClockOffsetMs(serverNowIso: string, clientNowMs: number): number {
+  const t = Date.parse(serverNowIso);
+  return Number.isFinite(t) ? t - clientNowMs : 0;
+}
+
+/** Elapsed milliseconds since a server timestamp, measured on server time. */
+export function serverAlignedElapsedMs(
+  startIso: string,
+  offsetMs: number,
+  clientNowMs: number,
+): number {
+  const start = Date.parse(startIso);
+  if (!Number.isFinite(start)) return 0;
+  return Math.max(0, clientNowMs + offsetMs - start);
+}
+
+
 export interface AttendanceVisit {
   id: string;
   service_job_id: string;
