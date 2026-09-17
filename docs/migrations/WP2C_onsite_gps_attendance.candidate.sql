@@ -58,9 +58,60 @@ CREATE TABLE IF NOT EXISTS public.service_job_onsite_attendance (
   has_gps_exception boolean NOT NULL DEFAULT false,
 
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+
+  -- Defence in depth: the same rules the server enforces, restated in the
+  -- database so even direct service-role misuse cannot store junk evidence.
+  CONSTRAINT service_job_onsite_attendance_in_result_chk CHECK (
+    clock_in_gps_result IN ('ok','low_accuracy','permission_denied','timeout',
+                            'unavailable','unsupported')),
+  CONSTRAINT service_job_onsite_attendance_out_result_chk CHECK (
+    clock_out_gps_result IS NULL OR clock_out_gps_result IN
+      ('ok','low_accuracy','permission_denied','timeout','unavailable','unsupported')),
+  CONSTRAINT service_job_onsite_attendance_in_lat_chk CHECK (
+    clock_in_latitude IS NULL OR (clock_in_latitude >= -90 AND clock_in_latitude <= 90)),
+  CONSTRAINT service_job_onsite_attendance_in_lng_chk CHECK (
+    clock_in_longitude IS NULL OR (clock_in_longitude >= -180 AND clock_in_longitude <= 180)),
+  CONSTRAINT service_job_onsite_attendance_out_lat_chk CHECK (
+    clock_out_latitude IS NULL OR (clock_out_latitude >= -90 AND clock_out_latitude <= 90)),
+  CONSTRAINT service_job_onsite_attendance_out_lng_chk CHECK (
+    clock_out_longitude IS NULL OR (clock_out_longitude >= -180 AND clock_out_longitude <= 180)),
+  CONSTRAINT service_job_onsite_attendance_in_acc_chk CHECK (
+    clock_in_accuracy_m IS NULL OR clock_in_accuracy_m >= 0),
+  CONSTRAINT service_job_onsite_attendance_out_acc_chk CHECK (
+    clock_out_accuracy_m IS NULL OR clock_out_accuracy_m >= 0),
+  -- Coordinates are always stored as a pair.
+  CONSTRAINT service_job_onsite_attendance_in_pair_chk CHECK (
+    (clock_in_latitude IS NULL) = (clock_in_longitude IS NULL)),
+  CONSTRAINT service_job_onsite_attendance_out_pair_chk CHECK (
+    (clock_out_latitude IS NULL) = (clock_out_longitude IS NULL)),
+  -- A success result means a real captured position with accuracy evidence;
+  -- a failure result means no coordinates at all.
+  CONSTRAINT service_job_onsite_attendance_in_capture_chk CHECK (
+    CASE WHEN clock_in_gps_result IN ('ok','low_accuracy')
+         THEN clock_in_latitude IS NOT NULL AND clock_in_accuracy_m IS NOT NULL
+         ELSE clock_in_latitude IS NULL AND clock_in_accuracy_m IS NULL END),
+  CONSTRAINT service_job_onsite_attendance_out_capture_chk CHECK (
+    clock_out_gps_result IS NULL OR
+    CASE WHEN clock_out_gps_result IN ('ok','low_accuracy')
+         THEN clock_out_latitude IS NOT NULL AND clock_out_accuracy_m IS NOT NULL
+         ELSE clock_out_latitude IS NULL AND clock_out_accuracy_m IS NULL END),
+  -- An uncaptured clock event must carry a reason.
+  CONSTRAINT service_job_onsite_attendance_in_reason_chk CHECK (
+    clock_in_gps_result IN ('ok','low_accuracy')
+    OR btrim(coalesce(clock_in_exception_reason, '')) <> ''),
+  CONSTRAINT service_job_onsite_attendance_out_reason_chk CHECK (
+    clock_out_at IS NULL
+    OR clock_out_gps_result IN ('ok','low_accuracy')
+    OR btrim(coalesce(clock_out_exception_reason, '')) <> ''),
+  CONSTRAINT service_job_onsite_attendance_order_chk CHECK (
+    clock_out_at IS NULL OR clock_out_at >= clock_in_at),
+  CONSTRAINT service_job_onsite_attendance_duration_chk CHECK (
+    duration_minutes IS NULL OR duration_minutes >= 0)
 );
 
+-- Server-only by construction: no browser role may touch the table at all.
+REVOKE ALL ON TABLE public.service_job_onsite_attendance FROM PUBLIC, anon, authenticated;
 GRANT ALL ON public.service_job_onsite_attendance TO service_role;
 
 ALTER TABLE public.service_job_onsite_attendance ENABLE ROW LEVEL SECURITY;
@@ -71,6 +122,7 @@ DROP POLICY IF EXISTS "onsite attendance is server-only"
 CREATE POLICY "onsite attendance is server-only"
   ON public.service_job_onsite_attendance FOR ALL
   USING (false) WITH CHECK (false);
+
 
 CREATE INDEX IF NOT EXISTS service_job_onsite_attendance_job_idx
   ON public.service_job_onsite_attendance (tenant_code, service_job_id, clock_in_at DESC);
