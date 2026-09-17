@@ -228,7 +228,10 @@ BEGIN
       RETURN jsonb_build_object('outcome', 'error', 'status', 400,
         'error', 'Latitude, longitude and accuracy are required for a captured location.');
     END IF;
-    IF v_lat < -90 OR v_lat > 90 OR v_lng < -180 OR v_lng > 180 OR v_acc < 0 THEN
+    -- 100000000 m is far beyond any real device reading, but rejects
+    -- infinities and absurd values written directly by service_role.
+    IF v_lat < -90 OR v_lat > 90 OR v_lng < -180 OR v_lng > 180
+       OR v_acc < 0 OR v_acc > 100000000 THEN
       RETURN jsonb_build_object('outcome', 'error', 'status', 400,
                                 'error', 'GPS coordinates or accuracy are out of range.');
     END IF;
