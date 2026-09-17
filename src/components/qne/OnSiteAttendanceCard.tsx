@@ -195,8 +195,12 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
   }
 
   const open = state?.openVisit ?? null;
-  const elapsed = open ? formatElapsed(Date.now() - new Date(open.clock_in_at).getTime()) : null;
+  const elapsed = open
+    ? formatElapsed(serverAlignedElapsedMs(open.clock_in_at, offsetMs, Date.now()))
+    : null;
+  const openElsewhere = !!state?.openOnOtherJob && !open;
   const disabled = !!state?.blockedReason || !state?.canAct || !!busy;
+
 
   return (
     <section
