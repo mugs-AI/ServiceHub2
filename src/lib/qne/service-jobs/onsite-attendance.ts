@@ -254,7 +254,12 @@ export function gpsSummary(
   result: string | null | undefined,
   accuracy: number | null | undefined,
 ): string {
-  const acc = Number.isFinite(Number(accuracy)) ? ` · ±${Math.round(Number(accuracy))} m` : "";
+  // Only a real finite reading earns an accuracy claim — null must never
+  // render as "±0 m".
+  const acc =
+    typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0
+      ? ` · ±${Math.round(accuracy)} m`
+      : "";
   if (result === "ok") return `GPS captured${acc}`;
   if (result === "low_accuracy") return `GPS captured (low accuracy)${acc}`;
   if (!result) return "No GPS recorded";
