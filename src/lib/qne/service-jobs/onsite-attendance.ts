@@ -62,15 +62,30 @@ export interface AttendanceCapture {
   exception_reason?: string | null;
 }
 
+/** Accuracy above this is not a real device reading — treat it as invalid. */
+export const MAX_ACCURACY_M = 100_000_000;
+
 export function isLocationCaptured(c: AttendanceCapture): boolean {
   if (c.gps_result !== "ok" && c.gps_result !== "low_accuracy") return false;
+  const { latitude: lat, longitude: lng, accuracy: acc } = c;
+  // Same rule as the strict payload parse and the database CHECKs: a captured
+  // position needs in-range coordinates AND usable accuracy evidence.
   return (
-    typeof c.latitude === "number" &&
-    Number.isFinite(c.latitude) &&
-    typeof c.longitude === "number" &&
-    Number.isFinite(c.longitude)
+    typeof lat === "number" &&
+    Number.isFinite(lat) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    typeof lng === "number" &&
+    Number.isFinite(lng) &&
+    lng >= -180 &&
+    lng <= 180 &&
+    typeof acc === "number" &&
+    Number.isFinite(acc) &&
+    acc >= 0 &&
+    acc <= MAX_ACCURACY_M
   );
 }
+
 
 /** A missing location may only be committed with a non-empty reason. */
 export function validateCapture(c: AttendanceCapture): { ok: true } | { ok: false; error: string } {
