@@ -53,8 +53,9 @@ describe("on-site attendance map links", () => {
     const zero = { gpsResult: "low_accuracy", latitude: 0, longitude: 0, accuracy: 500 };
     expect(validCoordinate(zero)).toEqual({ latitude: 0, longitude: 0 });
     expect(hasMapAction(zero)).toBe(true);
-    expect(mapChoicesForPoint(zero, { apple: false, android: false, canShare: false })?.[0].href)
-      .toContain("query=0%2C0");
+    expect(
+      mapChoicesForPoint(zero, { apple: false, android: false, canShare: false })?.[0].href,
+    ).toContain("query=0%2C0");
   });
 
   it("rejects missing, invalid, exception and non-captured evidence", () => {
@@ -69,11 +70,14 @@ describe("on-site attendance map links", () => {
     ).toBeNull();
     expect(hasMapAction({ ...validIn, gpsResult: "permission_denied" })).toBe(false);
     expect(
-      mapChoicesForPoint({ ...validIn, gpsResult: "unavailable" }, {
-        apple: true,
-        android: true,
-        canShare: true,
-      }),
+      mapChoicesForPoint(
+        { ...validIn, gpsResult: "unavailable" },
+        {
+          apple: true,
+          android: true,
+          canShare: true,
+        },
+      ),
     ).toBeNull();
     expect(sharePayload("Map In", { ...validIn, accuracy: -1 })).toBeNull();
   });

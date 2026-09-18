@@ -119,9 +119,19 @@ export function mapChoicesForPoint(
     choices.push({ id: "geo", label: "Other Maps", kind: "link", href: geoUri(c) });
   }
   if (device.canShare) {
-    choices.push({ id: "share", label: "Share / More Apps", kind: "share", href: shareLocationUrl(c) });
+    choices.push({
+      id: "share",
+      label: "Share / More Apps",
+      kind: "share",
+      href: shareLocationUrl(c),
+    });
   }
-  choices.push({ id: "copy", label: "Copy Location Link", kind: "copy", href: shareLocationUrl(c) });
+  choices.push({
+    id: "copy",
+    label: "Copy Location Link",
+    kind: "copy",
+    href: shareLocationUrl(c),
+  });
   return choices;
 }
 

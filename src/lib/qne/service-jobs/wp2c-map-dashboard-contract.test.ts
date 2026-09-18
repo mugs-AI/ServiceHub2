@@ -32,7 +32,9 @@ describe("attendance map action contract", () => {
   it("keeps a single chooser instance with accessible close semantics", () => {
     expect(CARD).toContain("const [chooser, setChooser] = useState<ChooserTarget | null>(null);");
     expect(CARD.match(/<MapChooserDialog /g)).toHaveLength(1);
-    expect(CARD).toContain("<MapChooserDialog target={chooser} onClose={() => setChooser(null)} />");
+    expect(CARD).toContain(
+      "<MapChooserDialog target={chooser} onClose={() => setChooser(null)} />",
+    );
     // Radix Dialog supplies Escape, outside click and focus management.
     expect(CARD).toContain('from "@/components/ui/dialog"');
     expect(CARD).toContain("onOpenChange={(open) => {");
@@ -50,7 +52,7 @@ describe("attendance map action contract", () => {
   });
 
   it("falls back to copying the link when sharing is unavailable or cancelled", () => {
-    expect(CARD).toContain("typeof navigator.share === \"function\"");
+    expect(CARD).toContain('typeof navigator.share === "function"');
     expect(CARD).toContain("await navigator.clipboard.writeText(url)");
     expect(CARD).toContain("await copyLink(payload.url);");
   });
