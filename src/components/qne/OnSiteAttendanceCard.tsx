@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatMYDateTime } from "@/lib/format-date";
 import {
   GPS_ERROR_MESSAGE,
+  GPS_RESULT_CODES,
   LOW_ACCURACY_THRESHOLD_M,
   formatElapsed,
   gpsResultFromError,
@@ -50,7 +51,7 @@ interface Capture {
 }
 
 interface MapPoint {
-  gpsResult: GpsResultCode | null;
+  gpsResult: string | null;
   latitude: number | null;
   longitude: number | null;
   accuracy: number | null;
@@ -67,10 +68,15 @@ export function isAppleMapsDevice(
 }
 
 export function mapUrlForPoint(point: MapPoint, appleDevice: boolean): string | null {
-  if (!point.gpsResult) return null;
+  if (
+    !point.gpsResult ||
+    !(GPS_RESULT_CODES as readonly string[]).includes(point.gpsResult)
+  ) {
+    return null;
+  }
   if (
     !isLocationCaptured({
-      gps_result: point.gpsResult,
+      gps_result: point.gpsResult as GpsResultCode,
       latitude: point.latitude,
       longitude: point.longitude,
       accuracy: point.accuracy,
