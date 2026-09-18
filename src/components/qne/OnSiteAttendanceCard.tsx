@@ -20,10 +20,23 @@ import {
   serverAlignedElapsedMs,
   serverClockOffsetMs,
 } from "@/lib/qne/service-jobs/onsite-attendance";
-import { isAppleMapsDevice, mapUrlForPoint } from "@/lib/qne/service-jobs/attendance-map";
+import {
+  hasMapAction,
+  isAndroidDevice,
+  isAppleMapsDevice,
+  mapChoicesForPoint,
+  sharePayload,
+} from "@/lib/qne/service-jobs/attendance-map";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import type { AttendanceVisit, GpsResultCode } from "@/lib/qne/service-jobs/onsite-attendance";
-import type { AttendanceMapPoint } from "@/lib/qne/service-jobs/attendance-map";
+import type { AttendanceMapPoint, MapDevice } from "@/lib/qne/service-jobs/attendance-map";
 import { getStoredToken } from "@/lib/qne/tokens";
 
 function authHeaders(): Record<string, string> {
