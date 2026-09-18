@@ -17,19 +17,44 @@ describe("attendance map action contract", () => {
     expect(visitOut).toBeGreaterThan(visitIn);
     expect(CARD.match(/label="Map In"/g)).toHaveLength(2);
     expect(CARD.match(/label="Map Out"/g)).toHaveLength(1);
+    // Same chooser contract for every map action, including the open visit.
+    expect(CARD.match(/onOpen=\{setChooser\}/g)).toHaveLength(3);
   });
 
-  it("uses validated points, accessible labels and safe external links", () => {
-    expect(CARD).toContain("mapUrlForPoint(point, currentDeviceUsesAppleMaps())");
-    expect(CARD).toContain('target="_blank"');
-    expect(CARD).toContain('rel="noopener noreferrer"');
-    expect(CARD).toContain("aria-label={`${label} in maps`}");
+  it("uses validated points and opens the ServiceHub chooser instead of one map app", () => {
+    expect(CARD).toContain("if (!hasMapAction(point)) return null;");
+    expect(CARD).toContain('aria-haspopup="dialog"');
+    expect(CARD).toContain("aria-label={`${label} — choose a maps app`}");
+    expect(CARD).toContain("mapChoicesForPoint(target.point, currentMapDevice())");
     expect(CARD).not.toMatch(/Latitude:|Longitude:|clock_in_latitude\}/);
   });
 
-  it("keeps map actions compact, wrapping and touch-friendly", () => {
+  it("keeps a single chooser instance with accessible close semantics", () => {
+    expect(CARD).toContain("const [chooser, setChooser] = useState<ChooserTarget | null>(null);");
+    expect(CARD.match(/<MapChooserDialog /g)).toHaveLength(1);
+    expect(CARD).toContain(
+      "<MapChooserDialog target={chooser} onClose={() => setChooser(null)} />",
+    );
+    // Radix Dialog supplies Escape, outside click and focus management.
+    expect(CARD).toContain('from "@/components/ui/dialog"');
+    expect(CARD).toContain("onOpenChange={(open) => {");
+    expect(CARD).toContain(">\n            Cancel\n          </button>");
+  });
+
+  it("keeps external links safe and choices touch-friendly at 320px and 390px", () => {
+    expect(CARD).toContain('target="_blank"');
+    expect(CARD).toContain('rel="noopener noreferrer"');
     expect(CARD).toContain('className="mt-2 flex flex-wrap gap-2"');
-    expect(CARD).toContain("inline-flex min-h-10 items-center justify-center");
+    expect(CARD).toContain("inline-flex min-h-11 items-center justify-center");
+    expect(CARD).toContain("inline-flex min-h-11 w-full items-center justify-center");
+    expect(CARD).toContain("w-full max-w-full");
+    expect(CARD).toContain("bottom-0 top-auto max-h-[85vh] w-full max-w-full translate-y-0");
+  });
+
+  it("falls back to copying the link when sharing is unavailable or cancelled", () => {
+    expect(CARD).toContain('typeof navigator.share === "function"');
+    expect(CARD).toContain("await navigator.clipboard.writeText(url)");
+    expect(CARD).toContain("await copyLink(payload.url);");
   });
 });
 

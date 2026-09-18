@@ -20,10 +20,23 @@ import {
   serverAlignedElapsedMs,
   serverClockOffsetMs,
 } from "@/lib/qne/service-jobs/onsite-attendance";
-import { isAppleMapsDevice, mapUrlForPoint } from "@/lib/qne/service-jobs/attendance-map";
+import {
+  hasMapAction,
+  isAndroidDevice,
+  isAppleMapsDevice,
+  mapChoicesForPoint,
+  sharePayload,
+} from "@/lib/qne/service-jobs/attendance-map";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import type { AttendanceVisit, GpsResultCode } from "@/lib/qne/service-jobs/onsite-attendance";
-import type { AttendanceMapPoint } from "@/lib/qne/service-jobs/attendance-map";
+import type { AttendanceMapPoint, MapDevice } from "@/lib/qne/service-jobs/attendance-map";
 import { getStoredToken } from "@/lib/qne/tokens";
 
 function authHeaders(): Record<string, string> {
@@ -50,24 +63,139 @@ interface Capture {
   accuracy: number | null;
 }
 
-function currentDeviceUsesAppleMaps(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return isAppleMapsDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
+function currentMapDevice(): MapDevice {
+  if (typeof navigator === "undefined") return { apple: false, android: false, canShare: false };
+  return {
+    apple: isAppleMapsDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints),
+    android: isAndroidDevice(navigator.userAgent, navigator.platform),
+    canShare: typeof navigator.share === "function",
+  };
 }
 
-function MapAction({ label, point }: { label: "Map In" | "Map Out"; point: AttendanceMapPoint }) {
-  const href = mapUrlForPoint(point, currentDeviceUsesAppleMaps());
-  if (!href) return null;
+interface ChooserTarget {
+  label: "Map In" | "Map Out";
+  point: AttendanceMapPoint;
+}
+
+/** Opens the ServiceHub-owned chooser — never a forced single map app. */
+function MapAction({
+  label,
+  point,
+  onOpen,
+}: {
+  label: "Map In" | "Map Out";
+  point: AttendanceMapPoint;
+  onOpen: (target: ChooserTarget) => void;
+}) {
+  if (!hasMapAction(point)) return null;
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={`${label} in maps`}
-      className="inline-flex min-h-10 items-center justify-center rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent"
+    <button
+      type="button"
+      onClick={() => onOpen({ label, point })}
+      aria-haspopup="dialog"
+      aria-label={`${label} — choose a maps app`}
+      className="inline-flex min-h-11 items-center justify-center rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent"
     >
       {label}
-    </a>
+    </button>
+  );
+}
+
+function MapChooserDialog({
+  target,
+  onClose,
+}: {
+  target: ChooserTarget | null;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const choices = target ? mapChoicesForPoint(target.point, currentMapDevice()) : null;
+
+  const copyLink = useCallback(async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied("Location link copied.");
+    } catch {
+      setCopied("Could not copy the link on this device.");
+    }
+  }, []);
+
+  const shareLink = useCallback(
+    async (label: "Map In" | "Map Out", point: AttendanceMapPoint) => {
+      const payload = sharePayload(label, point);
+      if (!payload) return;
+      try {
+        await navigator.share(payload);
+      } catch {
+        // Cancelled or unsupported — fall back to a link the user can paste.
+        await copyLink(payload.url);
+      }
+    },
+    [copyLink],
+  );
+
+  return (
+    <Dialog
+      open={!!target}
+      onOpenChange={(open) => {
+        if (!open) {
+          setCopied(null);
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="bottom-0 top-auto max-h-[85vh] w-full max-w-full translate-y-0 overflow-y-auto rounded-t-2xl p-4 sm:bottom-auto sm:top-[50%] sm:max-w-sm sm:translate-y-[-50%] sm:rounded-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base">Open {target?.label ?? "location"} in</DialogTitle>
+          <DialogDescription className="text-xs">
+            Choose where to open this location. Your device decides which installed app handles the
+            hand-off.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-2">
+          {(choices ?? []).map((choice) =>
+            choice.kind === "link" ? (
+              <a
+                key={choice.id}
+                href={choice.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onClose}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border bg-card px-3 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                {choice.label}
+              </a>
+            ) : (
+              <button
+                key={choice.id}
+                type="button"
+                onClick={() => {
+                  if (choice.kind === "share" && target) {
+                    void shareLink(target.label, target.point);
+                  } else {
+                    void copyLink(choice.href);
+                  }
+                }}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border bg-card px-3 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                {choice.label}
+              </button>
+            ),
+          )}
+          {copied && <p className="break-words text-xs text-muted-foreground">{copied}</p>}
+          <button
+            type="button"
+            onClick={() => {
+              setCopied(null);
+              onClose();
+            }}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg px-3 text-sm font-semibold text-muted-foreground hover:bg-accent"
+          >
+            Cancel
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -133,6 +261,8 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [offsetMs, setOffsetMs] = useState(0);
+  // Only one chooser may be open at a time across this card.
+  const [chooser, setChooser] = useState<ChooserTarget | null>(null);
 
   const [pending, setPending] = useState<{
     action: "clock_in" | "clock_out";
@@ -296,6 +426,7 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <MapAction
+              onOpen={setChooser}
               label="Map In"
               point={{
                 gpsResult: open.clock_in_gps_result,
@@ -417,6 +548,7 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
               )}
               <div className="mt-2 flex flex-wrap gap-2">
                 <MapAction
+                  onOpen={setChooser}
                   label="Map In"
                   point={{
                     gpsResult: v.clock_in_gps_result,
@@ -426,6 +558,7 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
                   }}
                 />
                 <MapAction
+                  onOpen={setChooser}
                   label="Map Out"
                   point={{
                     gpsResult: v.clock_out_gps_result,
@@ -439,6 +572,8 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
           ))}
         </ul>
       )}
+      <MapChooserDialog target={chooser} onClose={() => setChooser(null)} />
+
       {state && !state.canViewAll && (
         <p className="mt-2 text-[11px] text-muted-foreground">
           You are seeing your own visits only.
