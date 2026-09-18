@@ -20,8 +20,10 @@ import {
   serverAlignedElapsedMs,
   serverClockOffsetMs,
 } from "@/lib/qne/service-jobs/onsite-attendance";
+import { isAppleMapsDevice, mapUrlForPoint } from "@/lib/qne/service-jobs/attendance-map";
 
 import type { AttendanceVisit, GpsResultCode } from "@/lib/qne/service-jobs/onsite-attendance";
+import type { AttendanceMapPoint } from "@/lib/qne/service-jobs/attendance-map";
 import { getStoredToken } from "@/lib/qne/tokens";
 
 function authHeaders(): Record<string, string> {
@@ -46,6 +48,27 @@ interface Capture {
   latitude: number | null;
   longitude: number | null;
   accuracy: number | null;
+}
+
+function currentDeviceUsesAppleMaps(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return isAppleMapsDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
+}
+
+function MapAction({ label, point }: { label: "Map In" | "Map Out"; point: AttendanceMapPoint }) {
+  const href = mapUrlForPoint(point, currentDeviceUsesAppleMaps());
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${label} in maps`}
+      className="inline-flex min-h-10 items-center justify-center rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent"
+    >
+      {label}
+    </a>
+  );
 }
 
 function capturePosition(): Promise<Capture> {
@@ -271,6 +294,17 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
           <p className="mt-1 break-words text-xs text-muted-foreground">
             {gpsSummary(open.clock_in_gps_result, open.clock_in_accuracy_m)}
           </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <MapAction
+              label="Map In"
+              point={{
+                gpsResult: open.clock_in_gps_result,
+                latitude: open.clock_in_latitude,
+                longitude: open.clock_in_longitude,
+                accuracy: open.clock_in_accuracy_m,
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -381,6 +415,26 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
                   GPS exception recorded
                 </p>
               )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <MapAction
+                  label="Map In"
+                  point={{
+                    gpsResult: v.clock_in_gps_result,
+                    latitude: v.clock_in_latitude,
+                    longitude: v.clock_in_longitude,
+                    accuracy: v.clock_in_accuracy_m,
+                  }}
+                />
+                <MapAction
+                  label="Map Out"
+                  point={{
+                    gpsResult: v.clock_out_gps_result,
+                    latitude: v.clock_out_latitude,
+                    longitude: v.clock_out_longitude,
+                    accuracy: v.clock_out_accuracy_m,
+                  }}
+                />
+              </div>
             </li>
           ))}
         </ul>
