@@ -261,6 +261,8 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [offsetMs, setOffsetMs] = useState(0);
+  // Only one chooser may be open at a time across this card.
+  const [chooser, setChooser] = useState<ChooserTarget | null>(null);
 
   const [pending, setPending] = useState<{
     action: "clock_in" | "clock_out";
@@ -424,6 +426,7 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <MapAction
+              onOpen={setChooser}
               label="Map In"
               point={{
                 gpsResult: open.clock_in_gps_result,
@@ -545,6 +548,7 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
               )}
               <div className="mt-2 flex flex-wrap gap-2">
                 <MapAction
+                  onOpen={setChooser}
                   label="Map In"
                   point={{
                     gpsResult: v.clock_in_gps_result,
@@ -554,6 +558,7 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
                   }}
                 />
                 <MapAction
+                  onOpen={setChooser}
                   label="Map Out"
                   point={{
                     gpsResult: v.clock_out_gps_result,
@@ -567,6 +572,8 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
           ))}
         </ul>
       )}
+      <MapChooserDialog target={chooser} onClose={() => setChooser(null)} />
+
       {state && !state.canViewAll && (
         <p className="mt-2 text-[11px] text-muted-foreground">
           You are seeing your own visits only.
