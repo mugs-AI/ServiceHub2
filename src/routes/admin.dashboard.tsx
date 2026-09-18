@@ -138,36 +138,38 @@ function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:items-center sm:justify-between">
-        <div className="min-w-0">
+      <header className="flex w-full min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="w-full min-w-0 sm:flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">
             Administrator dashboard
           </p>
-          <h1 className="mt-1 truncate text-2xl font-semibold text-foreground sm:text-3xl">
+          <h1 className="mt-1 break-words text-2xl font-semibold text-foreground sm:truncate sm:text-3xl">
             {session?.companyName || "—"}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 break-words text-sm text-muted-foreground">
             Tenant {session?.tenantCode || "—"} · Signed in as{" "}
             {currentUser?.displayName || currentUser?.email || "administrator"}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="mr-2 text-[11px] text-muted-foreground">
+        <div className="w-full min-w-0 sm:w-auto">
+          <div className="mb-2 text-[11px] text-muted-foreground sm:mr-2 sm:text-right">
             {lastRefreshed
               ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
               : "—"}
           </div>
-          <button
-            type="button"
-            onClick={() => void loadOps()}
-            disabled={opsLoading}
-            className="min-h-9 rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50"
-          >
-            {opsLoading ? "Refreshing…" : "Refresh"}
-          </button>
-          <QuickLink to="/support" label="Workspace" />
-          <QuickLink to="/admin/snapshots" label="Snapshot Console" primary />
-          <QuickLink to="/settings" label="Settings" />
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <button
+              type="button"
+              onClick={() => void loadOps()}
+              disabled={opsLoading}
+              className="min-h-11 w-full rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50 sm:min-h-9 sm:w-auto"
+            >
+              {opsLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <QuickLink to="/support" label="Workspace" />
+            <QuickLink to="/admin/snapshots" label="Snapshot Console" primary />
+            <QuickLink to="/settings" label="Settings" />
+          </div>
         </div>
       </header>
 
@@ -195,8 +197,8 @@ function AdminDashboard() {
             No active assignments right now.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-            <table className="w-full text-left text-sm">
+          <div className="max-w-full overflow-x-auto rounded-xl border bg-card shadow-sm">
+            <table className="min-w-[36rem] w-full text-left text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2">Technician</th>
@@ -336,8 +338,8 @@ function QuickLink({ to, label, primary }: { to: string; label: string; primary?
       to={to}
       className={
         primary
-          ? "inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-          : "inline-flex min-h-11 items-center rounded-lg border bg-card px-4 text-sm font-medium text-foreground shadow-sm hover:bg-accent"
+          ? "inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-3 text-center text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-auto sm:px-4"
+          : "inline-flex min-h-11 w-full items-center justify-center rounded-lg border bg-card px-3 text-center text-sm font-medium text-foreground shadow-sm hover:bg-accent sm:w-auto sm:px-4"
       }
     >
       {label}
