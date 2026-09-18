@@ -20,10 +20,7 @@ import {
   serverAlignedElapsedMs,
   serverClockOffsetMs,
 } from "@/lib/qne/service-jobs/onsite-attendance";
-import {
-  isAppleMapsDevice,
-  mapUrlForPoint,
-} from "@/lib/qne/service-jobs/attendance-map";
+import { isAppleMapsDevice, mapUrlForPoint } from "@/lib/qne/service-jobs/attendance-map";
 
 import type { AttendanceVisit, GpsResultCode } from "@/lib/qne/service-jobs/onsite-attendance";
 import type { AttendanceMapPoint } from "@/lib/qne/service-jobs/attendance-map";

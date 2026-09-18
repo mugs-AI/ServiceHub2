@@ -23,7 +23,7 @@ describe("attendance map action contract", () => {
     expect(CARD).toContain("mapUrlForPoint(point, currentDeviceUsesAppleMaps())");
     expect(CARD).toContain('target="_blank"');
     expect(CARD).toContain('rel="noopener noreferrer"');
-    expect(CARD).toContain('aria-label={`${label} in maps`}');
+    expect(CARD).toContain("aria-label={`${label} in maps`}");
     expect(CARD).not.toMatch(/Latitude:|Longitude:|clock_in_latitude\}/);
   });
 

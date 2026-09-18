@@ -1,7 +1,4 @@
-import {
-  GPS_RESULT_CODES,
-  isLocationCaptured,
-} from "@/lib/qne/service-jobs/onsite-attendance";
+import { GPS_RESULT_CODES, isLocationCaptured } from "@/lib/qne/service-jobs/onsite-attendance";
 
 import type { GpsResultCode } from "@/lib/qne/service-jobs/onsite-attendance";
 

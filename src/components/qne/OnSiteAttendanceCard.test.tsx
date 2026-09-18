@@ -18,9 +18,7 @@ describe("on-site attendance map links", () => {
   });
 
   it("creates encoded Apple and Google universal URLs", () => {
-    expect(mapUrlForPoint(validIn, true)).toBe(
-      "https://maps.apple.com/?q=3.139%2C101.6869",
-    );
+    expect(mapUrlForPoint(validIn, true)).toBe("https://maps.apple.com/?q=3.139%2C101.6869");
     expect(mapUrlForPoint(validIn, false)).toBe(
       "https://www.google.com/maps/search/?api=1&query=3.139%2C101.6869",
     );
@@ -43,10 +41,7 @@ describe("on-site attendance map links", () => {
     expect(mapUrlForPoint({ ...validIn, longitude: Number.POSITIVE_INFINITY }, false)).toBeNull();
     expect(mapUrlForPoint({ ...validIn, accuracy: null }, false)).toBeNull();
     expect(
-      mapUrlForPoint(
-        { gpsResult: null, latitude: null, longitude: null, accuracy: null },
-        false,
-      ),
+      mapUrlForPoint({ gpsResult: null, latitude: null, longitude: null, accuracy: null }, false),
     ).toBeNull();
   });
 });
