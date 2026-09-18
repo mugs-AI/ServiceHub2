@@ -7,6 +7,7 @@ import { StatCard } from "./dashboard";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 
+
 export const Route = createFileRoute("/admin/dashboard")({
   component: () => (
     <AdminOnly>
@@ -26,6 +27,7 @@ interface HealthResponse {
   tenantCode: string;
   snapshots: HealthRow[];
 }
+
 
 interface AdminSummary {
   jobsToday: number;
@@ -121,13 +123,16 @@ function AdminDashboard() {
   const healthMap = new Map<HealthRow["snapshot_type"], HealthRow>(
     (health?.snapshots ?? []).map((r) => [r.snapshot_type, r]),
   );
-  const failedCount = health?.snapshots.filter((r) => r.health_status === "Error").length ?? 0;
+  const failedCount =
+    health?.snapshots.filter((r) => r.health_status === "Error").length ?? 0;
   const lastSyncs = (health?.snapshots ?? [])
     .map((r) => r.last_successful_sync ?? null)
     .filter((x): x is string => !!x)
     .sort()
     .reverse();
-  const lastSyncLabel = lastSyncs.length > 0 ? new Date(lastSyncs[0]).toLocaleString() : "—";
+  const lastSyncLabel = lastSyncs.length > 0
+    ? new Date(lastSyncs[0]).toLocaleString()
+    : "—";
 
   const s = ops?.summary;
 
@@ -175,36 +180,19 @@ function AdminDashboard() {
           </p>
         )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-7">
-          <StatLink to="/support">
-            <StatCard label="Jobs Today" value={s?.jobsToday ?? "—"} tone="blue" />
-          </StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "pending_approval" }}>
-            <StatCard label="Job Approvals" value={s?.pendingApproval ?? "—"} tone="amber" />
-          </StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "cancellation_requests" }}>
-            <StatCard
-              label="Cancellation Requests"
-              value={s?.cancellationRequests ?? "—"}
-              tone="red"
-            />
-          </StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "waiting_customer" }}>
-            <StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" />
-          </StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "waiting_vendor" }}>
-            <StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" />
-          </StatLink>
-          <StatLink to="/customers/due-soon">
-            <StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" />
-          </StatLink>
-          <StatLink to="/customers/overdue">
-            <StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" />
-          </StatLink>
+          <StatLink to="/support"><StatCard label="Jobs Today" value={s?.jobsToday ?? "—"} tone="blue" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "pending_approval" }}><StatCard label="Job Approvals" value={s?.pendingApproval ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "cancellation_requests" }}><StatCard label="Cancellation Requests" value={s?.cancellationRequests ?? "—"} tone="red" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "waiting_customer" }}><StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/jobs/pending" search={{ queueType: "waiting_vendor" }}><StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" /></StatLink>
+          <StatLink to="/customers/due-soon"><StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" /></StatLink>
+          <StatLink to="/customers/overdue"><StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" /></StatLink>
+
         </div>
       </Section>
 
       <Section title="User workload">
-        {!ops || ops.userWorkload.length === 0 ? (
+        {(!ops || ops.userWorkload.length === 0) ? (
           <p className="rounded-lg border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
             No active assignments right now.
           </p>
@@ -237,9 +225,7 @@ function AdminDashboard() {
                     }
                   >
                     <td className="px-3 py-2 text-foreground">{w.name}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-foreground">
-                      {w.total}
-                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-foreground">{w.total}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{w.inProgress}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{w.waiting}</td>
                   </tr>
@@ -252,20 +238,15 @@ function AdminDashboard() {
 
       <Section title="System health">
         {error && (
-          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <HealthCard
-            title="Customer Snapshots"
-            row={healthMap.get("Customers")}
-            loading={loading}
-          />
+          <HealthCard title="Customer Snapshots" row={healthMap.get("Customers")} loading={loading} />
           <HealthCard title="Stock Snapshots" row={healthMap.get("Stock")} loading={loading} />
-          <HealthCard
-            title="Contract Snapshots"
-            row={healthMap.get("Contract")}
-            loading={loading}
-          />
+          <HealthCard title="Contract Snapshots" row={healthMap.get("Contract")} loading={loading} />
+
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <StatCard label="Last Synchronization" value={lastSyncLabel} tone="blue" />
@@ -279,8 +260,9 @@ function AdminDashboard() {
       </Section>
 
       <p className="rounded-lg border bg-card px-4 py-3 text-xs text-muted-foreground shadow-sm">
-        Full operational KPIs, approvals and reports arrive with Phase 1 business modules.
-        System-health tiles are already live and read from this tenant's diagnostics API.
+        Full operational KPIs, approvals and reports arrive with Phase 1
+        business modules. System-health tiles are already live and read from
+        this tenant's diagnostics API.
       </p>
     </div>
   );
@@ -297,7 +279,15 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function HealthCard({ title, row, loading }: { title: string; row?: HealthRow; loading: boolean }) {
+function HealthCard({
+  title,
+  row,
+  loading,
+}: {
+  title: string;
+  row?: HealthRow;
+  loading: boolean;
+}) {
   const status = row?.health_status ?? "Unknown";
   const tone =
     status === "Healthy"
@@ -328,13 +318,18 @@ function HealthCard({ title, row, loading }: { title: string; row?: HealthRow; l
       </div>
       <div className="mt-2 text-xs text-muted-foreground">
         Last success:{" "}
-        {row?.last_successful_sync ? new Date(row.last_successful_sync).toLocaleString() : "—"}
+        {row?.last_successful_sync
+          ? new Date(row.last_successful_sync).toLocaleString()
+          : "—"}
       </div>
       {row?.error_message && (
-        <div className="mt-1 line-clamp-2 text-xs text-red-700">{row.error_message}</div>
+        <div className="mt-1 line-clamp-2 text-xs text-red-700">
+          {row.error_message}
+        </div>
       )}
     </div>
   );
+
 }
 
 function QuickLink({ to, label, primary }: { to: string; label: string; primary?: boolean }) {
@@ -362,11 +357,7 @@ function StatLink({
   children: ReactNode;
 }) {
   return (
-    <Link
-      to={to}
-      search={search as never}
-      className="block transition-transform hover:scale-[1.01]"
-    >
+    <Link to={to} search={search as never} className="block transition-transform hover:scale-[1.01]">
       {children}
     </Link>
   );
