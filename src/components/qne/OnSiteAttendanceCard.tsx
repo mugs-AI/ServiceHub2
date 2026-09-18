@@ -13,17 +13,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatMYDateTime } from "@/lib/format-date";
 import {
   GPS_ERROR_MESSAGE,
-  GPS_RESULT_CODES,
   LOW_ACCURACY_THRESHOLD_M,
   formatElapsed,
   gpsResultFromError,
   gpsSummary,
-  isLocationCaptured,
   serverAlignedElapsedMs,
   serverClockOffsetMs,
 } from "@/lib/qne/service-jobs/onsite-attendance";
+import {
+  isAppleMapsDevice,
+  mapUrlForPoint,
+} from "@/lib/qne/service-jobs/attendance-map";
 
 import type { AttendanceVisit, GpsResultCode } from "@/lib/qne/service-jobs/onsite-attendance";
+import type { AttendanceMapPoint } from "@/lib/qne/service-jobs/attendance-map";
 import { getStoredToken } from "@/lib/qne/tokens";
 
 function authHeaders(): Record<string, string> {
@@ -50,52 +53,12 @@ interface Capture {
   accuracy: number | null;
 }
 
-interface MapPoint {
-  gpsResult: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  accuracy: number | null;
-}
-
-export function isAppleMapsDevice(
-  userAgent: string,
-  platform: string,
-  maxTouchPoints: number,
-): boolean {
-  return /iPhone|iPad|iPod/i.test(userAgent) ||
-    /^iP/.test(platform) ||
-    (platform === "MacIntel" && maxTouchPoints > 1);
-}
-
-export function mapUrlForPoint(point: MapPoint, appleDevice: boolean): string | null {
-  if (
-    !point.gpsResult ||
-    !(GPS_RESULT_CODES as readonly string[]).includes(point.gpsResult)
-  ) {
-    return null;
-  }
-  if (
-    !isLocationCaptured({
-      gps_result: point.gpsResult as GpsResultCode,
-      latitude: point.latitude,
-      longitude: point.longitude,
-      accuracy: point.accuracy,
-    })
-  ) {
-    return null;
-  }
-  const coordinates = encodeURIComponent(`${point.latitude},${point.longitude}`);
-  return appleDevice
-    ? `https://maps.apple.com/?q=${coordinates}`
-    : `https://www.google.com/maps/search/?api=1&query=${coordinates}`;
-}
-
 function currentDeviceUsesAppleMaps(): boolean {
   if (typeof navigator === "undefined") return false;
   return isAppleMapsDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
 }
 
-function MapAction({ label, point }: { label: "Map In" | "Map Out"; point: MapPoint }) {
+function MapAction({ label, point }: { label: "Map In" | "Map Out"; point: AttendanceMapPoint }) {
   const href = mapUrlForPoint(point, currentDeviceUsesAppleMaps());
   if (!href) return null;
   return (

@@ -20,7 +20,7 @@ describe("attendance map action contract", () => {
   });
 
   it("uses validated points, accessible labels and safe external links", () => {
-    expect(CARD).toContain("isLocationCaptured({");
+    expect(CARD).toContain("mapUrlForPoint(point, currentDeviceUsesAppleMaps())");
     expect(CARD).toContain('target="_blank"');
     expect(CARD).toContain('rel="noopener noreferrer"');
     expect(CARD).toContain('aria-label={`${label} in maps`}');

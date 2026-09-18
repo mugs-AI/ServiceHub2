@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isAppleMapsDevice, mapUrlForPoint } from "./OnSiteAttendanceCard";
+import { isAppleMapsDevice, mapUrlForPoint } from "@/lib/qne/service-jobs/attendance-map";
 
 const validIn = {
   gpsResult: "ok" as const,
