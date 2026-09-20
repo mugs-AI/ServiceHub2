@@ -22,7 +22,9 @@ describe("attendance map action contract", () => {
   });
 
   it("uses validated points and opens the ServiceHub chooser instead of one map app", () => {
-    expect(CARD).toContain("if (!hasMapAction(point)) return null;");
+    // WP3A: the same validation gate, now able to render a disabled chip.
+    expect(CARD).toContain("if (!hasMapAction(point)) {");
+    expect(CARD).toContain("if (!placeholder) return null;");
     expect(CARD).toContain('aria-haspopup="dialog"');
     expect(CARD).toContain("aria-label={`${label} — choose a maps app`}");
     expect(CARD).toContain("mapChoicesForPoint(target.point, currentMapDevice())");
