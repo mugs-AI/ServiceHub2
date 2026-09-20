@@ -1152,6 +1152,47 @@ function WorkflowActions({
         </div>
       )}
 
+      {waitingParty && (
+        <ModalShell
+          title={WAITING_REF_LABEL[waitingParty]}
+          onClose={() => setWaitingParty(null)}
+        >
+          <div data-testid="waiting-ref-prompt" className="min-w-0">
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+              htmlFor="wp3a-waiting-ref"
+            >
+              Ref. No. *
+            </label>
+            <input
+              id="wp3a-waiting-ref"
+              value={waitingRef}
+              onChange={(e) => setWaitingRef(e.target.value.slice(0, MAX_WAITING_REF))}
+              maxLength={MAX_WAITING_REF}
+              placeholder="Reference number"
+              className="mt-1 w-full min-w-0 rounded-md border bg-background p-2 text-sm text-foreground"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setWaitingParty(null)}
+                disabled={!!busy}
+                className="min-h-[44px] rounded-lg border px-4 text-sm font-semibold hover:bg-accent disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!waitingRef.trim() || !!busy}
+                onClick={() => void submitWaiting(waitingParty)}
+                className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {busy === "waiting" ? "Working…" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
     </section>
   );
 }
