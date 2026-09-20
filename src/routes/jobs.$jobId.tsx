@@ -11,6 +11,13 @@ import { OnSiteAttendanceCard } from "@/components/qne/OnSiteAttendanceCard";
 import { SimpleCompletionCard } from "@/components/qne/SimpleCompletionCard";
 
 import { isTakeoverEligibleStatus } from "@/lib/qne/service-jobs/permissions";
+import {
+  refDisplay,
+  waitingPartyForStatus,
+  WAITING_REF_LABEL,
+  MAX_WAITING_REF,
+} from "@/lib/qne/service-jobs/wp3a-waiting";
+import type { WaitingParty } from "@/lib/qne/service-jobs/wp3a-waiting";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { DateField, TimeField } from "@/components/qne/DateTimeFields";
 import {
@@ -32,6 +39,10 @@ interface JobDetail {
   job_number: string;
   customer_code_snapshot: string;
   customer_name_snapshot: string | null;
+  // WP3A — latest waiting references (present once the candidate migration
+  // is applied; the UI shows "—" until then).
+  latest_customer_ref_no?: string | null;
+  latest_vendor_ref_no?: string | null;
   contact_person: string | null;
   contact_phone: string | null;
   contact_email: string | null;
