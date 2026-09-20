@@ -16,6 +16,15 @@ import {
 
 import type { WaitingInput } from "./wp3a-waiting";
 import type { ReopenDecisionInput, ReopenRequestRow } from "./wp3a-reopen";
+// Candidate (proposed, unapplied) schema shapes. The canonical generated
+// Supabase types must be regenerated only after an authorised migration
+// application; they are never hand-edited to describe unapplied schema.
+import type {
+  CandidateReopenDecideResult,
+  CandidateReopenRequestResult,
+  CandidateServiceJobColumns,
+  CandidateWaitingSetResult,
+} from "./wp3a-candidate-types";
 
 export interface JobOpsActor {
   tenantCode: string;
