@@ -1047,6 +1047,9 @@ function WorkflowActions({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // WP3A — a waiting transition must collect a reference number first.
+  const [waitingParty, setWaitingParty] = useState<WaitingParty | null>(null);
+  const [waitingRef, setWaitingRef] = useState("");
 
   const transitions = useMemo(() => {
     let t = allowedTransitionsClient(job.status);
