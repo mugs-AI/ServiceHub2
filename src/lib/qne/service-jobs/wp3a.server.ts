@@ -159,7 +159,11 @@ export async function requestReopenAtomic(
     p_actor_name: actor.name,
   });
   if (error) throw new Error(error.message);
-  return (data ?? { outcome: "error", error: "Reopen request failed." }) as RpcOutcome;
+  return (data ?? {
+    outcome: "error",
+    status: 500,
+    error: "Reopen request failed.",
+  }) as CandidateReopenRequestResult as RpcOutcome;
 }
 
 /**
