@@ -70,7 +70,7 @@ vi.mock("@/lib/qne/service-jobs/wp3-completion.server", () => ({
   completeJobAtomic: async (
     actor: { tenantCode: string; userId: string; isAdmin: boolean },
     jobId: string,
-    input: { resolutionSummary: string; followUpRequired: boolean },
+    input: { resolution_summary: string; follow_up_required: boolean },
   ) => {
     rpcCalls += 1;
     const job = jobs.get(jobId);
@@ -85,8 +85,8 @@ vi.mock("@/lib/qne/service-jobs/wp3-completion.server", () => ({
       if (
         existing &&
         existing.completed_by_user_id === actor.userId &&
-        existing.resolution_summary === input.resolutionSummary &&
-        existing.follow_up_required === input.followUpRequired
+        existing.resolution_summary === input.resolution_summary &&
+        existing.follow_up_required === input.follow_up_required
       ) {
         // Idempotent branch of the RPC: identical retry after a lost response.
         return {
@@ -105,8 +105,8 @@ vi.mock("@/lib/qne/service-jobs/wp3-completion.server", () => ({
     const row: CompletionRow = {
       tenant_code: actor.tenantCode,
       service_job_id: jobId,
-      resolution_summary: input.resolutionSummary,
-      follow_up_required: input.followUpRequired,
+      resolution_summary: input.resolution_summary,
+      follow_up_required: input.follow_up_required,
       completed_by_user_id: actor.userId,
       completed_at: new Date().toISOString(),
     };
@@ -165,7 +165,7 @@ beforeEach(() => {
 describe("POST retry idempotency", () => {
   it("does not reject a Completed Job before the RPC: an identical lost-response retry succeeds idempotently", async () => {
     const handler = await post();
-    const body = { resolutionSummary: "Fixed the unit.", followUpRequired: false };
+    const body = { resolution_summary: "Fixed the unit.", follow_up_required: false };
 
     const first = await handler({ request: req(body), params: { jobId: JOB_ID } });
     expect(first.status).toBe(200);
@@ -187,12 +187,12 @@ describe("POST retry idempotency", () => {
   it("keeps a non-identical retry as a 409 conflict from the RPC", async () => {
     const handler = await post();
     await handler({
-      request: req({ resolutionSummary: "Fixed the unit.", followUpRequired: false }),
+      request: req({ resolution_summary: "Fixed the unit.", follow_up_required: false }),
       params: { jobId: JOB_ID },
     });
 
     const changed = await handler({
-      request: req({ resolutionSummary: "Different summary.", followUpRequired: true }),
+      request: req({ resolution_summary: "Different summary.", follow_up_required: true }),
       params: { jobId: JOB_ID },
     });
     expect(changed.status).toBe(409);
@@ -203,7 +203,7 @@ describe("POST retry idempotency", () => {
     session = { ...TECH, userId: "helper-9" };
     const handler = await post();
     const res = await handler({
-      request: req({ resolutionSummary: "Fixed.", followUpRequired: false }),
+      request: req({ resolution_summary: "Fixed.", follow_up_required: false }),
       params: { jobId: JOB_ID },
     });
     expect(res.status).toBe(403);
@@ -214,7 +214,7 @@ describe("POST retry idempotency", () => {
     openAttendance = 1;
     const handler = await post();
     const res = await handler({
-      request: req({ resolutionSummary: "Fixed.", followUpRequired: false }),
+      request: req({ resolution_summary: "Fixed.", follow_up_required: false }),
       params: { jobId: JOB_ID },
     });
     expect(res.status).toBe(409);
