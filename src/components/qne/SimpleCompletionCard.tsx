@@ -136,7 +136,12 @@ export function SimpleCompletionCard({
           form control inside the three-control completion form; it only
           appears once the Job is completed (including legacy completions). */}
       {(view.mode === "locked" || view.mode === "legacy") && (
-        <JobReopenSection jobId={jobId} onChanged={() => void load()} />
+        <JobReopenSection
+          jobId={jobId}
+          onChanged={() => {
+            void handleReopenChanged();
+          }}
+        />
       )}
 
       {view.mode === "blocked" && (
