@@ -275,6 +275,32 @@ describe("completion card + reopen", () => {
     expect(COMPLETION_CARD).toContain("<JobReopenSection jobId={jobId}");
   });
 
+  it("refreshes the whole Job page after a reopen decision, not only the card", () => {
+    // An approved reopen changes status, workflow, appointment and attendance.
+    expect(COMPLETION_CARD).toContain("const handleReopenChanged = useCallback(async () => {");
+    expect(COMPLETION_CARD).toContain("await load();");
+    expect(COMPLETION_CARD).toContain("onCompleted?.();");
+    expect(COMPLETION_CARD).toContain("void handleReopenChanged();");
+    // The old card-only refresh is gone, and no promise is left unhandled.
+    expect(COMPLETION_CARD).not.toContain("onChanged={() => void load()}");
+    // The parent wires that callback to its full reload.
+    const page = read("src", "routes", "jobs.$jobId.tsx");
+    expect(page).toContain("onCompleted={reloadAll}");
+  });
+
+  it("reads the latest completion evidence deterministically across cycles", () => {
+    const server = read("src", "lib", "qne", "service-jobs", "wp3-completion.server.ts");
+    expect(server).toContain('.order("completed_at", { ascending: false })');
+    expect(server).toContain('.order("created_at", { ascending: false })');
+    expect(server).toContain("latest completion record");
+    expect(server).not.toContain("single completion record");
+    const read1 = server.slice(server.indexOf("export async function loadCompletionRecord"));
+    expect(read1).toContain('.eq("tenant_code", tenantCode)');
+    expect(read1).toContain('.eq("service_job_id", jobId)');
+    // Ordering is applied before the single-row limit.
+    expect(read1.indexOf('.order("completed_at"')).toBeLessThan(read1.indexOf(".limit(1)"));
+  });
+
   it("requests a reopen with a mandatory reason and never reopens directly", () => {
     expect(REOPEN_CARD).toContain("Request Reopen");
     expect(REOPEN_CARD).toContain("disabled={!reason.trim() || !!busy}");
