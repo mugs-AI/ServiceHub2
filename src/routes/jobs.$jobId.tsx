@@ -8,6 +8,7 @@ import { allowedTransitionsClient } from "@/lib/qne/service-jobs/workflow";
 import { CancellationPanel } from "@/components/qne/CancellationPanel";
 import { JobAttachmentsCard } from "@/components/qne/JobAttachmentsCard";
 import { OnSiteAttendanceCard } from "@/components/qne/OnSiteAttendanceCard";
+import { SimpleCompletionCard } from "@/components/qne/SimpleCompletionCard";
 
 import { isTakeoverEligibleStatus } from "@/lib/qne/service-jobs/permissions";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
