@@ -341,7 +341,26 @@ function JobDetailPage() {
 
       <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
         <Section title="Job details">
-          <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
+          {/* WP3A — latest waiting references sit in a compact right-hand
+              column beside the Customer area on desktop, stacked on mobile. */}
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0 flex-1">
+              <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
+            </div>
+            <dl
+              data-testid="waiting-refs"
+              className="min-w-0 shrink-0 space-y-0.5 text-xs md:w-56 md:text-right"
+            >
+              <div className="min-w-0">
+                <dt className="inline text-muted-foreground">Customer Ref. No.: </dt>
+                <dd className="inline break-words">{refDisplay(job.latest_customer_ref_no)}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="inline text-muted-foreground">Vendor Ref. No.: </dt>
+                <dd className="inline break-words">{refDisplay(job.latest_vendor_ref_no)}</dd>
+              </div>
+            </dl>
+          </div>
           <Kv k="Problem" v={job.problem_description} multiline />
           {/* SH2.2-JOB-UI-01 — Priority and Cancellation share one action row. */}
           <div className="flex flex-col gap-3 border-t pt-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1870,6 +1889,15 @@ function formatEvent(it: TimelineItem): string {
       return `Comment (${it.new_value ?? "internal"})`;
     case "internal_note_updated":
       return `Internal note updated`;
+    // WP3A — waiting reference and reopen lifecycle events.
+    case "waiting_reference_set":
+      return `Waiting: ${it.old_value ?? "—"} → ${it.new_value ?? "—"} (Ref. No. recorded)`;
+    case "reopen_requested":
+      return `Reopen requested`;
+    case "reopen_approved":
+      return `Reopen approved — back to In Progress`;
+    case "reopen_rejected":
+      return `Reopen rejected`;
     default:
       return it.event;
   }
