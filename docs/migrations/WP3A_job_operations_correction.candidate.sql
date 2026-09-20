@@ -90,12 +90,30 @@ BEGIN
 END
 $$;
 
+-- The replacement uniqueness is created BEFORE the old one-per-Job rules are
+-- removed, so the table is never briefly unprotected.
 CREATE UNIQUE INDEX IF NOT EXISTS service_job_completions_cycle_unique_idx
   ON public.service_job_completions (tenant_code, service_job_id, completion_cycle);
 
--- Replaced by the per-cycle uniqueness above.
+-- service_job_completion_unique is a UNIQUE CONSTRAINT, not a bare index: it
+-- must be dropped through ALTER TABLE (DROP INDEX cannot remove it). The
+-- primary key is deliberately untouched.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+      WHERE conname = 'service_job_completion_unique'
+        AND conrelid = 'public.service_job_completions'::regclass
+        AND contype = 'u'
+  ) THEN
+    ALTER TABLE public.service_job_completions
+      DROP CONSTRAINT service_job_completion_unique;
+  END IF;
+END
+$$;
+
+-- The separate per-tenant index is a plain unique index and drops directly.
 DROP INDEX IF EXISTS public.service_job_completions_one_per_job_idx;
-DROP INDEX IF EXISTS public.service_job_completion_unique;
 
 -- ---------------------------------------------------------------------------
 -- 3. Reopen requests. Tenant-scoped, server-only, at most one pending per Job.
