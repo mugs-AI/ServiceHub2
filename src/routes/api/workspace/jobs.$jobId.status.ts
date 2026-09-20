@@ -64,7 +64,6 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
             );
           }
 
-
           const { data: job, error: jobErr } = await supabaseAdmin
             .from("service_jobs")
             .select(
