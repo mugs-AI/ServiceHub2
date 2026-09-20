@@ -201,6 +201,19 @@ describe("E.1 collaborative transitions (teammate, not Primary PIC)", () => {
     expect(log("status_changed")).toHaveLength(1);
   });
 
+  it.each([["Waiting Customer"], ["Waiting Vendor"]])(
+    "refuses %s through the generic route and leaves the Job untouched",
+    async (to) => {
+      seedJob({ status: "In Progress" });
+      const h = await handlers("@/routes/api/workspace/jobs.$jobId.status");
+      const res = await h.POST({ request: req({ to }), params: { jobId: JOB_ID } });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toContain("reference number");
+      expect(job().status).toBe("In Progress");
+      expect(log("status_changed")).toHaveLength(0);
+    },
+  );
+
   it("records the acting teammate, not the Primary PIC, in the timeline", async () => {
     const h = await handlers("@/routes/api/workspace/jobs.$jobId.status");
     await h.POST({ request: req({ to: "In Progress" }), params: { jobId: JOB_ID } });
