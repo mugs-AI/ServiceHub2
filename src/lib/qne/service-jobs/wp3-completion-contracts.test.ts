@@ -35,14 +35,37 @@ describe("API authority, tenant and actor", () => {
     expect(SERVER.match(/\.eq\("tenant_code", tenantCode\)/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("denies an unauthorised actor with 403 before any mutation", () => {
-    expect(API).toContain("canCompleteJob(");
-    expect(API).toContain("{ status: 403 }");
+  it("POST delegates readiness and permission to the RPC as the single authoritative operation", () => {
+    const post = API.slice(API.indexOf("POST:"));
+    // After auth + strict body parse, POST must call the RPC directly with no
+    // stale precheck gate that would reject a lost-response retry on a
+    // now-Completed Job before it can reach the RPC's idempotent branch.
+    expect(post).toContain("completeJobAtomic(actor, params.jobId, parsed.value)");
+    expect(post).not.toContain("loadCompletionJob(");
+    expect(post).not.toContain("canCompleteJob(");
+    expect(post).not.toContain("countOpenAttendance(");
+    expect(post).not.toContain("completionBlockedReason(");
+    // Auth, actor resolution and strict parsing still gate the RPC call.
+    expect(post.indexOf("requireAuthenticatedN3User(request)")).toBeLessThan(
+      post.indexOf("completeJobAtomic("),
+    );
+    expect(post.indexOf("parseCompletionInput(body)")).toBeLessThan(
+      post.indexOf("completeJobAtomic("),
+    );
   });
 
-  it("rechecks lifecycle and open GPS attendance before mutating", () => {
-    expect(API).toContain("countOpenAttendance(");
-    expect(API).toContain("completionBlockedReason(job, openAttendance)");
+  it("POST surfaces the RPC's typed permission (403) and conflict (409) outcomes", () => {
+    const post = API.slice(API.indexOf("POST:"));
+    expect(post).toContain("result.outcome !== \"ok\"");
+    expect(post).toContain("result.status ?? 409");
+    expect(post).toContain("idempotent: Boolean(result.idempotent)");
+  });
+
+  it("GET keeps the read-model prechecks for rendering only", () => {
+    const get = API.slice(API.indexOf("GET:"), API.indexOf("POST:"));
+    expect(get).toContain("canCompleteJob(");
+    expect(get).toContain("countOpenAttendance(");
+    expect(get).toContain("completionBlockedReason(job, openAttendance)");
   });
 });
 
