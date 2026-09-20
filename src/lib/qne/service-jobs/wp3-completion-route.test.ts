@@ -124,7 +124,7 @@ type Handler = (arg: {
 }) => Promise<Response>;
 
 async function post(): Promise<Handler> {
-  const mod = (await import("@/routes/api/workspace/jobs.$jobId.complete")) as {
+  const mod = (await import("@/routes/api/workspace/jobs.$jobId.complete")) as unknown as {
     Route: { options: { server: { handlers: Record<string, Handler> } } };
   };
   return mod.Route.options.server.handlers.POST;
