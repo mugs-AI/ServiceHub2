@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { InfoPopover } from "@/components/qne/InfoPopover";
 import { formatMYDateTime } from "@/lib/format-date";
 import {
   CANCEL_APPROVAL_MODE_LABEL,
