@@ -11,6 +11,13 @@ import { OnSiteAttendanceCard } from "@/components/qne/OnSiteAttendanceCard";
 import { SimpleCompletionCard } from "@/components/qne/SimpleCompletionCard";
 
 import { isTakeoverEligibleStatus } from "@/lib/qne/service-jobs/permissions";
+import {
+  refDisplay,
+  waitingPartyForStatus,
+  WAITING_REF_LABEL,
+  MAX_WAITING_REF,
+} from "@/lib/qne/service-jobs/wp3a-waiting";
+import type { WaitingParty } from "@/lib/qne/service-jobs/wp3a-waiting";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { DateField, TimeField } from "@/components/qne/DateTimeFields";
 import {
@@ -32,6 +39,10 @@ interface JobDetail {
   job_number: string;
   customer_code_snapshot: string;
   customer_name_snapshot: string | null;
+  // WP3A — latest waiting references (present once the candidate migration
+  // is applied; the UI shows "—" until then).
+  latest_customer_ref_no?: string | null;
+  latest_vendor_ref_no?: string | null;
   contact_person: string | null;
   contact_phone: string | null;
   contact_email: string | null;
@@ -341,7 +352,26 @@ function JobDetailPage() {
 
       <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
         <Section title="Job details">
-          <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
+          {/* WP3A — latest waiting references sit in a compact right-hand
+              column beside the Customer area on desktop, stacked on mobile. */}
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0 flex-1">
+              <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
+            </div>
+            <dl
+              data-testid="waiting-refs"
+              className="min-w-0 shrink-0 space-y-0.5 text-xs md:w-56 md:text-right"
+            >
+              <div className="min-w-0">
+                <dt className="inline text-muted-foreground">Customer Ref. No.: </dt>
+                <dd className="inline break-words">{refDisplay(job.latest_customer_ref_no)}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="inline text-muted-foreground">Vendor Ref. No.: </dt>
+                <dd className="inline break-words">{refDisplay(job.latest_vendor_ref_no)}</dd>
+              </div>
+            </dl>
+          </div>
           <Kv k="Problem" v={job.problem_description} multiline />
           {/* SH2.2-JOB-UI-01 — Priority and Cancellation share one action row. */}
           <div className="flex flex-col gap-3 border-t pt-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1017,6 +1047,9 @@ function WorkflowActions({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // WP3A — a waiting transition must collect a reference number first.
+  const [waitingParty, setWaitingParty] = useState<WaitingParty | null>(null);
+  const [waitingRef, setWaitingRef] = useState("");
 
   const transitions = useMemo(() => {
     let t = allowedTransitionsClient(job.status);
@@ -1054,6 +1087,30 @@ function WorkflowActions({
     }
   }
 
+  // WP3A — the waiting transition goes through its own atomic endpoint so the
+  // status change, the latest reference and the activity evidence commit
+  // together. The server rejects a blank reference regardless of this form.
+  async function submitWaiting(party: WaitingParty) {
+    setBusy("waiting");
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/waiting`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ party, ref_no: waitingRef.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Transition failed");
+      setWaitingParty(null);
+      setWaitingRef("");
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Transition failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <section className="rounded-xl border bg-card p-3 shadow-sm">
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1064,7 +1121,15 @@ function WorkflowActions({
           <button
             key={to}
             type="button"
-            onClick={() => transition(to)}
+            onClick={() => {
+              const party = waitingPartyForStatus(to);
+              if (party) {
+                setWaitingRef("");
+                setWaitingParty(party);
+                return;
+              }
+              void transition(to);
+            }}
             disabled={!!busy}
             className={`min-h-10 rounded-lg px-3 text-sm font-semibold shadow-sm disabled:opacity-50 ${
               to === "Cancelled"
@@ -1087,6 +1152,47 @@ function WorkflowActions({
         </div>
       )}
 
+      {waitingParty && (
+        <ModalShell
+          title={WAITING_REF_LABEL[waitingParty]}
+          onClose={() => setWaitingParty(null)}
+        >
+          <div data-testid="waiting-ref-prompt" className="min-w-0">
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+              htmlFor="wp3a-waiting-ref"
+            >
+              Ref. No. *
+            </label>
+            <input
+              id="wp3a-waiting-ref"
+              value={waitingRef}
+              onChange={(e) => setWaitingRef(e.target.value.slice(0, MAX_WAITING_REF))}
+              maxLength={MAX_WAITING_REF}
+              placeholder="Reference number"
+              className="mt-1 w-full min-w-0 rounded-md border bg-background p-2 text-sm text-foreground"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setWaitingParty(null)}
+                disabled={!!busy}
+                className="min-h-[44px] rounded-lg border px-4 text-sm font-semibold hover:bg-accent disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!waitingRef.trim() || !!busy}
+                onClick={() => void submitWaiting(waitingParty)}
+                className="min-h-[44px] rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {busy === "waiting" ? "Working…" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
     </section>
   );
 }
@@ -1870,6 +1976,15 @@ function formatEvent(it: TimelineItem): string {
       return `Comment (${it.new_value ?? "internal"})`;
     case "internal_note_updated":
       return `Internal note updated`;
+    // WP3A — waiting reference and reopen lifecycle events.
+    case "waiting_reference_set":
+      return `Waiting: ${it.old_value ?? "—"} → ${it.new_value ?? "—"} (Ref. No. recorded)`;
+    case "reopen_requested":
+      return `Reopen requested`;
+    case "reopen_approved":
+      return `Reopen approved — back to In Progress`;
+    case "reopen_rejected":
+      return `Reopen rejected`;
     default:
       return it.event;
   }

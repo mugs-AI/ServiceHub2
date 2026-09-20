@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { JobReopenSection } from "@/components/qne/JobReopenSection";
 import { formatMYDateTime } from "@/lib/format-date";
 import {
   LEGACY_COMPLETION_LABEL,
@@ -118,6 +119,13 @@ export function SimpleCompletionCard({
       )}
 
       {view.mode === "locked" && <LockedCompletion record={view.record} />}
+
+      {/* WP3A — reopen request / decision for a Completed Job. It renders no
+          form control inside the three-control completion form; it only
+          appears once the Job is completed (including legacy completions). */}
+      {(view.mode === "locked" || view.mode === "legacy") && (
+        <JobReopenSection jobId={jobId} onChanged={() => void load()} />
+      )}
 
       {view.mode === "blocked" && (
         <p className="mt-2 break-words text-xs text-muted-foreground">{view.reason}</p>

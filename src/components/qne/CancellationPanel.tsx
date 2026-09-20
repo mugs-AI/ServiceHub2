@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { InfoPopover } from "@/components/qne/InfoPopover";
 import { formatMYDateTime } from "@/lib/format-date";
 import {
   CANCEL_APPROVAL_MODE_LABEL,
@@ -157,20 +158,32 @@ export function CancellationPanel({
 
   return wrap(
     <>
+      {/* WP3A — the request action shares the header row, and the approval
+          mode wording lives in an [i] balloon instead of a permanent line. */}
       <div
-        className={
-          embedded
-            ? "flex flex-wrap items-baseline gap-x-2 gap-y-1"
-            : "flex flex-wrap items-baseline justify-between gap-2"
-        }
+        data-testid="cancellation-header"
+        className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1"
       >
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Cancellation
-        </h2>
-        <span className="text-[11px] text-muted-foreground">
-          {CANCEL_APPROVAL_MODE_LABEL[state.settings.approvalMode]}
-        </span>
+        <div className="flex min-w-0 items-center gap-1">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Cancellation
+          </h2>
+          <InfoPopover label="About cancellation approval" testId="cancellation-approval-info">
+            {CANCEL_APPROVAL_MODE_LABEL[state.settings.approvalMode]}
+          </InfoPopover>
+        </div>
+        {!active && !terminal && state.canRequest && (
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => setOpen(true)}
+            className="min-h-[36px] shrink-0 rounded-lg border border-destructive/40 bg-background px-3 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+          >
+            {label}
+          </button>
+        )}
       </div>
+
 
 
       {active && (
@@ -214,18 +227,6 @@ export function CancellationPanel({
         </div>
       )}
 
-      {!active && !terminal && state.canRequest && (
-        <div className="mt-2">
-          <button
-            type="button"
-            disabled={!!busy}
-            onClick={() => setOpen(true)}
-            className="min-h-10 rounded-lg border border-destructive/40 bg-background px-3 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
-          >
-            {label}
-          </button>
-        </div>
-      )}
 
       {!active && !terminal && !state.canRequest && (
         <p className="mt-2 text-[11px] text-muted-foreground">
