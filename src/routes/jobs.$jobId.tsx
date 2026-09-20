@@ -339,7 +339,6 @@ function JobDetailPage() {
       {/* WP3 — simple atomic completion. */}
       <SimpleCompletionCard jobId={job.id} onCompleted={reloadAll} />
 
-
       <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
         <Section title="Job details">
           <Kv k="Customer" v={job.customer_name_snapshot ?? "(no name)"} />
