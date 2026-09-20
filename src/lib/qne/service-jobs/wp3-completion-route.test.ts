@@ -118,10 +118,7 @@ vi.mock("@/lib/qne/service-jobs/wp3-completion.server", () => ({
 
 /* ---------------- invocation ---------------- */
 
-type Handler = (arg: {
-  request: Request;
-  params: Record<string, string>;
-}) => Promise<Response>;
+type Handler = (arg: { request: Request; params: Record<string, string> }) => Promise<Response>;
 
 async function post(): Promise<Handler> {
   const mod = (await import("@/routes/api/workspace/jobs.$jobId.complete")) as unknown as {

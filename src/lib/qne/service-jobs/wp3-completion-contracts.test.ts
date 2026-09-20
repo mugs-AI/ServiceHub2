@@ -56,7 +56,7 @@ describe("API authority, tenant and actor", () => {
 
   it("POST surfaces the RPC's typed permission (403) and conflict (409) outcomes", () => {
     const post = API.slice(API.indexOf("POST:"));
-    expect(post).toContain("result.outcome !== \"ok\"");
+    expect(post).toContain('result.outcome !== "ok"');
     expect(post).toContain("result.status ?? 409");
     expect(post).toContain("idempotent: Boolean(result.idempotent)");
   });

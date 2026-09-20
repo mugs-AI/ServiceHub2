@@ -59,10 +59,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/complete")({
       POST: async ({ request, params }) => {
         const { requireAuthenticatedN3User, guardResponse } =
           await import("@/lib/qne/session/current-user.server");
-        const { completeJobAtomic } =
-          await import("@/lib/qne/service-jobs/wp3-completion.server");
-        const { parseCompletionInput } =
-          await import("@/lib/qne/service-jobs/wp3-completion");
+        const { completeJobAtomic } = await import("@/lib/qne/service-jobs/wp3-completion.server");
+        const { parseCompletionInput } = await import("@/lib/qne/service-jobs/wp3-completion");
         try {
           const user = await requireAuthenticatedN3User(request);
           const actor = {
