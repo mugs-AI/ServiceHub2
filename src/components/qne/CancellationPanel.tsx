@@ -227,18 +227,6 @@ export function CancellationPanel({
         </div>
       )}
 
-      {!active && !terminal && state.canRequest && (
-        <div className="mt-2">
-          <button
-            type="button"
-            disabled={!!busy}
-            onClick={() => setOpen(true)}
-            className="min-h-10 rounded-lg border border-destructive/40 bg-background px-3 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
-          >
-            {label}
-          </button>
-        </div>
-      )}
 
       {!active && !terminal && !state.canRequest && (
         <p className="mt-2 text-[11px] text-muted-foreground">
