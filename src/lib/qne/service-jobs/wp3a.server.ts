@@ -137,7 +137,11 @@ export async function setWaitingStateAtomic(
     p_actor_name: actor.name,
   });
   if (error) throw new Error(error.message);
-  return (data ?? { outcome: "error", error: "Waiting update failed." }) as RpcOutcome;
+  return (data ?? {
+    outcome: "error",
+    status: 500,
+    error: "Waiting update failed.",
+  }) as CandidateWaitingSetResult as RpcOutcome;
 }
 
 /** The ONLY reopen-request creation path. Never changes the Job status. */
