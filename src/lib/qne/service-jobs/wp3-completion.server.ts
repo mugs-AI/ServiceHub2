@@ -59,7 +59,15 @@ export async function loadCompletionJob(
 const RECORD_COLUMNS =
   "resolution_summary, follow_up_required, completed_by_user_id, completed_by_name_snapshot, completed_at";
 
-/** The single completion record for a Job, or null (including legacy Jobs). */
+/**
+ * The latest completion record for a Job, or null (including legacy Jobs).
+ *
+ * Completion cycles allow more than one immutable evidence row per Job, so the
+ * read is ordered newest-first and deterministic: completed_at DESC with
+ * created_at DESC as the tie-breaker. Both columns exist in the current
+ * pre-migration schema, so this read is safe before and after the WP3A
+ * candidate migration is applied.
+ */
 export async function loadCompletionRecord(
   tenantCode: string,
   jobId: string,
@@ -69,6 +77,8 @@ export async function loadCompletionRecord(
     .select<CompletionRecord>(RECORD_COLUMNS)
     .eq("tenant_code", tenantCode)
     .eq("service_job_id", jobId)
+    .order("completed_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(error.message);
