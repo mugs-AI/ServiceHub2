@@ -59,9 +59,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/complete")({
       POST: async ({ request, params }) => {
         const { requireAuthenticatedN3User, guardResponse } =
           await import("@/lib/qne/session/current-user.server");
-        const { loadCompletionJob, countOpenAttendance, completeJobAtomic } =
+        const { completeJobAtomic } =
           await import("@/lib/qne/service-jobs/wp3-completion.server");
-        const { canCompleteJob, completionBlockedReason, parseCompletionInput } =
+        const { parseCompletionInput } =
           await import("@/lib/qne/service-jobs/wp3-completion");
         try {
           const user = await requireAuthenticatedN3User(request);
@@ -81,17 +81,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/complete")({
           const parsed = parseCompletionInput(body);
           if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 
-          const job = await loadCompletionJob(actor.tenantCode, params.jobId);
-          if (!canCompleteJob({ actorUserId: actor.userId, isAdmin: actor.isAdmin }, job)) {
-            return Response.json(
-              { error: "Only the assigned technician or an administrator can complete this Job." },
-              { status: 403 },
-            );
-          }
-          const openAttendance = await countOpenAttendance(actor.tenantCode, params.jobId);
-          const blocked = completionBlockedReason(job, openAttendance);
-          if (blocked) return Response.json({ error: blocked }, { status: 409 });
-
+          // completeJobAtomic is the single authoritative readiness/permission/
+          // mutation operation. No POST-side prechecks: they would reject an
+          // identical lost-response retry before it reaches the RPC's
+          // idempotent branch, and duplicate checks the RPC performs under lock.
           const result = await completeJobAtomic(actor, params.jobId, parsed.value);
           if (result.outcome !== "ok") {
             return Response.json(
