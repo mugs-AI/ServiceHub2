@@ -186,5 +186,9 @@ export async function decideReopenAtomic(
     p_is_admin: actor.isAdmin,
   });
   if (error) throw new Error(error.message);
-  return (data ?? { outcome: "error", error: "Reopen decision failed." }) as RpcOutcome;
+  return (data ?? {
+    outcome: "error",
+    status: 500,
+    error: "Reopen decision failed.",
+  }) as CandidateReopenDecideResult as RpcOutcome;
 }
