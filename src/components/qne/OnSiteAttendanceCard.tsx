@@ -529,66 +529,73 @@ export function OnSiteAttendanceCard({ jobId }: { jobId: string }) {
       {!!state?.visits.length && (
         <ul className="mt-3 space-y-2">
           {state.visits.slice(0, 8).map((v) => (
-            <li key={v.id} className="rounded-lg border p-2 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-1">
-                <span className="min-w-0 break-words font-medium">
-                  {v.actor_name_snapshot ?? "(unknown)"}
-                </span>
-                <span className="text-muted-foreground">
-                  {v.clock_out_at ? `${v.duration_minutes ?? 0} min` : "In progress"}
-                </span>
-              </div>
-              <p className="mt-0.5 break-words text-muted-foreground">
+            // WP3A — one compact row: person, In time + Map In, Out time +
+            // Map Out, and an [i] balloon holding the GPS result, accuracy and
+            // any exception detail. Coordinates are never rendered as text.
+            <li
+              key={v.id}
+              data-testid="attendance-visit-row"
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-2 text-xs"
+            >
+              <span className="min-w-0 flex-1 basis-full break-words font-medium sm:basis-auto">
+                {v.actor_name_snapshot ?? "(unknown)"}
+              </span>
+              <span className="shrink-0 text-muted-foreground">
                 In {formatMYDateTime(v.clock_in_at)}
-                {v.clock_out_at ? ` · Out ${formatMYDateTime(v.clock_out_at)}` : ""}
-              </p>
-              {/* Full GPS evidence: both clock events, plus the stored reason
-                  for anyone the server already authorised to see this row. */}
-              <p className="mt-0.5 break-words text-muted-foreground">
-                Clock In: {gpsSummary(v.clock_in_gps_result, v.clock_in_accuracy_m)}
-              </p>
-              {v.clock_in_exception_reason && (
-                <p className="mt-0.5 break-words text-amber-700">
-                  Clock In reason: {v.clock_in_exception_reason}
+              </span>
+              <MapAction
+                onOpen={setChooser}
+                tone="peach"
+                placeholder
+                label="Map In"
+                point={{
+                  gpsResult: v.clock_in_gps_result,
+                  latitude: v.clock_in_latitude,
+                  longitude: v.clock_in_longitude,
+                  accuracy: v.clock_in_accuracy_m,
+                }}
+              />
+              <span className="shrink-0 text-muted-foreground">
+                Out {v.clock_out_at ? formatMYDateTime(v.clock_out_at) : "—"}
+              </span>
+              <MapAction
+                onOpen={setChooser}
+                tone="peach"
+                placeholder
+                label="Map Out"
+                point={{
+                  gpsResult: v.clock_out_gps_result,
+                  latitude: v.clock_out_latitude,
+                  longitude: v.clock_out_longitude,
+                  accuracy: v.clock_out_accuracy_m,
+                }}
+              />
+              <InfoPopover label="GPS details for this visit" testId="attendance-visit-info">
+                <p className="break-words">
+                  Clock In: {gpsSummary(v.clock_in_gps_result, v.clock_in_accuracy_m)}
                 </p>
-              )}
-              {v.clock_out_at && (
-                <p className="mt-0.5 break-words text-muted-foreground">
-                  Clock Out: {gpsSummary(v.clock_out_gps_result, v.clock_out_accuracy_m)}
+                {v.clock_in_exception_reason && (
+                  <p className="mt-1 break-words">
+                    Clock In reason: {v.clock_in_exception_reason}
+                  </p>
+                )}
+                {v.clock_out_at && (
+                  <p className="mt-1 break-words">
+                    Clock Out: {gpsSummary(v.clock_out_gps_result, v.clock_out_accuracy_m)}
+                  </p>
+                )}
+                {v.clock_out_at && v.clock_out_exception_reason && (
+                  <p className="mt-1 break-words">
+                    Clock Out reason: {v.clock_out_exception_reason}
+                  </p>
+                )}
+                <p className="mt-1 break-words">
+                  {v.clock_out_at ? `${v.duration_minutes ?? 0} min` : "In progress"}
                 </p>
-              )}
-              {v.clock_out_at && v.clock_out_exception_reason && (
-                <p className="mt-0.5 break-words text-amber-700">
-                  Clock Out reason: {v.clock_out_exception_reason}
-                </p>
-              )}
-              {v.has_gps_exception && (
-                <p className="mt-0.5 break-words font-medium text-amber-700">
-                  GPS exception recorded
-                </p>
-              )}
-              <div className="mt-2 flex flex-wrap gap-2">
-                <MapAction
-                  onOpen={setChooser}
-                  label="Map In"
-                  point={{
-                    gpsResult: v.clock_in_gps_result,
-                    latitude: v.clock_in_latitude,
-                    longitude: v.clock_in_longitude,
-                    accuracy: v.clock_in_accuracy_m,
-                  }}
-                />
-                <MapAction
-                  onOpen={setChooser}
-                  label="Map Out"
-                  point={{
-                    gpsResult: v.clock_out_gps_result,
-                    latitude: v.clock_out_latitude,
-                    longitude: v.clock_out_longitude,
-                    accuracy: v.clock_out_accuracy_m,
-                  }}
-                />
-              </div>
+                {v.has_gps_exception && (
+                  <p className="mt-1 break-words font-medium">GPS exception recorded</p>
+                )}
+              </InfoPopover>
             </li>
           ))}
         </ul>
