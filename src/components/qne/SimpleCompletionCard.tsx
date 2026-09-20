@@ -88,6 +88,18 @@ export function SimpleCompletionCard({
     }
   }, [busy, followUp, jobId, load, onCompleted, summary]);
 
+  // WP3A — an approved reopen changes the Job itself (status, workflow,
+  // appointment, attendance), not just this card. Reload the card first, then
+  // let the parent reload the whole Job page. The promise is awaited inside and
+  // never left unhandled at the call site.
+  const handleReopenChanged = useCallback(async () => {
+    try {
+      await load();
+    } finally {
+      onCompleted?.();
+    }
+  }, [load, onCompleted]);
+
   if (!state) {
     return (
       <div className="rounded-xl border bg-card p-3 text-sm text-muted-foreground">
