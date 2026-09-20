@@ -56,10 +56,10 @@ function requireActor(actor: JobOpsActor): string {
   return actor.userId;
 }
 
-export interface WaitingRefs {
-  latest_customer_ref_no: string | null;
-  latest_vendor_ref_no: string | null;
-}
+export type WaitingRefs = Pick<
+  CandidateServiceJobColumns,
+  "latest_customer_ref_no" | "latest_vendor_ref_no"
+>;
 
 /** Current-state latest references for the compact Job details column. */
 export async function loadWaitingRefs(
