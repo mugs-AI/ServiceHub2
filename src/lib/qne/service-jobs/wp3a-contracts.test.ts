@@ -52,6 +52,43 @@ describe("candidate migration", () => {
     expect(SQL).toContain("DROP INDEX IF EXISTS public.service_job_completions_one_per_job_idx");
   });
 
+  it("removes the old one-per-job uniqueness safely and keeps the primary key", () => {
+    // service_job_completion_unique is a UNIQUE CONSTRAINT: DROP INDEX cannot
+    // remove it, so the candidate uses a guarded ALTER TABLE ... DROP CONSTRAINT.
+    expect(SQL).toContain("DROP CONSTRAINT service_job_completion_unique");
+    expect(SQL).toContain("WHERE conname = 'service_job_completion_unique'");
+    expect(SQL).toContain("AND contype = 'u'");
+    expect(SQL).not.toContain("DROP INDEX IF EXISTS public.service_job_completion_unique");
+    // Never touches the primary key.
+    expect(SQL).not.toMatch(/DROP CONSTRAINT\s+service_job_completions_pkey/);
+
+    // The replacement uniqueness must exist before the old rules are removed.
+    const newIndexAt = SQL.indexOf("service_job_completions_cycle_unique_idx");
+    const dropConstraintAt = SQL.indexOf("DROP CONSTRAINT service_job_completion_unique");
+    const dropIndexAt = SQL.indexOf(
+      "DROP INDEX IF EXISTS public.service_job_completions_one_per_job_idx",
+    );
+    expect(newIndexAt).toBeGreaterThan(0);
+    expect(newIndexAt).toBeLessThan(dropConstraintAt);
+    expect(newIndexAt).toBeLessThan(dropIndexAt);
+  });
+
+  it("ships candidate types instead of editing the generated Supabase types", () => {
+    const candidate = read("src", "lib", "qne", "service-jobs", "wp3a-candidate-types.ts");
+    expect(candidate).toContain("latest_customer_ref_no");
+    expect(candidate).toContain("latest_vendor_ref_no");
+    expect(candidate).toContain("completion_cycle");
+    expect(candidate).toContain("CandidateServiceJobReopenRequestRow");
+    expect(candidate).toContain("CandidateWaitingSetResult");
+    expect(candidate).toContain("CandidateReopenRequestResult");
+    expect(candidate).toContain("CandidateReopenDecideResult");
+    expect(candidate).toMatch(/regenerated only after an authorised migration/i);
+    // The generated types must not describe unapplied schema.
+    const generated = read("src", "integrations", "supabase", "types.ts");
+    expect(generated).not.toContain("service_job_reopen_requests");
+    expect(generated).not.toContain("latest_customer_ref_no");
+  });
+
   it("creates one-pending-per-job reopen requests with server-only access", () => {
     expect(SQL).toContain("CREATE TABLE IF NOT EXISTS public.service_job_reopen_requests");
     expect(SQL).toContain("service_job_reopen_requests_one_pending_idx");
