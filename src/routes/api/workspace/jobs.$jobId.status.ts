@@ -50,6 +50,19 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
               { status: 400 },
             );
           }
+          // WP3A — no generic waiting bypass. A waiting transition must carry a
+          // reference number, which only the dedicated endpoint collects and
+          // stores atomically with the status change and the activity evidence.
+          // Returning from a waiting state to In Progress stays here.
+          if (to === "Waiting Customer" || to === "Waiting Vendor") {
+            return Response.json(
+              {
+                error:
+                  "A waiting transition requires a reference number. Use the Waiting on Customer / Waiting on Vendor action on the Job.",
+              },
+              { status: 400 },
+            );
+          }
 
 
           const { data: job, error: jobErr } = await supabaseAdmin
