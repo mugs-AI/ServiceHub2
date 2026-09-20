@@ -2,8 +2,8 @@
 //
 // An eligible active Job shows exactly three controls: a required Resolution
 // Summary, a "Follow-up still required" checkbox and one primary "Complete
-// Job" button. No checklist, diagnosis, action taken, test result,
-// acknowledgement, waiver, signature, follow-up date or service report.
+// Job" button. None of the retired legacy completion inputs are collected or
+// displayed here; see src/lib/qne/service-jobs/wp3-completion.ts.
 //
 // Every rule is re-checked on the server inside the completion transaction;
 // hiding a control is convenience, not authorisation.

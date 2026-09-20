@@ -12,7 +12,7 @@
 --
 -- Strictly additive:
 --   * no DROP / RENAME of any existing object
---   * no change to the legacy Field Operations tables or to public.sh_field_mutate
+--   * no change to the legacy Field Operations tables or their existing RPCs
 --   * no change to WP2B attachments, WP2C attendance, cancellation or workflow
 --   * no backfill: a historically Completed Job with no completion row stays
 --     exactly as it is (JB26072201) and is reported as a legacy completion.
