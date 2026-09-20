@@ -336,6 +336,9 @@ function JobDetailPage() {
       {/* WP2B — compact Job Attachments card (Google Drive, internal-only). */}
       <JobAttachmentsCard jobId={job.id} />
 
+      {/* WP3 — simple atomic completion. */}
+      <SimpleCompletionCard jobId={job.id} onCompleted={reloadAll} />
+
 
       <div className={pendingLock ? "pointer-events-none opacity-60 space-y-6" : "space-y-6"}>
         <Section title="Job details">
