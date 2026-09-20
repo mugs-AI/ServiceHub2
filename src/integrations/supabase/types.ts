@@ -1184,6 +1184,12 @@ export type Database = {
           ack_remark: string | null
           action_taken: string | null
           checklist: Json
+          completed_at: string | null
+          completed_by_code_snapshot: string | null
+          completed_by_email_snapshot: string | null
+          completed_by_name_snapshot: string | null
+          completed_by_user_id: string | null
+          completion_kind: string | null
           created_at: string
           diagnosis: string | null
           follow_up_date: string | null
@@ -1218,6 +1224,12 @@ export type Database = {
           ack_remark?: string | null
           action_taken?: string | null
           checklist?: Json
+          completed_at?: string | null
+          completed_by_code_snapshot?: string | null
+          completed_by_email_snapshot?: string | null
+          completed_by_name_snapshot?: string | null
+          completed_by_user_id?: string | null
+          completion_kind?: string | null
           created_at?: string
           diagnosis?: string | null
           follow_up_date?: string | null
@@ -1252,6 +1264,12 @@ export type Database = {
           ack_remark?: string | null
           action_taken?: string | null
           checklist?: Json
+          completed_at?: string | null
+          completed_by_code_snapshot?: string | null
+          completed_by_email_snapshot?: string | null
+          completed_by_name_snapshot?: string | null
+          completed_by_user_id?: string | null
+          completion_kind?: string | null
           created_at?: string
           diagnosis?: string | null
           follow_up_date?: string | null
@@ -2587,6 +2605,19 @@ export type Database = {
           p_verifier_ciphertext: string
         }
         Returns: string
+      }
+      sh_job_complete_simple: {
+        Args: {
+          p_actor_code: string
+          p_actor_email: string
+          p_actor_name: string
+          p_actor_user_id: string
+          p_is_admin: boolean
+          p_job_id: string
+          p_payload?: Json
+          p_tenant_code: string
+        }
+        Returns: Json
       }
       sh_next_job_number: {
         Args: { p_date_key: string; p_tenant_code: string }
