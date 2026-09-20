@@ -184,8 +184,8 @@ describe("E.1 collaborative transitions (teammate, not Primary PIC)", () => {
   const cases: Array<[string, string]> = [
     ["Open", "In Progress"],
     ["Assigned", "In Progress"],
-    ["In Progress", "Waiting Customer"],
-    ["In Progress", "Waiting Vendor"],
+    // WP3A: In Progress → Waiting * now goes through the dedicated /waiting
+    // endpoint because it requires a reference number (covered below).
     ["Waiting Customer", "In Progress"],
     ["Waiting Vendor", "In Progress"],
   ];
