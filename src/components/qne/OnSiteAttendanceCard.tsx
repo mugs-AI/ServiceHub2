@@ -82,19 +82,40 @@ function MapAction({
   label,
   point,
   onOpen,
+  tone = "plain",
+  placeholder = false,
 }: {
   label: "Map In" | "Map Out";
   point: AttendanceMapPoint;
   onOpen: (target: ChooserTarget) => void;
+  /** WP3A — light peach treatment for the compact visit rows. */
+  tone?: "plain" | "peach";
+  /** Render a disabled chip instead of nothing when there is no valid point. */
+  placeholder?: boolean;
 }) {
-  if (!hasMapAction(point)) return null;
+  const base =
+    "inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border px-3 text-xs font-semibold";
+  const peach =
+    "border-orange-200 bg-orange-100 text-orange-900 hover:bg-orange-200 dark:border-orange-900/50 dark:bg-orange-900/30 dark:text-orange-100";
+  const plain = "bg-card text-foreground hover:bg-accent";
+  if (!hasMapAction(point)) {
+    if (!placeholder) return null;
+    return (
+      <span
+        aria-disabled="true"
+        className={`${base} cursor-not-allowed opacity-40 ${tone === "peach" ? peach : plain}`}
+      >
+        {label}
+      </span>
+    );
+  }
   return (
     <button
       type="button"
       onClick={() => onOpen({ label, point })}
       aria-haspopup="dialog"
       aria-label={`${label} — choose a maps app`}
-      className="inline-flex min-h-11 items-center justify-center rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent"
+      className={`${base} ${tone === "peach" ? peach : plain}`}
     >
       {label}
     </button>
