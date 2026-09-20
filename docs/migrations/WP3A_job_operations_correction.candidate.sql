@@ -77,9 +77,9 @@ $$;
 ALTER TABLE public.service_job_completions
   ADD COLUMN IF NOT EXISTS completion_cycle integer NOT NULL DEFAULT 1;
 
-UPDATE public.service_job_completions
-  SET completion_cycle = 1
-  WHERE completion_cycle IS NULL OR completion_cycle < 1;
+-- Existing evidence rows are backfilled to cycle 1 by the NOT NULL DEFAULT 1
+-- above, so no UPDATE against completion evidence is ever issued: existing
+-- completion evidence stays immutable.
 
 DO $$
 BEGIN
