@@ -82,7 +82,9 @@ describe("candidate migration", () => {
     expect(candidate).toContain("CandidateWaitingSetResult");
     expect(candidate).toContain("CandidateReopenRequestResult");
     expect(candidate).toContain("CandidateReopenDecideResult");
-    expect(candidate).toMatch(/regenerated only after an authorised migration/i);
+    expect(candidate.replace(/\s*\n\/\/\s*/g, " ")).toMatch(
+      /regenerated only after an authorised migration application/i,
+    );
     // The generated types must not describe unapplied schema.
     const generated = read("src", "integrations", "supabase", "types.ts");
     expect(generated).not.toContain("service_job_reopen_requests");
