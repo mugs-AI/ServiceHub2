@@ -1087,6 +1087,30 @@ function WorkflowActions({
     }
   }
 
+  // WP3A — the waiting transition goes through its own atomic endpoint so the
+  // status change, the latest reference and the activity evidence commit
+  // together. The server rejects a blank reference regardless of this form.
+  async function submitWaiting(party: WaitingParty) {
+    setBusy("waiting");
+    setErr(null);
+    try {
+      const res = await fetch(`/api/workspace/jobs/${job.id}/waiting`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ party, ref_no: waitingRef.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Transition failed");
+      setWaitingParty(null);
+      setWaitingRef("");
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Transition failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <section className="rounded-xl border bg-card p-3 shadow-sm">
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1097,7 +1121,15 @@ function WorkflowActions({
           <button
             key={to}
             type="button"
-            onClick={() => transition(to)}
+            onClick={() => {
+              const party = waitingPartyForStatus(to);
+              if (party) {
+                setWaitingRef("");
+                setWaitingParty(party);
+                return;
+              }
+              void transition(to);
+            }}
             disabled={!!busy}
             className={`min-h-10 rounded-lg px-3 text-sm font-semibold shadow-sm disabled:opacity-50 ${
               to === "Cancelled"
