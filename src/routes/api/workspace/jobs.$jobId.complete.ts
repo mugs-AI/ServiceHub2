@@ -12,12 +12,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/complete")({
   server: {
     handlers: {
       GET: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { loadCompletionJob, loadCompletionRecord, countOpenAttendance } = await import(
-          "@/lib/qne/service-jobs/wp3-completion.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { loadCompletionJob, loadCompletionRecord, countOpenAttendance } =
+          await import("@/lib/qne/service-jobs/wp3-completion.server");
         const { canCompleteJob, completionBlockedReason, completionView, MAX_RESOLUTION_SUMMARY } =
           await import("@/lib/qne/service-jobs/wp3-completion");
         try {
@@ -59,15 +57,12 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/complete")({
       },
 
       POST: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { loadCompletionJob, countOpenAttendance, completeJobAtomic } = await import(
-          "@/lib/qne/service-jobs/wp3-completion.server"
-        );
-        const { canCompleteJob, completionBlockedReason, parseCompletionInput } = await import(
-          "@/lib/qne/service-jobs/wp3-completion"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { loadCompletionJob, countOpenAttendance, completeJobAtomic } =
+          await import("@/lib/qne/service-jobs/wp3-completion.server");
+        const { canCompleteJob, completionBlockedReason, parseCompletionInput } =
+          await import("@/lib/qne/service-jobs/wp3-completion");
         try {
           const user = await requireAuthenticatedN3User(request);
           const actor = {

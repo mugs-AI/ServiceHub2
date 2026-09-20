@@ -83,7 +83,10 @@ describe("strict input parsing", () => {
       false,
     );
     const r = parseCompletionInput({ resolution_summary: " done ", follow_up_required: true });
-    expect(r).toEqual({ ok: true, value: { resolution_summary: "done", follow_up_required: true } });
+    expect(r).toEqual({
+      ok: true,
+      value: { resolution_summary: "done", follow_up_required: true },
+    });
     const d = parseCompletionInput({ resolution_summary: "done" });
     expect(d.ok && d.value.follow_up_required).toBe(false);
   });
@@ -100,7 +103,12 @@ describe("display state", () => {
 
   it("shows the form for an eligible active Job", () => {
     expect(
-      completionView({ status: "In Progress", is_deleted: false, record: null, blockedReason: null }),
+      completionView({
+        status: "In Progress",
+        is_deleted: false,
+        record: null,
+        blockedReason: null,
+      }),
     ).toEqual({ mode: "form" });
   });
 

@@ -104,10 +104,15 @@ describe("atomicity", () => {
 
 describe("candidate SQL is additive and unapplied", () => {
   it("exists at the reviewed path and was not applied", () => {
-    expect(existsSync(join(process.cwd(), "docs/migrations/WP3_simple_atomic_completion.candidate.sql")))
-      .toBe(true);
+    expect(
+      existsSync(join(process.cwd(), "docs/migrations/WP3_simple_atomic_completion.candidate.sql")),
+    ).toBe(true);
     // No WP3 migration recorded in the applied migration history.
-    const applied = read("supabase", "migrations", "20260917143341_a9308359-65c3-4292-9078-1e7f86946d70.sql");
+    const applied = read(
+      "supabase",
+      "migrations",
+      "20260917143341_a9308359-65c3-4292-9078-1e7f86946d70.sql",
+    );
     expect(applied).not.toContain("sh_job_complete_simple");
   });
 
@@ -122,7 +127,9 @@ describe("candidate SQL is additive and unapplied", () => {
 describe("UI contract", () => {
   it("mounts the compact completion card on the Job detail page", () => {
     expect(ROUTE).toContain("<SimpleCompletionCard jobId={job.id}");
-    expect(ROUTE).toContain('import { SimpleCompletionCard } from "@/components/qne/SimpleCompletionCard"');
+    expect(ROUTE).toContain(
+      'import { SimpleCompletionCard } from "@/components/qne/SimpleCompletionCard"',
+    );
   });
 
   it("offers exactly the three approved controls", () => {

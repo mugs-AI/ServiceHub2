@@ -11,7 +11,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { formatMYDateTime } from "@/lib/format-date";
-import { LEGACY_COMPLETION_LABEL, MAX_RESOLUTION_SUMMARY } from "@/lib/qne/service-jobs/wp3-completion";
+import {
+  LEGACY_COMPLETION_LABEL,
+  MAX_RESOLUTION_SUMMARY,
+} from "@/lib/qne/service-jobs/wp3-completion";
 import { getStoredToken } from "@/lib/qne/tokens";
 
 import type { CompletionRecord, CompletionView } from "@/lib/qne/service-jobs/wp3-completion";
