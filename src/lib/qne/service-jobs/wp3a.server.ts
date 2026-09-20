@@ -62,10 +62,7 @@ export type WaitingRefs = Pick<
 >;
 
 /** Current-state latest references for the compact Job details column. */
-export async function loadWaitingRefs(
-  tenantCode: string,
-  jobId: string,
-): Promise<WaitingRefs> {
+export async function loadWaitingRefs(tenantCode: string, jobId: string): Promise<WaitingRefs> {
   const { data, error } = await wp3aSchema
     .from(JOBS_TABLE_REF)
     .select<WaitingRefs>("latest_customer_ref_no, latest_vendor_ref_no")

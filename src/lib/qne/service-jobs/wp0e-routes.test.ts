@@ -32,7 +32,9 @@ vi.mock("@/lib/qne/session/current-user.server", () => ({
     };
   },
   guardResponse: (err: unknown) =>
-    err instanceof UnauthorizedError ? Response.json({ error: "Unauthorized" }, { status: 401 }) : null,
+    err instanceof UnauthorizedError
+      ? Response.json({ error: "Unauthorized" }, { status: 401 })
+      : null,
 }));
 
 /* ---------------- supabase double ---------------- */
@@ -99,7 +101,9 @@ function query(table: string, op: "select" | "update" | "insert" | "delete", pay
     maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
     single: async () => {
       const r = run();
-      return r.length === 1 ? { data: r[0], error: null } : { data: null, error: { message: "no row" } };
+      return r.length === 1
+        ? { data: r[0], error: null }
+        : { data: null, error: { message: "no row" } };
     },
     then: (resolve: (v: { data: Row[]; error: null }) => unknown) =>
       Promise.resolve({ data: run(), error: null }).then(resolve),

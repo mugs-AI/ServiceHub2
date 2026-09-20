@@ -17,8 +17,7 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/status")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { canTransition, ALL_STATUSES } =
           await import("@/lib/qne/service-jobs/workflow.server");
-        const { isGenericCompleteBlocked } =
-          await import("@/lib/qne/service-jobs/permissions");
+        const { isGenericCompleteBlocked } = await import("@/lib/qne/service-jobs/permissions");
         try {
           const user = await requireAuthenticatedN3User(request);
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

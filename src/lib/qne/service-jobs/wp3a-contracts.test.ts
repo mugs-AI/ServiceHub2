@@ -16,13 +16,7 @@ const SQL = read("docs", "migrations", "WP3A_job_operations_correction.candidate
 const SERVER = read("src", "lib", "qne", "service-jobs", "wp3a.server.ts");
 const WAITING_ROUTE = read("src", "routes", "api", "workspace", "jobs.$jobId.waiting.ts");
 const REOPEN_ROUTE = read("src", "routes", "api", "workspace", "jobs.$jobId.reopen.ts");
-const DECISION_ROUTE = read(
-  "src",
-  "routes",
-  "api",
-  "workspace",
-  "jobs.$jobId.reopen.decision.ts",
-);
+const DECISION_ROUTE = read("src", "routes", "api", "workspace", "jobs.$jobId.reopen.decision.ts");
 const STATUS_ROUTE = read("src", "routes", "api", "workspace", "jobs.$jobId.status.ts");
 const JOB_PAGE = read("src", "routes", "jobs.$jobId.tsx");
 const CANCEL_PANEL = read("src", "components", "qne", "CancellationPanel.tsx");
@@ -34,7 +28,12 @@ describe("candidate migration", () => {
   it("is the single WP3A candidate and is NOT applied", () => {
     expect(
       existsSync(
-        join(process.cwd(), "supabase", "migrations", "WP3A_job_operations_correction.candidate.sql"),
+        join(
+          process.cwd(),
+          "supabase",
+          "migrations",
+          "WP3A_job_operations_correction.candidate.sql",
+        ),
       ),
     ).toBe(false);
     expect(SQL).toContain("CANDIDATE, NOT APPLIED");
@@ -131,9 +130,9 @@ describe("candidate migration", () => {
     ]) {
       expect(SQL).toContain(evt);
     }
-    expect(SQL.match(/INSERT INTO public\.service_job_activity_log/g)?.length).toBeGreaterThanOrEqual(
-      4,
-    );
+    expect(
+      SQL.match(/INSERT INTO public\.service_job_activity_log/g)?.length,
+    ).toBeGreaterThanOrEqual(4);
   });
 
   it("keeps decision authority server-side and admin-only", () => {
@@ -272,9 +271,7 @@ describe("completion card + reopen", () => {
   });
 
   it("mounts the reopen section only in the completed / legacy view", () => {
-    expect(COMPLETION_CARD).toContain(
-      '{(view.mode === "locked" || view.mode === "legacy") && (',
-    );
+    expect(COMPLETION_CARD).toContain('{(view.mode === "locked" || view.mode === "legacy") && (');
     expect(COMPLETION_CARD).toContain("<JobReopenSection jobId={jobId}");
   });
 

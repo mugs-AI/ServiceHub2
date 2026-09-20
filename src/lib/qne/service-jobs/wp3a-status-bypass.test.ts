@@ -20,9 +20,7 @@ const ROUTE = readFileSync(
 
 describe("generic status route", () => {
   it("rejects both waiting targets with a 400 pointing at the dedicated action", () => {
-    expect(ROUTE).toContain(
-      'if (to === "Waiting Customer" || to === "Waiting Vendor") {',
-    );
+    expect(ROUTE).toContain('if (to === "Waiting Customer" || to === "Waiting Vendor") {');
     const guard = ROUTE.slice(
       ROUTE.indexOf('if (to === "Waiting Customer"'),
       ROUTE.indexOf("const { data: job, error: jobErr }"),
