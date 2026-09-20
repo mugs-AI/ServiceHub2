@@ -16,6 +16,15 @@ import {
 
 import type { WaitingInput } from "./wp3a-waiting";
 import type { ReopenDecisionInput, ReopenRequestRow } from "./wp3a-reopen";
+// Candidate (proposed, unapplied) schema shapes. The canonical generated
+// Supabase types must be regenerated only after an authorised migration
+// application; they are never hand-edited to describe unapplied schema.
+import type {
+  CandidateReopenDecideResult,
+  CandidateReopenRequestResult,
+  CandidateServiceJobColumns,
+  CandidateWaitingSetResult,
+} from "./wp3a-candidate-types";
 
 export interface JobOpsActor {
   tenantCode: string;
@@ -47,16 +56,13 @@ function requireActor(actor: JobOpsActor): string {
   return actor.userId;
 }
 
-export interface WaitingRefs {
-  latest_customer_ref_no: string | null;
-  latest_vendor_ref_no: string | null;
-}
+export type WaitingRefs = Pick<
+  CandidateServiceJobColumns,
+  "latest_customer_ref_no" | "latest_vendor_ref_no"
+>;
 
 /** Current-state latest references for the compact Job details column. */
-export async function loadWaitingRefs(
-  tenantCode: string,
-  jobId: string,
-): Promise<WaitingRefs> {
+export async function loadWaitingRefs(tenantCode: string, jobId: string): Promise<WaitingRefs> {
   const { data, error } = await wp3aSchema
     .from(JOBS_TABLE_REF)
     .select<WaitingRefs>("latest_customer_ref_no, latest_vendor_ref_no")
@@ -128,7 +134,11 @@ export async function setWaitingStateAtomic(
     p_actor_name: actor.name,
   });
   if (error) throw new Error(error.message);
-  return (data ?? { outcome: "error", error: "Waiting update failed." }) as RpcOutcome;
+  return (data ?? {
+    outcome: "error",
+    status: 500,
+    error: "Waiting update failed.",
+  }) as CandidateWaitingSetResult as RpcOutcome;
 }
 
 /** The ONLY reopen-request creation path. Never changes the Job status. */
@@ -146,7 +156,11 @@ export async function requestReopenAtomic(
     p_actor_name: actor.name,
   });
   if (error) throw new Error(error.message);
-  return (data ?? { outcome: "error", error: "Reopen request failed." }) as RpcOutcome;
+  return (data ?? {
+    outcome: "error",
+    status: 500,
+    error: "Reopen request failed.",
+  }) as CandidateReopenRequestResult as RpcOutcome;
 }
 
 /**
@@ -169,5 +183,9 @@ export async function decideReopenAtomic(
     p_is_admin: actor.isAdmin,
   });
   if (error) throw new Error(error.message);
-  return (data ?? { outcome: "error", error: "Reopen decision failed." }) as RpcOutcome;
+  return (data ?? {
+    outcome: "error",
+    status: 500,
+    error: "Reopen decision failed.",
+  }) as CandidateReopenDecideResult as RpcOutcome;
 }

@@ -16,13 +16,7 @@ const SQL = read("docs", "migrations", "WP3A_job_operations_correction.candidate
 const SERVER = read("src", "lib", "qne", "service-jobs", "wp3a.server.ts");
 const WAITING_ROUTE = read("src", "routes", "api", "workspace", "jobs.$jobId.waiting.ts");
 const REOPEN_ROUTE = read("src", "routes", "api", "workspace", "jobs.$jobId.reopen.ts");
-const DECISION_ROUTE = read(
-  "src",
-  "routes",
-  "api",
-  "workspace",
-  "jobs.$jobId.reopen.decision.ts",
-);
+const DECISION_ROUTE = read("src", "routes", "api", "workspace", "jobs.$jobId.reopen.decision.ts");
 const STATUS_ROUTE = read("src", "routes", "api", "workspace", "jobs.$jobId.status.ts");
 const JOB_PAGE = read("src", "routes", "jobs.$jobId.tsx");
 const CANCEL_PANEL = read("src", "components", "qne", "CancellationPanel.tsx");
@@ -34,7 +28,12 @@ describe("candidate migration", () => {
   it("is the single WP3A candidate and is NOT applied", () => {
     expect(
       existsSync(
-        join(process.cwd(), "supabase", "migrations", "WP3A_job_operations_correction.candidate.sql"),
+        join(
+          process.cwd(),
+          "supabase",
+          "migrations",
+          "WP3A_job_operations_correction.candidate.sql",
+        ),
       ),
     ).toBe(false);
     expect(SQL).toContain("CANDIDATE, NOT APPLIED");
@@ -50,6 +49,45 @@ describe("candidate migration", () => {
     );
     expect(SQL).toContain("(tenant_code, service_job_id, completion_cycle)");
     expect(SQL).toContain("DROP INDEX IF EXISTS public.service_job_completions_one_per_job_idx");
+  });
+
+  it("removes the old one-per-job uniqueness safely and keeps the primary key", () => {
+    // service_job_completion_unique is a UNIQUE CONSTRAINT: DROP INDEX cannot
+    // remove it, so the candidate uses a guarded ALTER TABLE ... DROP CONSTRAINT.
+    expect(SQL).toContain("DROP CONSTRAINT service_job_completion_unique");
+    expect(SQL).toContain("WHERE conname = 'service_job_completion_unique'");
+    expect(SQL).toContain("AND contype = 'u'");
+    expect(SQL).not.toContain("DROP INDEX IF EXISTS public.service_job_completion_unique");
+    // Never touches the primary key.
+    expect(SQL).not.toMatch(/DROP CONSTRAINT\s+service_job_completions_pkey/);
+
+    // The replacement uniqueness must exist before the old rules are removed.
+    const newIndexAt = SQL.indexOf("service_job_completions_cycle_unique_idx");
+    const dropConstraintAt = SQL.indexOf("DROP CONSTRAINT service_job_completion_unique");
+    const dropIndexAt = SQL.indexOf(
+      "DROP INDEX IF EXISTS public.service_job_completions_one_per_job_idx",
+    );
+    expect(newIndexAt).toBeGreaterThan(0);
+    expect(newIndexAt).toBeLessThan(dropConstraintAt);
+    expect(newIndexAt).toBeLessThan(dropIndexAt);
+  });
+
+  it("ships candidate types instead of editing the generated Supabase types", () => {
+    const candidate = read("src", "lib", "qne", "service-jobs", "wp3a-candidate-types.ts");
+    expect(candidate).toContain("latest_customer_ref_no");
+    expect(candidate).toContain("latest_vendor_ref_no");
+    expect(candidate).toContain("completion_cycle");
+    expect(candidate).toContain("CandidateServiceJobReopenRequestRow");
+    expect(candidate).toContain("CandidateWaitingSetResult");
+    expect(candidate).toContain("CandidateReopenRequestResult");
+    expect(candidate).toContain("CandidateReopenDecideResult");
+    expect(candidate.replace(/\s*\n\/\/\s*/g, " ")).toMatch(
+      /regenerated only after an authorised migration application/i,
+    );
+    // The generated types must not describe unapplied schema.
+    const generated = read("src", "integrations", "supabase", "types.ts");
+    expect(generated).not.toContain("service_job_reopen_requests");
+    expect(generated).not.toContain("latest_customer_ref_no");
   });
 
   it("creates one-pending-per-job reopen requests with server-only access", () => {
@@ -92,9 +130,9 @@ describe("candidate migration", () => {
     ]) {
       expect(SQL).toContain(evt);
     }
-    expect(SQL.match(/INSERT INTO public\.service_job_activity_log/g)?.length).toBeGreaterThanOrEqual(
-      4,
-    );
+    expect(
+      SQL.match(/INSERT INTO public\.service_job_activity_log/g)?.length,
+    ).toBeGreaterThanOrEqual(4);
   });
 
   it("keeps decision authority server-side and admin-only", () => {
@@ -233,9 +271,7 @@ describe("completion card + reopen", () => {
   });
 
   it("mounts the reopen section only in the completed / legacy view", () => {
-    expect(COMPLETION_CARD).toContain(
-      '{(view.mode === "locked" || view.mode === "legacy") && (',
-    );
+    expect(COMPLETION_CARD).toContain('{(view.mode === "locked" || view.mode === "legacy") && (');
     expect(COMPLETION_CARD).toContain("<JobReopenSection jobId={jobId}");
   });
 

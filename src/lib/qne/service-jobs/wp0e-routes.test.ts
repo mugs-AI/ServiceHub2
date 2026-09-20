@@ -32,7 +32,9 @@ vi.mock("@/lib/qne/session/current-user.server", () => ({
     };
   },
   guardResponse: (err: unknown) =>
-    err instanceof UnauthorizedError ? Response.json({ error: "Unauthorized" }, { status: 401 }) : null,
+    err instanceof UnauthorizedError
+      ? Response.json({ error: "Unauthorized" }, { status: 401 })
+      : null,
 }));
 
 /* ---------------- supabase double ---------------- */
@@ -99,7 +101,9 @@ function query(table: string, op: "select" | "update" | "insert" | "delete", pay
     maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
     single: async () => {
       const r = run();
-      return r.length === 1 ? { data: r[0], error: null } : { data: null, error: { message: "no row" } };
+      return r.length === 1
+        ? { data: r[0], error: null }
+        : { data: null, error: { message: "no row" } };
     },
     then: (resolve: (v: { data: Row[]; error: null }) => unknown) =>
       Promise.resolve({ data: run(), error: null }).then(resolve),
@@ -184,8 +188,8 @@ describe("E.1 collaborative transitions (teammate, not Primary PIC)", () => {
   const cases: Array<[string, string]> = [
     ["Open", "In Progress"],
     ["Assigned", "In Progress"],
-    ["In Progress", "Waiting Customer"],
-    ["In Progress", "Waiting Vendor"],
+    // WP3A: In Progress → Waiting * now goes through the dedicated /waiting
+    // endpoint because it requires a reference number (covered below).
     ["Waiting Customer", "In Progress"],
     ["Waiting Vendor", "In Progress"],
   ];
@@ -200,6 +204,19 @@ describe("E.1 collaborative transitions (teammate, not Primary PIC)", () => {
     expect(job().assigned_user_name_snapshot).toBe("PIC");
     expect(log("status_changed")).toHaveLength(1);
   });
+
+  it.each([["Waiting Customer"], ["Waiting Vendor"]])(
+    "refuses %s through the generic route and leaves the Job untouched",
+    async (to) => {
+      seedJob({ status: "In Progress" });
+      const h = await handlers("@/routes/api/workspace/jobs.$jobId.status");
+      const res = await h.POST({ request: req({ to }), params: { jobId: JOB_ID } });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toContain("reference number");
+      expect(job().status).toBe("In Progress");
+      expect(log("status_changed")).toHaveLength(0);
+    },
+  );
 
   it("records the acting teammate, not the Primary PIC, in the timeline", async () => {
     const h = await handlers("@/routes/api/workspace/jobs.$jobId.status");

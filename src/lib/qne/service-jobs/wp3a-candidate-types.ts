@@ -1,0 +1,114 @@
+// WP3A — CANDIDATE database types (proposed schema, NOT yet applied).
+//
+// These describe exactly what
+// docs/migrations/WP3A_job_operations_correction.candidate.sql proposes. They
+// exist because the canonical generated Supabase types
+// (src/integrations/supabase/types.ts) describe the LIVE database only and are
+// never hand-edited to pretend an unapplied migration exists.
+//
+// The canonical generated Supabase types must be regenerated only after an
+// authorised migration application; this file is then retired in favour of
+// them.
+
+/** Columns the candidate ADDS to public.service_jobs. */
+export interface CandidateServiceJobColumns {
+  /** Latest Customer reference captured on a Waiting Customer transition. */
+  latest_customer_ref_no: string | null;
+  /** Latest Vendor reference captured on a Waiting Vendor transition. */
+  latest_vendor_ref_no: string | null;
+  /** Current completion cycle (>= 1); an approved reopen advances it by one. */
+  completion_cycle: number;
+}
+
+/** Columns the candidate ADDS to public.service_job_completions. */
+export interface CandidateServiceJobCompletionColumns {
+  /** Cycle this evidence row belongs to; unique per (tenant, job, cycle). */
+  completion_cycle: number;
+}
+
+export type CandidateReopenStatus = "pending" | "approved" | "rejected";
+
+/** New table public.service_job_reopen_requests. */
+export interface CandidateServiceJobReopenRequestRow {
+  id: string;
+  tenant_code: string;
+  service_job_id: string;
+  status: CandidateReopenStatus;
+  reason: string;
+  prior_status: string;
+  completion_cycle_at_request: number;
+  requested_by_user_id: string | null;
+  requested_by_name_snapshot: string | null;
+  requested_at: string;
+  decision_note: string | null;
+  decided_by_user_id: string | null;
+  decided_by_name_snapshot: string | null;
+  decided_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CandidateServiceJobReopenRequestInsert = Omit<
+  CandidateServiceJobReopenRequestRow,
+  "id" | "created_at" | "updated_at" | "requested_at"
+> &
+  Partial<Pick<CandidateServiceJobReopenRequestRow, "id" | "requested_at">>;
+
+/** Shared error envelope every candidate RPC returns instead of raising. */
+export interface CandidateRpcError {
+  outcome: "error";
+  status: number;
+  error: string;
+}
+
+/* ----------------------------- sh_job_waiting_set ----------------------------- */
+
+export interface CandidateWaitingSetArgs {
+  p_tenant_code: string;
+  p_job_id: string;
+  p_party: "customer" | "vendor";
+  p_ref_no: string;
+  p_actor_user_id: string;
+  p_actor_name: string | null;
+}
+
+export type CandidateWaitingSetResult =
+  | { outcome: "ok"; status_value: string; party: "customer" | "vendor"; ref_no: string }
+  | CandidateRpcError;
+
+/* --------------------------- sh_job_reopen_request --------------------------- */
+
+export interface CandidateReopenRequestArgs {
+  p_tenant_code: string;
+  p_job_id: string;
+  p_reason: string;
+  p_actor_user_id: string;
+  p_actor_name: string | null;
+}
+
+export type CandidateReopenRequestResult =
+  | { outcome: "ok"; request_id: string }
+  | CandidateRpcError;
+
+/* ---------------------------- sh_job_reopen_decide ---------------------------- */
+
+export interface CandidateReopenDecideArgs {
+  p_tenant_code: string;
+  p_request_id: string;
+  p_decision: "approve" | "reject";
+  p_note: string | null;
+  p_actor_user_id: string;
+  p_actor_name: string | null;
+  p_is_admin: boolean;
+}
+
+export type CandidateReopenDecideResult =
+  | { outcome: "ok"; decision: "approve" | "reject"; request_id: string }
+  | CandidateRpcError;
+
+/** Table names the candidate schema introduces or extends. */
+export const CANDIDATE_TABLES = {
+  reopenRequests: "service_job_reopen_requests",
+  jobs: "service_jobs",
+  completions: "service_job_completions",
+} as const;
