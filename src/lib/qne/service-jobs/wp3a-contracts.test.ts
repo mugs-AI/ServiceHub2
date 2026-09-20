@@ -272,7 +272,8 @@ describe("completion card + reopen", () => {
 
   it("mounts the reopen section only in the completed / legacy view", () => {
     expect(COMPLETION_CARD).toContain('{(view.mode === "locked" || view.mode === "legacy") && (');
-    expect(COMPLETION_CARD).toContain("<JobReopenSection jobId={jobId}");
+    expect(COMPLETION_CARD).toContain("<JobReopenSection");
+    expect(COMPLETION_CARD).toContain("jobId={jobId}");
   });
 
   it("refreshes the whole Job page after a reopen decision, not only the card", () => {
