@@ -19,23 +19,12 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 
-const ASSIGNED_TO_ME_STATUSES = [
-  "Draft",
-  "Pending Approval",
-  "Open",
-  "Assigned",
-  "In Progress",
-  "Waiting Customer",
-  "Waiting Vendor",
-] as const;
-
-const MY_PENDING_STATUSES = [
-  "Draft",
-  "Assigned",
-  "In Progress",
-  "Waiting Customer",
-  "Waiting Vendor",
-] as const;
+// Shared with the dashboard UI so a card count and the list it opens can
+// never describe different scopes.
+import {
+  ASSIGNED_TO_ME_STATUSES,
+  MY_PENDING_STATUSES,
+} from "@/lib/qne/dashboard/my-work-scope";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
