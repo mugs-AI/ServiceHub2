@@ -233,6 +233,11 @@ function PendingQueuePage() {
     navigate({ to: "/jobs/$jobId", params: { jobId: r.service_job_id } });
   };
 
+  const openReopen = (r: ReopenRow) => {
+    openJobTab(r.service_job_id, r.job_number);
+    navigate({ to: "/jobs/$jobId", params: { jobId: r.service_job_id } });
+  };
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
