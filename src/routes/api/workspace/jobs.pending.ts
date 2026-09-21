@@ -14,7 +14,10 @@ type QueueType =
   | "assigned_not_started"
   | "waiting_customer"
   | "waiting_vendor"
-  | "cancellation_requested";
+  | "cancellation_requested"
+  // WP3A queue categories (stable URL keys for dashboard deep links).
+  | "completed_followup"
+  | "completed";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;

@@ -28,6 +28,7 @@ import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as AdminSnapshotsRouteImport } from './routes/admin.snapshots'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as ApiWorkspaceTechniciansRouteImport } from './routes/api/workspace/technicians'
+import { Route as ApiWorkspaceReopenRequestsRouteImport } from './routes/api/workspace/reopen-requests'
 import { Route as ApiWorkspaceJobsRouteImport } from './routes/api/workspace/jobs'
 import { Route as ApiWorkspaceEntitlementCustomersRouteImport } from './routes/api/workspace/entitlement-customers'
 import { Route as ApiWorkspaceCustomersRouteImport } from './routes/api/workspace/customers'
@@ -187,6 +188,12 @@ const ApiWorkspaceTechniciansRoute = ApiWorkspaceTechniciansRouteImport.update({
   path: '/api/workspace/technicians',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceReopenRequestsRoute =
+  ApiWorkspaceReopenRequestsRouteImport.update({
+    id: '/api/workspace/reopen-requests',
+    path: '/api/workspace/reopen-requests',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiWorkspaceJobsRoute = ApiWorkspaceJobsRouteImport.update({
   id: '/api/workspace/jobs',
   path: '/api/workspace/jobs',
@@ -594,6 +601,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
   '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
+  '/api/workspace/reopen-requests': typeof ApiWorkspaceReopenRequestsRoute
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
@@ -677,6 +685,7 @@ export interface FileRoutesByTo {
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
   '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
+  '/api/workspace/reopen-requests': typeof ApiWorkspaceReopenRequestsRoute
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
@@ -762,6 +771,7 @@ export interface FileRoutesById {
   '/api/workspace/customers': typeof ApiWorkspaceCustomersRoute
   '/api/workspace/entitlement-customers': typeof ApiWorkspaceEntitlementCustomersRoute
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
+  '/api/workspace/reopen-requests': typeof ApiWorkspaceReopenRequestsRoute
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
   '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
@@ -848,6 +858,7 @@ export interface FileRouteTypes {
     | '/api/workspace/customers'
     | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
+    | '/api/workspace/reopen-requests'
     | '/api/workspace/technicians'
     | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
@@ -931,6 +942,7 @@ export interface FileRouteTypes {
     | '/api/workspace/customers'
     | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
+    | '/api/workspace/reopen-requests'
     | '/api/workspace/technicians'
     | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
@@ -1015,6 +1027,7 @@ export interface FileRouteTypes {
     | '/api/workspace/customers'
     | '/api/workspace/entitlement-customers'
     | '/api/workspace/jobs'
+    | '/api/workspace/reopen-requests'
     | '/api/workspace/technicians'
     | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
@@ -1097,6 +1110,7 @@ export interface RootRouteChildren {
   ApiWorkspaceCustomersRoute: typeof ApiWorkspaceCustomersRoute
   ApiWorkspaceEntitlementCustomersRoute: typeof ApiWorkspaceEntitlementCustomersRoute
   ApiWorkspaceJobsRoute: typeof ApiWorkspaceJobsRouteWithChildren
+  ApiWorkspaceReopenRequestsRoute: typeof ApiWorkspaceReopenRequestsRoute
   ApiWorkspaceTechniciansRoute: typeof ApiWorkspaceTechniciansRoute
   ApiIntegrationsGoogleDriveCallbackRoute: typeof ApiIntegrationsGoogleDriveCallbackRoute
   ApiIntegrationsGoogleDriveConnectRoute: typeof ApiIntegrationsGoogleDriveConnectRoute
@@ -1236,6 +1250,13 @@ declare module '@tanstack/react-router' {
       path: '/api/workspace/technicians'
       fullPath: '/api/workspace/technicians'
       preLoaderRoute: typeof ApiWorkspaceTechniciansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/reopen-requests': {
+      id: '/api/workspace/reopen-requests'
+      path: '/api/workspace/reopen-requests'
+      fullPath: '/api/workspace/reopen-requests'
+      preLoaderRoute: typeof ApiWorkspaceReopenRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workspace/jobs': {
@@ -1868,6 +1889,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceCustomersRoute: ApiWorkspaceCustomersRoute,
   ApiWorkspaceEntitlementCustomersRoute: ApiWorkspaceEntitlementCustomersRoute,
   ApiWorkspaceJobsRoute: ApiWorkspaceJobsRouteWithChildren,
+  ApiWorkspaceReopenRequestsRoute: ApiWorkspaceReopenRequestsRoute,
   ApiWorkspaceTechniciansRoute: ApiWorkspaceTechniciansRoute,
   ApiIntegrationsGoogleDriveCallbackRoute:
     ApiIntegrationsGoogleDriveCallbackRoute,
