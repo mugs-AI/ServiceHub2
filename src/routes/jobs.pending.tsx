@@ -47,8 +47,26 @@ interface QueueRow {
   assigned_user_id: string | null;
   assigned_user_name_snapshot: string | null;
   created_at: string;
+  completed_at?: string | null;
   /** Owner/Admin only — set by the server for Jobs with an active request. */
   has_active_cancellation_request?: boolean;
+}
+
+/** WP3A — pending reopen request row (GET /api/workspace/reopen-requests). */
+interface ReopenRow {
+  request_id: string;
+  service_job_id: string;
+  job_number: string;
+  subject: string;
+  customer_code: string;
+  customer_name: string | null;
+  job_status: string;
+  priority: string;
+  assigned_user_name: string | null;
+  requested_by_name: string | null;
+  requested_at: string;
+  reason: string;
+  prior_status: string;
 }
 
 const QUEUE_TABS = [
