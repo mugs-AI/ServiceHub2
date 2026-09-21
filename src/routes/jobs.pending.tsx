@@ -6,6 +6,11 @@ import { useTabs } from "@/lib/tabs";
 import { useSession } from "@/lib/qne/session-context";
 import { formatMYDateTime } from "@/lib/format-date";
 import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
+import {
+  QUEUE_COMPLETED,
+  QUEUE_COMPLETED_FOLLOWUP,
+  QUEUE_REOPEN_REQUESTS,
+} from "@/lib/qne/service-jobs/wp3a-queues";
 
 /** Owner/Admin decision queue row (GET /api/admin/cancellation-requests). */
 interface CancellationRow {
@@ -83,6 +88,21 @@ const QUEUE_TABS = [
   { key: "assigned_not_started", label: "Assigned", emptyMsg: "No Assigned jobs.", adminOnly: false },
   { key: "waiting_customer", label: "Waiting Customer", emptyMsg: "No jobs waiting on customer.", adminOnly: false },
   { key: "waiting_vendor", label: "Waiting Vendor", emptyMsg: "No jobs waiting on vendor.", adminOnly: false },
+  // WP3A categories. The keys are the stable URL values used by dashboard
+  // deep links, so a bookmarked link keeps working.
+  {
+    key: QUEUE_REOPEN_REQUESTS,
+    label: "Reopen Requests",
+    emptyMsg: "No pending reopen requests.",
+    adminOnly: false,
+  },
+  {
+    key: QUEUE_COMPLETED_FOLLOWUP,
+    label: "Completed Follow-up",
+    emptyMsg: "No completed jobs still need follow-up.",
+    adminOnly: false,
+  },
+  { key: QUEUE_COMPLETED, label: "Completed", emptyMsg: "No completed jobs.", adminOnly: false },
 ] as const;
 
 export const Route = createFileRoute("/jobs/pending")({
