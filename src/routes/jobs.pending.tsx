@@ -133,6 +133,7 @@ function PendingQueuePage() {
 
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [cancelRows, setCancelRows] = useState<CancellationRow[]>([]);
+  const [reopenRows, setReopenRows] = useState<ReopenRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
