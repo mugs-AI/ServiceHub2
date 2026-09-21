@@ -264,12 +264,15 @@ function UserDashboard() {
       <section>
         <SectionTitle>My work</SectionTitle>
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS })}><MiniStat label="My Pending Tasks" value={summary.myPendingTasks} tone="blue" emphasise /></StatLink>
-          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["Assigned"] })}><MiniStat label="Assigned to Me" value={summary.assignedToMe} tone="blue" /></StatLink>
-          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["Pending Approval"] })}><MiniStat label="Waiting Approval" value={summary.myWaitingApproval} tone="amber" /></StatLink>
-          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["In Progress"] })}><MiniStat label="My In Progress" value={summary.myInProgress} tone="amber" /></StatLink>
-          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["Waiting Customer"] })}><MiniStat label="My Waiting Customer" value={summary.myWaitingCustomer} tone="amber" /></StatLink>
-          <StatLink onClick={() => setFilters({ ...DEFAULT_FILTERS, statuses: ["Waiting Vendor"] })}><MiniStat label="My Waiting Vendor" value={summary.myWaitingVendor} tone="purple" /></StatLink>
+          {/* Every card opens exactly the scope it counts: the status list comes
+              from the same shared module the server uses, stale persisted
+              filters are discarded and paging restarts at page 1. */}
+          <StatLink onClick={() => applyCardScope(cardStatusScope("myPendingTasks"))}><MiniStat label="My Pending Tasks" value={summary.myPendingTasks} tone="blue" emphasise /></StatLink>
+          <StatLink onClick={() => applyCardScope(cardStatusScope("assignedToMe"))}><MiniStat label="Assigned to Me" value={summary.assignedToMe} tone="blue" /></StatLink>
+          <StatLink onClick={() => applyCardScope(["Pending Approval"])}><MiniStat label="Waiting Approval" value={summary.myWaitingApproval} tone="amber" /></StatLink>
+          <StatLink onClick={() => applyCardScope(["In Progress"])}><MiniStat label="My In Progress" value={summary.myInProgress} tone="amber" /></StatLink>
+          <StatLink onClick={() => applyCardScope(["Waiting Customer"])}><MiniStat label="My Waiting Customer" value={summary.myWaitingCustomer} tone="amber" /></StatLink>
+          <StatLink onClick={() => applyCardScope(["Waiting Vendor"])}><MiniStat label="My Waiting Vendor" value={summary.myWaitingVendor} tone="purple" /></StatLink>
           <MiniStat label="Completed by Me Today" value={summary.completedByMeToday} tone="green" />
         </div>
         <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
