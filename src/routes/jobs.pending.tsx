@@ -6,6 +6,11 @@ import { useTabs } from "@/lib/tabs";
 import { useSession } from "@/lib/qne/session-context";
 import { formatMYDateTime } from "@/lib/format-date";
 import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
+import {
+  QUEUE_COMPLETED,
+  QUEUE_COMPLETED_FOLLOWUP,
+  QUEUE_REOPEN_REQUESTS,
+} from "@/lib/qne/service-jobs/wp3a-queues";
 
 /** Owner/Admin decision queue row (GET /api/admin/cancellation-requests). */
 interface CancellationRow {
@@ -47,8 +52,26 @@ interface QueueRow {
   assigned_user_id: string | null;
   assigned_user_name_snapshot: string | null;
   created_at: string;
+  completed_at?: string | null;
   /** Owner/Admin only — set by the server for Jobs with an active request. */
   has_active_cancellation_request?: boolean;
+}
+
+/** WP3A — pending reopen request row (GET /api/workspace/reopen-requests). */
+interface ReopenRow {
+  request_id: string;
+  service_job_id: string;
+  job_number: string;
+  subject: string;
+  customer_code: string;
+  customer_name: string | null;
+  job_status: string;
+  priority: string;
+  assigned_user_name: string | null;
+  requested_by_name: string | null;
+  requested_at: string;
+  reason: string;
+  prior_status: string;
 }
 
 const QUEUE_TABS = [
@@ -65,6 +88,21 @@ const QUEUE_TABS = [
   { key: "assigned_not_started", label: "Assigned", emptyMsg: "No Assigned jobs.", adminOnly: false },
   { key: "waiting_customer", label: "Waiting Customer", emptyMsg: "No jobs waiting on customer.", adminOnly: false },
   { key: "waiting_vendor", label: "Waiting Vendor", emptyMsg: "No jobs waiting on vendor.", adminOnly: false },
+  // WP3A categories. The keys are the stable URL values used by dashboard
+  // deep links, so a bookmarked link keeps working.
+  {
+    key: QUEUE_REOPEN_REQUESTS,
+    label: "Reopen Requests",
+    emptyMsg: "No pending reopen requests.",
+    adminOnly: false,
+  },
+  {
+    key: QUEUE_COMPLETED_FOLLOWUP,
+    label: "Completed Follow-up",
+    emptyMsg: "No completed jobs still need follow-up.",
+    adminOnly: false,
+  },
+  { key: QUEUE_COMPLETED, label: "Completed", emptyMsg: "No completed jobs.", adminOnly: false },
 ] as const;
 
 export const Route = createFileRoute("/jobs/pending")({
@@ -95,6 +133,7 @@ function PendingQueuePage() {
 
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [cancelRows, setCancelRows] = useState<CancellationRow[]>([]);
+  const [reopenRows, setReopenRows] = useState<ReopenRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -109,6 +148,10 @@ function PendingQueuePage() {
   // Owner/Admin keep the rich decision queue; Normal Users get the safe,
   // Job-state-only Workspace view of the very same tab.
   const cancellationView = isCancellationTab && isAdmin;
+  // WP3A — the Reopen Requests tab reads its own tenant-scoped request list.
+  const reopenView = queueType === QUEUE_REOPEN_REQUESTS;
+  const isCompletedTab =
+    queueType === QUEUE_COMPLETED || queueType === QUEUE_COMPLETED_FOLLOWUP;
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -128,6 +171,20 @@ function PendingQueuePage() {
         if (!res.ok) throw new Error(body?.error ?? "Failed to load cancellation requests");
         setCancelRows(body.requests ?? []);
         setRows([]);
+        setReopenRows([]);
+        setTotal(body.total ?? 0);
+        return;
+      }
+
+      if (reopenView) {
+        const res = await fetch(`/api/workspace/reopen-requests?${sp.toString()}`, {
+          headers: authHeaders(),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error ?? "Failed to load reopen requests");
+        setReopenRows(body.requests ?? []);
+        setRows([]);
+        setCancelRows([]);
         setTotal(body.total ?? 0);
         return;
       }
@@ -143,6 +200,7 @@ function PendingQueuePage() {
       if (!res.ok) throw new Error(body?.error ?? "Failed to load queue");
       setRows(body.jobs ?? []);
       setCancelRows([]);
+      setReopenRows([]);
       setTotal(body.total ?? 0);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
@@ -158,6 +216,7 @@ function PendingQueuePage() {
     page,
     cancellationView,
     isCancellationTab,
+    reopenView,
   ]);
 
   useEffect(() => {
@@ -170,6 +229,11 @@ function PendingQueuePage() {
   };
 
   const openRequest = (r: CancellationRow) => {
+    openJobTab(r.service_job_id, r.job_number);
+    navigate({ to: "/jobs/$jobId", params: { jobId: r.service_job_id } });
+  };
+
+  const openReopen = (r: ReopenRow) => {
     openJobTab(r.service_job_id, r.job_number);
     navigate({ to: "/jobs/$jobId", params: { jobId: r.service_job_id } });
   };
@@ -278,12 +342,65 @@ function PendingQueuePage() {
           <Skeleton className="h-20 w-full" />
         </div>
       )}
-      {!loading && rows.length === 0 && cancelRows.length === 0 && !err && (
-        <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
-          {(isCancellationTab
-            ? QUEUE_TABS.find((t) => t.key === CANCELLATION_QUEUE)?.emptyMsg
-            : QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg) ?? "No jobs."}
-        </div>
+      {!loading &&
+        rows.length === 0 &&
+        cancelRows.length === 0 &&
+        reopenRows.length === 0 &&
+        !err && (
+          <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
+            {(isCancellationTab
+              ? QUEUE_TABS.find((t) => t.key === CANCELLATION_QUEUE)?.emptyMsg
+              : QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg) ?? "No jobs."}
+          </div>
+        )}
+
+      {/* WP3A — Reopen Requests: enough context to decide, and a clear open
+          action to the Job where an Owner/Admin approves or rejects. */}
+      {reopenView && reopenRows.length > 0 && (
+        <ul data-testid="reopen-queue" className="space-y-2">
+          {reopenRows.map((r) => (
+            <li key={r.request_id}>
+              <button
+                type="button"
+                onClick={() => openReopen(r)}
+                className="block w-full min-w-0 rounded-lg border-2 border-amber-300 border-l-4 border-l-amber-500 bg-amber-50 p-3 text-left shadow-sm hover:bg-amber-100"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-mono text-xs font-semibold text-primary">
+                    {r.job_number}
+                  </span>
+                  <span className="text-[10px] uppercase text-muted-foreground">
+                    Requested {formatMYDateTime(r.requested_at)}
+                  </span>
+                </div>
+                <div className="mt-1 break-words text-sm font-semibold">{r.subject}</div>
+                <div className="break-words text-xs text-muted-foreground">
+                  {r.customer_name ?? r.customer_code}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                  <StatusBadge status={r.job_status} />
+                  <PriorityBadge priority={r.priority} />
+                  <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
+                    {r.assigned_user_name ?? "Unassigned"}
+                  </span>
+                  <span className="rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 text-amber-900">
+                    Awaiting Owner/Admin Decision
+                  </span>
+                </div>
+                <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                  <div className="break-words">
+                    Requested by{" "}
+                    <span className="font-medium text-foreground">
+                      {r.requested_by_name ?? "—"}
+                    </span>
+                  </div>
+                  <div className="break-words whitespace-pre-wrap text-foreground">{r.reason}</div>
+                  <div className="font-semibold text-primary">Open Job to decide →</div>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       {cancellationView && cancelRows.length > 0 && (
@@ -351,10 +468,12 @@ function PendingQueuePage() {
                     {r.job_number}
                   </span>
                   <span className="text-[10px] uppercase text-muted-foreground">
-                    {formatMYDateTime(r.created_at)}
+                    {isCompletedTab && r.completed_at
+                      ? `Completed ${formatMYDateTime(r.completed_at)}`
+                      : formatMYDateTime(r.created_at)}
                   </span>
                 </div>
-                <div className="mt-1 truncate text-sm font-semibold">{r.subject}</div>
+                <div className="mt-1 break-words text-sm font-semibold">{r.subject}</div>
                 <div className="text-xs text-muted-foreground">
                   {r.customer_name_snapshot ?? r.customer_code_snapshot}
                 </div>

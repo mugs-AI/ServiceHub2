@@ -1189,6 +1189,7 @@ export type Database = {
           completed_by_email_snapshot: string | null
           completed_by_name_snapshot: string | null
           completed_by_user_id: string | null
+          completion_cycle: number
           completion_kind: string | null
           created_at: string
           diagnosis: string | null
@@ -1229,6 +1230,7 @@ export type Database = {
           completed_by_email_snapshot?: string | null
           completed_by_name_snapshot?: string | null
           completed_by_user_id?: string | null
+          completion_cycle?: number
           completion_kind?: string | null
           created_at?: string
           diagnosis?: string | null
@@ -1269,6 +1271,7 @@ export type Database = {
           completed_by_email_snapshot?: string | null
           completed_by_name_snapshot?: string | null
           completed_by_user_id?: string | null
+          completion_cycle?: number
           completion_kind?: string | null
           created_at?: string
           diagnosis?: string | null
@@ -1298,7 +1301,7 @@ export type Database = {
           {
             foreignKeyName: "service_job_completions_service_job_id_fkey"
             columns: ["service_job_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
@@ -1440,6 +1443,71 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "service_job_onsite_attendance_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_job_reopen_requests: {
+        Row: {
+          completion_cycle_at_request: number
+          created_at: string
+          decided_at: string | null
+          decided_by_name_snapshot: string | null
+          decided_by_user_id: string | null
+          decision_note: string | null
+          id: string
+          prior_status: string
+          reason: string
+          requested_at: string
+          requested_by_name_snapshot: string | null
+          requested_by_user_id: string | null
+          service_job_id: string
+          status: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          completion_cycle_at_request?: number
+          created_at?: string
+          decided_at?: string | null
+          decided_by_name_snapshot?: string | null
+          decided_by_user_id?: string | null
+          decision_note?: string | null
+          id?: string
+          prior_status: string
+          reason: string
+          requested_at?: string
+          requested_by_name_snapshot?: string | null
+          requested_by_user_id?: string | null
+          service_job_id: string
+          status?: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          completion_cycle_at_request?: number
+          created_at?: string
+          decided_at?: string | null
+          decided_by_name_snapshot?: string | null
+          decided_by_user_id?: string | null
+          decision_note?: string | null
+          id?: string
+          prior_status?: string
+          reason?: string
+          requested_at?: string
+          requested_by_name_snapshot?: string | null
+          requested_by_user_id?: string | null
+          service_job_id?: string
+          status?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_reopen_requests_service_job_id_fkey"
             columns: ["service_job_id"]
             isOneToOne: false
             referencedRelation: "service_jobs"
@@ -1707,6 +1775,7 @@ export type Database = {
           cancelled_by_name_snapshot: string | null
           cancelled_by_user_id: string | null
           completed_at: string | null
+          completion_cycle: number
           completion_snapshot: Json | null
           contact_email: string | null
           contact_person: string | null
@@ -1726,6 +1795,8 @@ export type Database = {
           internal_note: string | null
           is_deleted: boolean
           job_number: string
+          latest_customer_ref_no: string | null
+          latest_vendor_ref_no: string | null
           leave_note: string | null
           left_site_at: string | null
           n3_customer_id: string | null
@@ -1783,6 +1854,7 @@ export type Database = {
           cancelled_by_name_snapshot?: string | null
           cancelled_by_user_id?: string | null
           completed_at?: string | null
+          completion_cycle?: number
           completion_snapshot?: Json | null
           contact_email?: string | null
           contact_person?: string | null
@@ -1802,6 +1874,8 @@ export type Database = {
           internal_note?: string | null
           is_deleted?: boolean
           job_number: string
+          latest_customer_ref_no?: string | null
+          latest_vendor_ref_no?: string | null
           leave_note?: string | null
           left_site_at?: string | null
           n3_customer_id?: string | null
@@ -1859,6 +1933,7 @@ export type Database = {
           cancelled_by_name_snapshot?: string | null
           cancelled_by_user_id?: string | null
           completed_at?: string | null
+          completion_cycle?: number
           completion_snapshot?: Json | null
           contact_email?: string | null
           contact_person?: string | null
@@ -1878,6 +1953,8 @@ export type Database = {
           internal_note?: string | null
           is_deleted?: boolean
           job_number?: string
+          latest_customer_ref_no?: string | null
+          latest_vendor_ref_no?: string | null
           leave_note?: string | null
           left_site_at?: string | null
           n3_customer_id?: string | null
@@ -2615,6 +2692,39 @@ export type Database = {
           p_is_admin: boolean
           p_job_id: string
           p_payload?: Json
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
+      sh_job_reopen_decide: {
+        Args: {
+          p_actor_name: string
+          p_actor_user_id: string
+          p_decision: string
+          p_is_admin: boolean
+          p_note: string
+          p_request_id: string
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
+      sh_job_reopen_request: {
+        Args: {
+          p_actor_name: string
+          p_actor_user_id: string
+          p_job_id: string
+          p_reason: string
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
+      sh_job_waiting_set: {
+        Args: {
+          p_actor_name: string
+          p_actor_user_id: string
+          p_job_id: string
+          p_party: string
+          p_ref_no: string
           p_tenant_code: string
         }
         Returns: Json

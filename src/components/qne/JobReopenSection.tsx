@@ -26,13 +26,7 @@ interface ReopenState {
   history: ReopenRequestRow[];
 }
 
-export function JobReopenSection({
-  jobId,
-  onChanged,
-}: {
-  jobId: string;
-  onChanged?: () => void;
-}) {
+export function JobReopenSection({ jobId, onChanged }: { jobId: string; onChanged?: () => void }) {
   const [state, setState] = useState<ReopenState | null>(null);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -113,7 +107,8 @@ export function JobReopenSection({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="min-h-[44px] w-full rounded-md border px-3 text-sm font-semibold hover:bg-accent"
+          data-testid="reopen-request-button"
+          className="min-h-[44px] w-full rounded-md border border-amber-400 bg-amber-100 px-3 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
         >
           Request Reopen
         </button>

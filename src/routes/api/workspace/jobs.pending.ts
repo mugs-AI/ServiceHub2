@@ -14,7 +14,10 @@ type QueueType =
   | "assigned_not_started"
   | "waiting_customer"
   | "waiting_vendor"
-  | "cancellation_requested";
+  | "cancellation_requested"
+  // WP3A queue categories (stable URL keys for dashboard deep links).
+  | "completed_followup"
+  | "completed";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
@@ -56,7 +59,7 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           let query = supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, subscription_category_snapshot, stock_code_snapshot, entitlement_status_snapshot, entitlement_expiry_snapshot, assigned_user_id, assigned_user_name_snapshot, assigned_at, started_at, created_at",
+              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, subscription_category_snapshot, stock_code_snapshot, entitlement_status_snapshot, entitlement_expiry_snapshot, assigned_user_id, assigned_user_name_snapshot, assigned_at, started_at, created_at, completed_at, completion_cycle",
               { count: "exact" },
             )
             .eq("tenant_code", user.tenantCode)
@@ -75,6 +78,13 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             query = query.eq("status", "Waiting Customer");
           } else if (queueType === "waiting_vendor") {
             query = query.eq("status", "Waiting Vendor");
+          } else if (
+            queueType === "completed" ||
+            queueType === "completed_followup"
+          ) {
+            // WP3A — Completed lists. is_deleted = false is already applied
+            // above, so a soft-deleted Job can never appear here.
+            query = query.eq("status", "Completed");
           } else {
             // All pending statuses (non-terminal, non-In-Progress, non-deleted).
             query = query.in("status", [
@@ -123,6 +133,41 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             return a.created_at.localeCompare(b.created_at);
           });
 
+          // WP3A — Completed lists read newest completion first.
+          if (queueType === "completed" || queueType === "completed_followup") {
+            rows = rows
+              .slice()
+              .sort((a, b) =>
+                String(b.completed_at ?? b.created_at).localeCompare(
+                  String(a.completed_at ?? a.created_at),
+                ),
+              );
+          }
+
+          // WP3A — "Completed Follow-up": only evidence belonging to the Job's
+          // CURRENT completion cycle counts, so an earlier cycle's follow-up
+          // flag can never leak into a later cycle.
+          let followUpOnly = false;
+          if (queueType === "completed_followup") {
+            followUpOnly = true;
+            const ids = rows.map((r) => r.id);
+            if (ids.length === 0) {
+              rows = [];
+            } else {
+              const { data: evidence, error: evErr } = await supabaseAdmin
+                .from("service_job_completions")
+                .select("service_job_id, completion_cycle, follow_up_required")
+                .eq("tenant_code", user.tenantCode)
+                .in("service_job_id", ids);
+              if (evErr) throw evErr;
+              const { followUpJobIds } = await import(
+                "@/lib/qne/service-jobs/wp3a-queues"
+              );
+              const keep = followUpJobIds(rows, evidence ?? []);
+              rows = rows.filter((r) => keep.has(r.id));
+            }
+          }
+
           // Shared cancellation-state awareness. Every authenticated
           // same-tenant user may know that a Job they can already see carries
           // an active cancellation request; no request detail is ever exposed
@@ -142,6 +187,10 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             );
             rows = rows.filter((r) => flagged.has(r.id));
             total = rows.length;
+          } else if (followUpOnly) {
+            // Filtered above, so the count must come from the filtered rows.
+            total = rows.length;
+            flagged = new Set();
           } else {
             total = count ?? rows.length;
             flagged = new Set();
