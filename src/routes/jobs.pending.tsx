@@ -200,6 +200,7 @@ function PendingQueuePage() {
       if (!res.ok) throw new Error(body?.error ?? "Failed to load queue");
       setRows(body.jobs ?? []);
       setCancelRows([]);
+      setReopenRows([]);
       setTotal(body.total ?? 0);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
@@ -215,6 +216,7 @@ function PendingQueuePage() {
     page,
     cancellationView,
     isCancellationTab,
+    reopenView,
   ]);
 
   useEffect(() => {
