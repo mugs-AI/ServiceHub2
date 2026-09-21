@@ -171,6 +171,20 @@ function PendingQueuePage() {
         if (!res.ok) throw new Error(body?.error ?? "Failed to load cancellation requests");
         setCancelRows(body.requests ?? []);
         setRows([]);
+        setReopenRows([]);
+        setTotal(body.total ?? 0);
+        return;
+      }
+
+      if (reopenView) {
+        const res = await fetch(`/api/workspace/reopen-requests?${sp.toString()}`, {
+          headers: authHeaders(),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error ?? "Failed to load reopen requests");
+        setReopenRows(body.requests ?? []);
+        setRows([]);
+        setCancelRows([]);
         setTotal(body.total ?? 0);
         return;
       }
