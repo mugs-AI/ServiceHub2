@@ -468,10 +468,12 @@ function PendingQueuePage() {
                     {r.job_number}
                   </span>
                   <span className="text-[10px] uppercase text-muted-foreground">
-                    {formatMYDateTime(r.created_at)}
+                    {isCompletedTab && r.completed_at
+                      ? `Completed ${formatMYDateTime(r.completed_at)}`
+                      : formatMYDateTime(r.created_at)}
                   </span>
                 </div>
-                <div className="mt-1 truncate text-sm font-semibold">{r.subject}</div>
+                <div className="mt-1 break-words text-sm font-semibold">{r.subject}</div>
                 <div className="text-xs text-muted-foreground">
                   {r.customer_name_snapshot ?? r.customer_code_snapshot}
                 </div>
