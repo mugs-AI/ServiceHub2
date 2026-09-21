@@ -50,7 +50,8 @@ export function followUpJobIds(
     if (e.follow_up_required !== true) continue;
     const want = cycleByJob.get(e.service_job_id);
     if (want === undefined) continue;
-    const got = typeof e.completion_cycle === "number" && e.completion_cycle > 0 ? e.completion_cycle : 1;
+    const got =
+      typeof e.completion_cycle === "number" && e.completion_cycle > 0 ? e.completion_cycle : 1;
     if (got === want) out.add(e.service_job_id);
   }
   return out;

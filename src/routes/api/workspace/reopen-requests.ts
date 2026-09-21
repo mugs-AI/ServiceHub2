@@ -20,9 +20,8 @@ export const Route = createFileRoute("/api/workspace/reopen-requests")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         try {
           const user = await requireAuthenticatedN3User(request);

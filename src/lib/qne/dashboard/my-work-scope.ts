@@ -35,7 +35,5 @@ export const TERMINAL_STATUSES = ["Completed", "Cancelled"] as const;
  * copy keeps callers from mutating the shared constant.
  */
 export function cardStatusScope(card: "assignedToMe" | "myPendingTasks"): string[] {
-  return card === "assignedToMe"
-    ? [...ASSIGNED_TO_ME_STATUSES]
-    : [...MY_PENDING_STATUSES];
+  return card === "assignedToMe" ? [...ASSIGNED_TO_ME_STATUSES] : [...MY_PENDING_STATUSES];
 }

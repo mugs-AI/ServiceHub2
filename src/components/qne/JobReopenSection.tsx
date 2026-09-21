@@ -26,13 +26,7 @@ interface ReopenState {
   history: ReopenRequestRow[];
 }
 
-export function JobReopenSection({
-  jobId,
-  onChanged,
-}: {
-  jobId: string;
-  onChanged?: () => void;
-}) {
+export function JobReopenSection({ jobId, onChanged }: { jobId: string; onChanged?: () => void }) {
   const [state, setState] = useState<ReopenState | null>(null);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
