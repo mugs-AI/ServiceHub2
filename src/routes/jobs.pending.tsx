@@ -148,6 +148,10 @@ function PendingQueuePage() {
   // Owner/Admin keep the rich decision queue; Normal Users get the safe,
   // Job-state-only Workspace view of the very same tab.
   const cancellationView = isCancellationTab && isAdmin;
+  // WP3A — the Reopen Requests tab reads its own tenant-scoped request list.
+  const reopenView = queueType === QUEUE_REOPEN_REQUESTS;
+  const isCompletedTab =
+    queueType === QUEUE_COMPLETED || queueType === QUEUE_COMPLETED_FOLLOWUP;
 
   const reload = useCallback(async () => {
     setLoading(true);
