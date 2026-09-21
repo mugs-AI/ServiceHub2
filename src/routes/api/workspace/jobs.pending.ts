@@ -59,7 +59,7 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           let query = supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, subscription_category_snapshot, stock_code_snapshot, entitlement_status_snapshot, entitlement_expiry_snapshot, assigned_user_id, assigned_user_name_snapshot, assigned_at, started_at, created_at",
+              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, subscription_category_snapshot, stock_code_snapshot, entitlement_status_snapshot, entitlement_expiry_snapshot, assigned_user_id, assigned_user_name_snapshot, assigned_at, started_at, created_at, completed_at, completion_cycle",
               { count: "exact" },
             )
             .eq("tenant_code", user.tenantCode)
@@ -78,6 +78,13 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             query = query.eq("status", "Waiting Customer");
           } else if (queueType === "waiting_vendor") {
             query = query.eq("status", "Waiting Vendor");
+          } else if (
+            queueType === "completed" ||
+            queueType === "completed_followup"
+          ) {
+            // WP3A — Completed lists. is_deleted = false is already applied
+            // above, so a soft-deleted Job can never appear here.
+            query = query.eq("status", "Completed");
           } else {
             // All pending statuses (non-terminal, non-In-Progress, non-deleted).
             query = query.in("status", [
