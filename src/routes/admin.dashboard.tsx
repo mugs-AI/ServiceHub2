@@ -33,6 +33,8 @@ interface AdminSummary {
   jobsToday: number;
   pendingApproval: number;
   cancellationRequests: number;
+  /** WP3A — pending reopen requests awaiting an Owner/Admin decision. */
+  reopenRequests: number;
   waitingCustomer: number;
   waitingVendor: number;
   dueSoonCustomers: number;
