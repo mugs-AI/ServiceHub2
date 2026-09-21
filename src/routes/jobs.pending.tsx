@@ -337,7 +337,11 @@ function PendingQueuePage() {
           <Skeleton className="h-20 w-full" />
         </div>
       )}
-      {!loading && rows.length === 0 && cancelRows.length === 0 && !err && (
+      {!loading &&
+        rows.length === 0 &&
+        cancelRows.length === 0 &&
+        reopenRows.length === 0 &&
+        !err && (
         <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
           {(isCancellationTab
             ? QUEUE_TABS.find((t) => t.key === CANCELLATION_QUEUE)?.emptyMsg
