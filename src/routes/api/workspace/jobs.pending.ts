@@ -187,6 +187,10 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             );
             rows = rows.filter((r) => flagged.has(r.id));
             total = rows.length;
+          } else if (followUpOnly) {
+            // Filtered above, so the count must come from the filtered rows.
+            total = rows.length;
+            flagged = new Set();
           } else {
             total = count ?? rows.length;
             flagged = new Set();
