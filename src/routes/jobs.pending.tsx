@@ -342,11 +342,60 @@ function PendingQueuePage() {
         cancelRows.length === 0 &&
         reopenRows.length === 0 &&
         !err && (
-        <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
-          {(isCancellationTab
-            ? QUEUE_TABS.find((t) => t.key === CANCELLATION_QUEUE)?.emptyMsg
-            : QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg) ?? "No jobs."}
-        </div>
+          <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
+            {(isCancellationTab
+              ? QUEUE_TABS.find((t) => t.key === CANCELLATION_QUEUE)?.emptyMsg
+              : QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg) ?? "No jobs."}
+          </div>
+        )}
+
+      {/* WP3A — Reopen Requests: enough context to decide, and a clear open
+          action to the Job where an Owner/Admin approves or rejects. */}
+      {reopenView && reopenRows.length > 0 && (
+        <ul data-testid="reopen-queue" className="space-y-2">
+          {reopenRows.map((r) => (
+            <li key={r.request_id}>
+              <button
+                type="button"
+                onClick={() => openReopen(r)}
+                className="block w-full min-w-0 rounded-lg border-2 border-amber-300 border-l-4 border-l-amber-500 bg-amber-50 p-3 text-left shadow-sm hover:bg-amber-100"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-mono text-xs font-semibold text-primary">
+                    {r.job_number}
+                  </span>
+                  <span className="text-[10px] uppercase text-muted-foreground">
+                    Requested {formatMYDateTime(r.requested_at)}
+                  </span>
+                </div>
+                <div className="mt-1 break-words text-sm font-semibold">{r.subject}</div>
+                <div className="break-words text-xs text-muted-foreground">
+                  {r.customer_name ?? r.customer_code}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                  <StatusBadge status={r.job_status} />
+                  <PriorityBadge priority={r.priority} />
+                  <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
+                    {r.assigned_user_name ?? "Unassigned"}
+                  </span>
+                  <span className="rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 text-amber-900">
+                    Awaiting Owner/Admin Decision
+                  </span>
+                </div>
+                <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                  <div className="break-words">
+                    Requested by{" "}
+                    <span className="font-medium text-foreground">
+                      {r.requested_by_name ?? "—"}
+                    </span>
+                  </div>
+                  <div className="break-words whitespace-pre-wrap text-foreground">{r.reason}</div>
+                  <div className="font-semibold text-primary">Open Job to decide →</div>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       {cancellationView && cancelRows.length > 0 && (
