@@ -139,6 +139,7 @@ export const Route = createFileRoute("/api/admin/dashboard")({
               jobsToday: rToday.count ?? 0,
               pendingApproval: rApproval.count ?? 0,
               cancellationRequests,
+              reopenRequests,
               waitingCustomer: rWaitCust.count ?? 0,
               waitingVendor: rWaitVend.count ?? 0,
               dueSoonCustomers,
