@@ -124,6 +124,16 @@ export const Route = createFileRoute("/api/admin/dashboard")({
             user.tenantCode,
           );
 
+          // WP3A — pending Job reopen requests awaiting an Owner/Admin
+          // decision. Tenant-scoped and status = 'pending' only.
+          const rReopen = await supabaseAdmin
+            .from("service_job_reopen_requests")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_code", user.tenantCode)
+            .eq("status", "pending");
+          if (rReopen.error) throw rReopen.error;
+          const reopenRequests = rReopen.count ?? 0;
+
           return Response.json({
             summary: {
               jobsToday: rToday.count ?? 0,
