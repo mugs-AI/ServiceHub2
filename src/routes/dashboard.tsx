@@ -7,6 +7,7 @@ import { useTabs } from "@/lib/tabs";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
 import { MyDayPanel } from "@/components/qne/DaySchedule";
+import { cardStatusScope } from "@/lib/qne/dashboard/my-work-scope";
 
 export const Route = createFileRoute("/dashboard")({
   component: UserDashboard,
@@ -214,6 +215,15 @@ function UserDashboard() {
   const openJob = (r: MyWorkItem) => {
     openJobTab(r.id, r.job_number);
     navigate({ to: "/jobs/$jobId", params: { jobId: r.id } });
+  };
+
+  /**
+   * Clicking a My Work card must show exactly the scope that card counted.
+   * Persisted filters from an earlier visit are discarded and paging resets.
+   */
+  const applyCardScope = (statuses: string[]) => {
+    setPage(1);
+    setFilters({ ...DEFAULT_FILTERS, statuses });
   };
 
   const toggle = (list: string[], value: string): string[] =>
