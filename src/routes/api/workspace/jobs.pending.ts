@@ -133,6 +133,41 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             return a.created_at.localeCompare(b.created_at);
           });
 
+          // WP3A — Completed lists read newest completion first.
+          if (queueType === "completed" || queueType === "completed_followup") {
+            rows = rows
+              .slice()
+              .sort((a, b) =>
+                String(b.completed_at ?? b.created_at).localeCompare(
+                  String(a.completed_at ?? a.created_at),
+                ),
+              );
+          }
+
+          // WP3A — "Completed Follow-up": only evidence belonging to the Job's
+          // CURRENT completion cycle counts, so an earlier cycle's follow-up
+          // flag can never leak into a later cycle.
+          let followUpOnly = false;
+          if (queueType === "completed_followup") {
+            followUpOnly = true;
+            const ids = rows.map((r) => r.id);
+            if (ids.length === 0) {
+              rows = [];
+            } else {
+              const { data: evidence, error: evErr } = await supabaseAdmin
+                .from("service_job_completions")
+                .select("service_job_id, completion_cycle, follow_up_required")
+                .eq("tenant_code", user.tenantCode)
+                .in("service_job_id", ids);
+              if (evErr) throw evErr;
+              const { followUpJobIds } = await import(
+                "@/lib/qne/service-jobs/wp3a-queues"
+              );
+              const keep = followUpJobIds(rows, evidence ?? []);
+              rows = rows.filter((r) => keep.has(r.id));
+            }
+          }
+
           // Shared cancellation-state awareness. Every authenticated
           // same-tenant user may know that a Job they can already see carries
           // an active cancellation request; no request detail is ever exposed
