@@ -95,7 +95,6 @@ export function resolvedByFor(row: ScopeRow): string | null {
   return null;
 }
 
-
 export interface ScopeCounts {
   completed: number;
   resolved: number;

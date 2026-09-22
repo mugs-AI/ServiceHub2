@@ -11,7 +11,6 @@
 // evidence yet and therefore cannot be cleared. The candidate migration's
 // additive materialisation creates exactly those missing rows on apply.
 
-
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { deriveOutcome } from "./wp3b-followup";
 import { FOLLOWUPS_TABLE, FOLLOWUP_CLEAR_RPC, wp3bSchema } from "./wp3b-db.server";
@@ -96,7 +95,6 @@ export interface OutcomeJob {
   outcome: CompletionOutcome;
   followup: FollowupRow | null;
 }
-
 
 /**
  * The single central derivation of EVERY completed cycle for a tenant, used by

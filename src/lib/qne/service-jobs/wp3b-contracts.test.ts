@@ -39,7 +39,9 @@ describe("WP3B candidate migration", () => {
     // Identity comes from canonical Job + completion evidence.
     expect(block).toMatch(/FROM public\.service_jobs j/);
     expect(block).toMatch(/JOIN public\.service_job_completions c/);
-    expect(block).toMatch(/coalesce\(c\.completion_cycle, 1\) = coalesce\(j\.completion_cycle, 1\)/);
+    expect(block).toMatch(
+      /coalesce\(c\.completion_cycle, 1\) = coalesce\(j\.completion_cycle, 1\)/,
+    );
     // Only non-deleted, currently Completed, ticked cycles with no row.
     expect(block).toMatch(/j\.is_deleted = false/);
     expect(block).toMatch(/j\.status = 'Completed'/);
@@ -59,7 +61,6 @@ describe("WP3B candidate migration", () => {
     expect(SQL).not.toMatch(/needs\s+no backfill/);
     expect(SQL).toMatch(/not a destructive backfill/);
   });
-
 
   it("never rewrites completion evidence", () => {
     expect(SQL).not.toMatch(/UPDATE public\.service_job_completions/);
@@ -210,14 +211,15 @@ describe("WP3B dashboard and queue data contract", () => {
   it("an open follow-up is only actionable with durable current-cycle evidence", () => {
     const RULES = read("src/lib/qne/service-jobs/wp3b-followup.ts");
     // UI: no row -> no control, whatever the derived outcome says.
-    expect(RULES).toMatch(/const fu = input\.followup;\s*\n\s*if \(!fu\) return \{ mode: "hidden" \}/);
+    expect(RULES).toMatch(
+      /const fu = input\.followup;\s*\n\s*if \(!fu\) return \{ mode: "hidden" \}/,
+    );
     // Server: the RPC rejects a clear with no follow-up row for the cycle.
     expect(SQL).toMatch(/This Job has no open follow-up for its current completion cycle/);
     // The card only renders the action for the "open" view mode.
     expect(SECTION).toMatch(/view\.mode === "open" && view\.canClear/);
   });
 });
-
 
 describe("WP3B Job UI", () => {
   it("mounts the follow-up section once, only in the locked / legacy view", () => {

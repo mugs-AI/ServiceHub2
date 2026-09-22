@@ -194,4 +194,3 @@ export function followupView(input: {
   if (input.job.status !== "Completed" || input.job.is_deleted) return { mode: "hidden" };
   return { mode: "open", canClear: canClearFollowup(input.actor, input.job) };
 }
-

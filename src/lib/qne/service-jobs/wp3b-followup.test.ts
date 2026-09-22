@@ -266,7 +266,6 @@ describe("WP3B dashboard scopes", () => {
       resolved_by_user_id: "ME",
     },
     {
-
       outcome: "follow_up_open" as const,
       assigned_user_id: "ME",
       completed_at: "2026-09-01T00:00:00.000Z",
@@ -431,4 +430,3 @@ describe("WP3B follow-up evidence is required before an action is offered", () =
     expect(followupBlockedReason(completedJob, materialised)).toBeNull();
   });
 });
-
