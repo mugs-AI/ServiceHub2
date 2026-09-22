@@ -183,7 +183,41 @@ describe("WP3B dashboard and queue data contract", () => {
     expect(PENDING).toMatch(/outcomesForQueue/);
     expect(PENDING).toMatch(/eq\("tenant_code", user\.tenantCode\)/);
   });
+
+  it("Resolved by Me is attributed to the actual actor, not the assignee", () => {
+    const SCOPE = read("src/lib/qne/dashboard/followup-scope.ts");
+    // The read model retains the completion actor and derives the resolver.
+    expect(SERVER).toMatch(/completed_by_user_id/);
+    expect(SERVER).toMatch(/resolved_by_user_id: resolvedBy/);
+    expect(SERVER).toMatch(
+      /outcome === "resolved_at_completion"[\s\S]*?completion\?\.completed_by_user_id/,
+    );
+    expect(SERVER).toMatch(
+      /outcome === "resolved_after_follow_up"[\s\S]*?followup\?\.resolved_by_user_id/,
+    );
+    // The shared count credits the resolver; workload scopes keep the assignee.
+    expect(SCOPE).toMatch(/export function resolvedByFor/);
+    expect(SCOPE).toMatch(/resolvedByFor\(row\) === me\) counts\.resolvedByMeToday/);
+    expect(SCOPE).not.toMatch(/if \(mine\) counts\.resolvedByMeToday/);
+    expect(SCOPE).toMatch(/if \(mine\) counts\.myFollowUps/);
+    expect(SCOPE).toMatch(/if \(mine\) counts\.myReopenPending/);
+    // Both dashboards pass the resolver through the shared scope rows.
+    for (const src of [ADMIN, MYWORK]) {
+      expect(src).toMatch(/resolved_by_user_id: r\.resolved_by_user_id/);
+    }
+  });
+
+  it("an open follow-up is only actionable with durable current-cycle evidence", () => {
+    const RULES = read("src/lib/qne/service-jobs/wp3b-followup.ts");
+    // UI: no row -> no control, whatever the derived outcome says.
+    expect(RULES).toMatch(/const fu = input\.followup;\s*\n\s*if \(!fu\) return \{ mode: "hidden" \}/);
+    // Server: the RPC rejects a clear with no follow-up row for the cycle.
+    expect(SQL).toMatch(/This Job has no open follow-up for its current completion cycle/);
+    // The card only renders the action for the "open" view mode.
+    expect(SECTION).toMatch(/view\.mode === "open" && view\.canClear/);
+  });
 });
+
 
 describe("WP3B Job UI", () => {
   it("mounts the follow-up section once, only in the locked / legacy view", () => {
