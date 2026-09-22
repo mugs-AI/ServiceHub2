@@ -67,10 +67,14 @@ describe("My Work card/list parity", () => {
   });
 
   it("dashboard cards use the shared scope and reset paging", () => {
-    expect(dashboardUi).toContain('cardStatusScope("assignedToMe")');
-    expect(dashboardUi).toContain('cardStatusScope("myPendingTasks")');
+    // WP3C: every card now sends its server-validated scope key, and the
+    // server derives the status list from the same shared module.
+    expect(dashboardUi).toContain("MY_WORK_CARDS");
+    expect(dashboardUi).toContain('sp.set("scope", scope)');
     expect(dashboardUi).not.toContain('statuses: ["Assigned"] }');
     expect(dashboardUi).toMatch(/const applyCardScope[\s\S]*setPage\(1\)/);
+    const myWork = readFileSync("src/routes/api/dashboard/my-work.ts", "utf8");
+    expect(myWork).toContain("statusesForMyWorkScope");
   });
 
   it("server and UI import the same scope module", () => {
@@ -212,10 +216,11 @@ describe("Admin Dashboard reopen card", () => {
   });
 
   it("deep links to the Pending Queue reopen tab", () => {
-    expect(adminUi).toContain("QUEUE_REOPEN_REQUESTS");
-    expect(adminUi).toContain('label="Reopen Requests"');
-    expect(adminUi).toContain("reopenRequests");
-    expect(adminUi).toContain('to="/jobs/pending"');
+    const cards = readFileSync("src/lib/qne/dashboard/admin-cards.ts", "utf8");
+    expect(cards).toContain('queueType: "reopen_requests"');
+    expect(cards).toContain('label: "Reopen Requests"');
+    expect(cards).toContain('key: "reopenRequests"');
+    expect(adminUi).toContain('to: "/jobs/pending"');
   });
 });
 
