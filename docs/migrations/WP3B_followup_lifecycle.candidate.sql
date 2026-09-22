@@ -119,6 +119,57 @@ REVOKE ALL ON public.service_job_followups FROM authenticated;
 GRANT ALL ON public.service_job_followups TO service_role;
 
 -- ---------------------------------------------------------------------------
+-- 1b. Additive compatibility materialisation (INSERT-only)
+--
+-- Jobs that were already completed with follow_up_required = true on their
+-- CURRENT completion cycle must become clearable the moment this migration is
+-- applied. Without a durable row they would derive as Follow-up Open forever
+-- and sh_followup_clear would answer "no open follow-up".
+--
+-- This statement:
+--   * inserts ONE open row per missing (tenant, Job, current cycle);
+--   * takes tenant_code, service_job_id, completion_id and completion_cycle
+--     from canonical Job and completion evidence only;
+--   * takes opened_at from completion.completed_at, else the Job's
+--     completed_at, else now() as a last fallback;
+--   * takes the opener from the completion actor snapshots;
+--   * touches nothing that already exists — ON CONFLICT DO NOTHING preserves
+--     any follow-up evidence, and completion evidence is never written.
+-- No-tick completions and legacy completions without modern evidence are
+-- excluded, so no fake follow-up row is ever created.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.service_job_followups (
+  tenant_code, service_job_id, completion_id, completion_cycle,
+  state, opened_at, opened_by_user_id, opened_by_name_snapshot
+)
+SELECT
+  j.tenant_code,
+  j.id,
+  c.id,
+  coalesce(j.completion_cycle, 1),
+  'open',
+  coalesce(c.completed_at, j.completed_at, now()),
+  c.completed_by_user_id,
+  c.completed_by_name_snapshot
+FROM public.service_jobs j
+JOIN public.service_job_completions c
+  ON  c.tenant_code = j.tenant_code
+  AND c.service_job_id = j.id
+  AND coalesce(c.completion_cycle, 1) = coalesce(j.completion_cycle, 1)
+WHERE j.is_deleted = false
+  AND j.status = 'Completed'
+  AND coalesce(c.follow_up_required, false) = true
+  AND NOT EXISTS (
+    SELECT 1 FROM public.service_job_followups f
+    WHERE f.tenant_code = j.tenant_code
+      AND f.service_job_id = j.id
+      AND f.completion_cycle = coalesce(j.completion_cycle, 1)
+  )
+ON CONFLICT (tenant_code, service_job_id, completion_cycle) DO NOTHING;
+
+
+
+-- ---------------------------------------------------------------------------
 -- 2. Central outcome projection — every completed cycle, derived not stored
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE VIEW public.service_job_completion_outcomes AS
