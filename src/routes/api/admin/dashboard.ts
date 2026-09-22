@@ -134,12 +134,35 @@ export const Route = createFileRoute("/api/admin/dashboard")({
           if (rReopen.error) throw rReopen.error;
           const reopenRequests = rReopen.count ?? 0;
 
+          // WP3B — completion outcomes for the CURRENT cycle of every
+          // completed Job. The card counts and the Pending Queue lists they
+          // open both come from this one shared derivation, so they can never
+          // disagree. Legacy Completed jobs without modern completion evidence
+          // are counted separately and are never reported as Resolved.
+          const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
+          const { countScopes } = await import("@/lib/qne/dashboard/followup-scope");
+          const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
+          const wp3b = countScopes(
+            outcomeRows.map((r) => ({
+              outcome: r.outcome,
+              assigned_user_id: r.assigned_user_id,
+              completed_at: r.completed_at,
+              followup_resolved_at: r.followup?.resolved_at ?? null,
+            })),
+            { todayFromIso: fromIso, todayToIso: toIso },
+          );
+
           return Response.json({
             summary: {
               jobsToday: rToday.count ?? 0,
               pendingApproval: rApproval.count ?? 0,
               cancellationRequests,
               reopenRequests,
+              followUpOpen: wp3b.followUpOpen,
+              reopenPending: wp3b.reopenPending,
+              resolvedToday: wp3b.resolvedToday,
+              completedCurrentCycle: wp3b.completed,
+              legacyCompleted: wp3b.legacyUnknown,
               waitingCustomer: rWaitCust.count ?? 0,
               waitingVendor: rWaitVend.count ?? 0,
               dueSoonCustomers,

@@ -17,7 +17,11 @@ type QueueType =
   | "cancellation_requested"
   // WP3A queue categories (stable URL keys for dashboard deep links).
   | "completed_followup"
-  | "completed";
+  | "completed"
+  // WP3B outcome categories (same stable-key rule).
+  | "follow_up_open"
+  | "reopen_pending"
+  | "resolved";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
@@ -80,7 +84,10 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             query = query.eq("status", "Waiting Vendor");
           } else if (
             queueType === "completed" ||
-            queueType === "completed_followup"
+            queueType === "completed_followup" ||
+            queueType === "follow_up_open" ||
+            queueType === "reopen_pending" ||
+            queueType === "resolved"
           ) {
             // WP3A — Completed lists. is_deleted = false is already applied
             // above, so a soft-deleted Job can never appear here.
@@ -134,7 +141,13 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           });
 
           // WP3A — Completed lists read newest completion first.
-          if (queueType === "completed" || queueType === "completed_followup") {
+          if (
+            queueType === "completed" ||
+            queueType === "completed_followup" ||
+            queueType === "follow_up_open" ||
+            queueType === "reopen_pending" ||
+            queueType === "resolved"
+          ) {
             rows = rows
               .slice()
               .sort((a, b) =>
@@ -148,6 +161,27 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           // CURRENT completion cycle counts, so an earlier cycle's follow-up
           // flag can never leak into a later cycle.
           let followUpOnly = false;
+
+          // WP3B — outcome lists (Follow-up Open / Reopen Pending / Resolved).
+          // The SAME shared derivation the dashboard cards count with decides
+          // membership here, so a card count and its list always agree.
+          // Legacy Completed jobs without modern evidence are never included.
+          if (
+            queueType === "follow_up_open" ||
+            queueType === "reopen_pending" ||
+            queueType === "resolved"
+          ) {
+            followUpOnly = true;
+            const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
+            const { outcomesForQueue } = await import("@/lib/qne/dashboard/followup-scope");
+            const wanted = new Set<string>(outcomesForQueue(queueType));
+            const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
+            const keep = new Set(
+              outcomeRows.filter((r) => wanted.has(r.outcome)).map((r) => r.id),
+            );
+            rows = rows.filter((r) => keep.has(r.id));
+          }
+
           if (queueType === "completed_followup") {
             followUpOnly = true;
             const ids = rows.map((r) => r.id);

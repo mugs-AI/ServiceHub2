@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { JobFollowupSection } from "@/components/qne/JobFollowupSection";
 import { JobReopenSection } from "@/components/qne/JobReopenSection";
 import { formatMYDateTime } from "@/lib/format-date";
 import {
@@ -135,6 +136,17 @@ export function SimpleCompletionCard({
       {/* WP3A — reopen request / decision for a Completed Job. It renders no
           form control inside the three-control completion form; it only
           appears once the Job is completed (including legacy completions). */}
+      {/* WP3B — outcome badge and Clear Follow-up. Clearing keeps the Job
+          Completed and never modifies the completion evidence above. */}
+      {(view.mode === "locked" || view.mode === "legacy") && (
+        <JobFollowupSection
+          jobId={jobId}
+          onChanged={() => {
+            void handleReopenChanged();
+          }}
+        />
+      )}
+
       {(view.mode === "locked" || view.mode === "legacy") && (
         <JobReopenSection
           jobId={jobId}

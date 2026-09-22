@@ -81,6 +81,7 @@ import { Route as ApiWorkspaceJobsJobIdPriorityRouteImport } from './routes/api/
 import { Route as ApiWorkspaceJobsJobIdOnsiteAttendanceRouteImport } from './routes/api/workspace/jobs.$jobId.onsite-attendance'
 import { Route as ApiWorkspaceJobsJobIdInternalNoteRouteImport } from './routes/api/workspace/jobs.$jobId.internal-note'
 import { Route as ApiWorkspaceJobsJobIdHistoryRouteImport } from './routes/api/workspace/jobs.$jobId.history'
+import { Route as ApiWorkspaceJobsJobIdFollowupRouteImport } from './routes/api/workspace/jobs.$jobId.followup'
 import { Route as ApiWorkspaceJobsJobIdFieldRouteImport } from './routes/api/workspace/jobs.$jobId.field'
 import { Route as ApiWorkspaceJobsJobIdCompleteRouteImport } from './routes/api/workspace/jobs.$jobId.complete'
 import { Route as ApiWorkspaceJobsJobIdCommentsRouteImport } from './routes/api/workspace/jobs.$jobId.comments'
@@ -482,6 +483,12 @@ const ApiWorkspaceJobsJobIdHistoryRoute =
     path: '/history',
     getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
   } as any)
+const ApiWorkspaceJobsJobIdFollowupRoute =
+  ApiWorkspaceJobsJobIdFollowupRouteImport.update({
+    id: '/followup',
+    path: '/followup',
+    getParentRoute: () => ApiWorkspaceJobsJobIdRoute,
+  } as any)
 const ApiWorkspaceJobsJobIdFieldRoute =
   ApiWorkspaceJobsJobIdFieldRouteImport.update({
     id: '/field',
@@ -617,6 +624,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/complete': typeof ApiWorkspaceJobsJobIdCompleteRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
+  '/api/workspace/jobs/$jobId/followup': typeof ApiWorkspaceJobsJobIdFollowupRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
   '/api/workspace/jobs/$jobId/onsite-attendance': typeof ApiWorkspaceJobsJobIdOnsiteAttendanceRoute
@@ -701,6 +709,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/complete': typeof ApiWorkspaceJobsJobIdCompleteRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
+  '/api/workspace/jobs/$jobId/followup': typeof ApiWorkspaceJobsJobIdFollowupRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
   '/api/workspace/jobs/$jobId/onsite-attendance': typeof ApiWorkspaceJobsJobIdOnsiteAttendanceRoute
@@ -787,6 +796,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs/$jobId/comments': typeof ApiWorkspaceJobsJobIdCommentsRoute
   '/api/workspace/jobs/$jobId/complete': typeof ApiWorkspaceJobsJobIdCompleteRoute
   '/api/workspace/jobs/$jobId/field': typeof ApiWorkspaceJobsJobIdFieldRoute
+  '/api/workspace/jobs/$jobId/followup': typeof ApiWorkspaceJobsJobIdFollowupRoute
   '/api/workspace/jobs/$jobId/history': typeof ApiWorkspaceJobsJobIdHistoryRoute
   '/api/workspace/jobs/$jobId/internal-note': typeof ApiWorkspaceJobsJobIdInternalNoteRoute
   '/api/workspace/jobs/$jobId/onsite-attendance': typeof ApiWorkspaceJobsJobIdOnsiteAttendanceRoute
@@ -874,6 +884,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/complete'
     | '/api/workspace/jobs/$jobId/field'
+    | '/api/workspace/jobs/$jobId/followup'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
     | '/api/workspace/jobs/$jobId/onsite-attendance'
@@ -958,6 +969,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/complete'
     | '/api/workspace/jobs/$jobId/field'
+    | '/api/workspace/jobs/$jobId/followup'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
     | '/api/workspace/jobs/$jobId/onsite-attendance'
@@ -1043,6 +1055,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs/$jobId/comments'
     | '/api/workspace/jobs/$jobId/complete'
     | '/api/workspace/jobs/$jobId/field'
+    | '/api/workspace/jobs/$jobId/followup'
     | '/api/workspace/jobs/$jobId/history'
     | '/api/workspace/jobs/$jobId/internal-note'
     | '/api/workspace/jobs/$jobId/onsite-attendance'
@@ -1623,6 +1636,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceJobsJobIdHistoryRouteImport
       parentRoute: typeof ApiWorkspaceJobsJobIdRoute
     }
+    '/api/workspace/jobs/$jobId/followup': {
+      id: '/api/workspace/jobs/$jobId/followup'
+      path: '/followup'
+      fullPath: '/api/workspace/jobs/$jobId/followup'
+      preLoaderRoute: typeof ApiWorkspaceJobsJobIdFollowupRouteImport
+      parentRoute: typeof ApiWorkspaceJobsJobIdRoute
+    }
     '/api/workspace/jobs/$jobId/field': {
       id: '/api/workspace/jobs/$jobId/field'
       path: '/field'
@@ -1773,6 +1793,7 @@ interface ApiWorkspaceJobsJobIdRouteChildren {
   ApiWorkspaceJobsJobIdCommentsRoute: typeof ApiWorkspaceJobsJobIdCommentsRoute
   ApiWorkspaceJobsJobIdCompleteRoute: typeof ApiWorkspaceJobsJobIdCompleteRoute
   ApiWorkspaceJobsJobIdFieldRoute: typeof ApiWorkspaceJobsJobIdFieldRoute
+  ApiWorkspaceJobsJobIdFollowupRoute: typeof ApiWorkspaceJobsJobIdFollowupRoute
   ApiWorkspaceJobsJobIdHistoryRoute: typeof ApiWorkspaceJobsJobIdHistoryRoute
   ApiWorkspaceJobsJobIdInternalNoteRoute: typeof ApiWorkspaceJobsJobIdInternalNoteRoute
   ApiWorkspaceJobsJobIdOnsiteAttendanceRoute: typeof ApiWorkspaceJobsJobIdOnsiteAttendanceRoute
@@ -1799,6 +1820,7 @@ const ApiWorkspaceJobsJobIdRouteChildren: ApiWorkspaceJobsJobIdRouteChildren = {
   ApiWorkspaceJobsJobIdCommentsRoute: ApiWorkspaceJobsJobIdCommentsRoute,
   ApiWorkspaceJobsJobIdCompleteRoute: ApiWorkspaceJobsJobIdCompleteRoute,
   ApiWorkspaceJobsJobIdFieldRoute: ApiWorkspaceJobsJobIdFieldRoute,
+  ApiWorkspaceJobsJobIdFollowupRoute: ApiWorkspaceJobsJobIdFollowupRoute,
   ApiWorkspaceJobsJobIdHistoryRoute: ApiWorkspaceJobsJobIdHistoryRoute,
   ApiWorkspaceJobsJobIdInternalNoteRoute:
     ApiWorkspaceJobsJobIdInternalNoteRoute,
