@@ -141,7 +141,13 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           });
 
           // WP3A — Completed lists read newest completion first.
-          if (queueType === "completed" || queueType === "completed_followup") {
+          if (
+            queueType === "completed" ||
+            queueType === "completed_followup" ||
+            queueType === "follow_up_open" ||
+            queueType === "reopen_pending" ||
+            queueType === "resolved"
+          ) {
             rows = rows
               .slice()
               .sort((a, b) =>
