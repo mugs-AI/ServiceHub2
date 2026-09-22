@@ -56,3 +56,85 @@ export function isPersonalCard(card: Wp3bCard): boolean {
 export function isTodayCard(card: Wp3bCard): boolean {
   return card === "resolvedToday" || card === "resolvedByMeToday";
 }
+
+/* ---------------- shared counting ---------------- */
+
+export interface ScopeRow {
+  outcome: CompletionOutcome;
+  assigned_user_id: string | null;
+  completed_at: string | null;
+  /** Follow-up clear timestamp, when the cycle had a follow-up. */
+  followup_resolved_at?: string | null;
+}
+
+/**
+ * When a completed cycle became Resolved: the completion timestamp for a
+ * no-tick completion, the clear timestamp for a cleared follow-up.
+ */
+export function resolvedAtFor(row: ScopeRow): string | null {
+  if (row.outcome === "resolved_after_follow_up") return row.followup_resolved_at ?? null;
+  if (row.outcome === "resolved_at_completion") return row.completed_at ?? null;
+  return null;
+}
+
+export interface ScopeCounts {
+  completed: number;
+  resolved: number;
+  followUpOpen: number;
+  reopenPending: number;
+  legacyUnknown: number;
+  resolvedToday: number;
+  myFollowUps: number;
+  myReopenPending: number;
+  resolvedByMeToday: number;
+}
+
+/**
+ * The one definition every WP3B card count uses. The destination list applies
+ * the same predicates (see outcomesForQueue), so a count and its list agree.
+ */
+export function countScopes(
+  rows: readonly ScopeRow[],
+  opts: { meUserId?: string | null; todayFromIso?: string; todayToIso?: string } = {},
+): ScopeCounts {
+  const me = opts.meUserId ?? null;
+  const inToday = (iso: string | null): boolean => {
+    if (!iso || !opts.todayFromIso || !opts.todayToIso) return false;
+    return iso >= opts.todayFromIso && iso < opts.todayToIso;
+  };
+
+  const counts: ScopeCounts = {
+    completed: 0,
+    resolved: 0,
+    followUpOpen: 0,
+    reopenPending: 0,
+    legacyUnknown: 0,
+    resolvedToday: 0,
+    myFollowUps: 0,
+    myReopenPending: 0,
+    resolvedByMeToday: 0,
+  };
+
+  for (const row of rows) {
+    const mine = me !== null && row.assigned_user_id === me;
+    if (row.outcome === "legacy_unknown") {
+      counts.legacyUnknown += 1;
+      continue;
+    }
+    counts.completed += 1;
+    if (row.outcome === "follow_up_open") {
+      counts.followUpOpen += 1;
+      if (mine) counts.myFollowUps += 1;
+    } else if (row.outcome === "reopen_pending") {
+      counts.reopenPending += 1;
+      if (mine) counts.myReopenPending += 1;
+    } else {
+      counts.resolved += 1;
+      if (inToday(resolvedAtFor(row))) {
+        counts.resolvedToday += 1;
+        if (mine) counts.resolvedByMeToday += 1;
+      }
+    }
+  }
+  return counts;
+}
