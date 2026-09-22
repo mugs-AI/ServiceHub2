@@ -26,6 +26,7 @@ import {
   MY_PENDING_STATUSES,
   isLifecycleMyWorkScope,
   isMyWorkScope,
+  myWorkScopeRequiresCurrentAssignee,
   statusesForMyWorkScope,
 } from "@/lib/qne/dashboard/my-work-scope";
 
@@ -38,7 +39,10 @@ function trim(v: unknown, max = 200): string | null {
 
 function csv(v: unknown): string[] {
   if (typeof v !== "string") return [];
-  return v.split(",").map((s) => s.trim()).filter(Boolean);
+  return v
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /** [start, end) as ISO strings for today's Malaysia calendar day. */
@@ -59,12 +63,9 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         try {
           const user = await requireAuthenticatedN3User(request);
           const myUserId = user.diagnostics.matchedN3UserId;
@@ -103,18 +104,14 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           const from = trim(sp.get("from"), 40);
           const to = trim(sp.get("to"), 40);
           const includeCompleted =
-            sp.get("includeCompleted") === "1" ||
-            sp.get("includeCompleted") === "true";
+            sp.get("includeCompleted") === "1" || sp.get("includeCompleted") === "true";
           const rawScope = sp.get("scope");
           if (rawScope !== null && !isMyWorkScope(rawScope)) {
             return Response.json({ error: "Invalid My Work scope." }, { status: 400 });
           }
           const scope = rawScope && isMyWorkScope(rawScope) ? rawScope : null;
           const page = Math.max(Number(sp.get("page") ?? 1) || 1, 1);
-          const pageSize = Math.min(
-            Math.max(Number(sp.get("pageSize") ?? 25) || 25, 1),
-            100,
-          );
+          const pageSize = Math.min(Math.max(Number(sp.get("pageSize") ?? 25) || 25, 1), 100);
 
           // --- Summary (parallel counts on tenant + assignee scope) ---
           const base = () =>
@@ -142,10 +139,7 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
             base().eq("status", "Waiting Customer"),
             base().eq("status", "Waiting Vendor"),
             base().eq("status", "Pending Approval"),
-            base()
-              .eq("status", "Completed")
-              .gte("completed_at", mytFrom)
-              .lt("completed_at", mytTo),
+            base().eq("status", "Completed").gte("completed_at", mytFrom).lt("completed_at", mytTo),
           ]);
 
           const errs = [
@@ -170,16 +164,17 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           const { countScopes } = await import("@/lib/qne/dashboard/followup-scope");
           const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
           const scopeRows = outcomeRows.map((r) => ({
-              outcome: r.outcome,
-              assigned_user_id: r.assigned_user_id,
-              completed_at: r.completed_at,
-              followup_resolved_at: r.followup?.resolved_at ?? null,
-              resolved_by_user_id: r.resolved_by_user_id,
-            }));
-          const wp3b = countScopes(
-            scopeRows,
-            { meUserId: myUserId, todayFromIso: mytFrom, todayToIso: mytTo },
-          );
+            outcome: r.outcome,
+            assigned_user_id: r.assigned_user_id,
+            completed_at: r.completed_at,
+            followup_resolved_at: r.followup?.resolved_at ?? null,
+            resolved_by_user_id: r.resolved_by_user_id,
+          }));
+          const wp3b = countScopes(scopeRows, {
+            meUserId: myUserId,
+            todayFromIso: mytFrom,
+            todayToIso: mytTo,
+          });
 
           const summary = {
             myFollowUps: wp3b.myFollowUps,
@@ -196,6 +191,10 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           };
 
           // --- Items ---
+          // Tenant + soft-delete are always enforced. The current-assignee
+          // constraint is applied only for scopes that are defined by current
+          // assignment; "Resolved by Me Today" is credited to the actual
+          // resolver, so a Job reassigned after resolution must stay listed.
           let query = supabaseAdmin
             .from("service_jobs")
             .select(
@@ -203,31 +202,43 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
               { count: "exact" },
             )
             .eq("tenant_code", user.tenantCode)
-            .eq("is_deleted", false)
-            .eq("assigned_user_id", myUserId);
+            .eq("is_deleted", false);
+          if (myWorkScopeRequiresCurrentAssignee(scope)) {
+            query = query.eq("assigned_user_id", myUserId);
+          }
 
           if (scope && isLifecycleMyWorkScope(scope)) {
             const { matchesWp3bCard } = await import("@/lib/qne/dashboard/followup-scope");
-            const card = scope === "my_followups"
-              ? "myFollowUps"
-              : scope === "my_reopen_pending"
-                ? "myReopenPending"
-                : "resolvedByMeToday";
+            const card =
+              scope === "my_followups"
+                ? "myFollowUps"
+                : scope === "my_reopen_pending"
+                  ? "myReopenPending"
+                  : "resolvedByMeToday";
             const keep = new Set(
               outcomeRows
-                .filter((row, index) => matchesWp3bCard(scopeRows[index], card, {
-                  meUserId: myUserId,
-                  todayFromIso: mytFrom,
-                  todayToIso: mytTo,
-                }))
+                .filter((row, index) =>
+                  matchesWp3bCard(scopeRows[index], card, {
+                    meUserId: myUserId,
+                    todayFromIso: mytFrom,
+                    todayToIso: mytTo,
+                  }),
+                )
                 .map((row) => row.id),
             );
             if (keep.size === 0) {
-              return Response.json({ summary, items: [], total: 0, page, pageSize, me: {
-                userId: myUserId,
-                displayName: user.displayName || user.email || "",
-                reason: user.diagnostics.reason,
-              } });
+              return Response.json({
+                summary,
+                items: [],
+                total: 0,
+                page,
+                pageSize,
+                me: {
+                  userId: myUserId,
+                  displayName: user.displayName || user.email || "",
+                  reason: user.diagnostics.reason,
+                },
+              });
             }
             query = query.in("id", [...keep]);
           }
