@@ -101,7 +101,10 @@ export async function loadCompletionOutcomes(tenantCode: string): Promise<Outcom
 
   const cycleByJob = new Map<string, number>();
   for (const j of rows) {
-    cycleByJob.set(j.id, typeof j.completion_cycle === "number" && j.completion_cycle > 0 ? j.completion_cycle : 1);
+    cycleByJob.set(
+      j.id,
+      typeof j.completion_cycle === "number" && j.completion_cycle > 0 ? j.completion_cycle : 1,
+    );
   }
   const ids = rows.map((j) => j.id);
 
