@@ -25,8 +25,7 @@ export type AdminDashboardQueueKey = (typeof ADMIN_DASHBOARD_QUEUE_KEYS)[number]
 
 export function isAdminDashboardQueueKey(value: unknown): value is AdminDashboardQueueKey {
   return (
-    typeof value === "string" &&
-    (ADMIN_DASHBOARD_QUEUE_KEYS as readonly string[]).includes(value)
+    typeof value === "string" && (ADMIN_DASHBOARD_QUEUE_KEYS as readonly string[]).includes(value)
   );
 }
 
@@ -42,7 +41,9 @@ export function statusesForAdminQueue(key: AdminDashboardQueueKey): readonly str
  * outcome read model rather than by Job status alone.
  */
 export function isOutcomeAdminQueue(key: AdminDashboardQueueKey): boolean {
-  return key === "resolved_today" || key === "legacy_completed" || key === "completed_current_cycle";
+  return (
+    key === "resolved_today" || key === "legacy_completed" || key === "completed_current_cycle"
+  );
 }
 
 export const ADMIN_QUEUE_LABELS: Record<AdminDashboardQueueKey, string> = {

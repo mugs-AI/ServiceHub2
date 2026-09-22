@@ -92,13 +92,58 @@ export interface MyWorkCardDef {
 }
 
 export const MY_WORK_CARDS: readonly MyWorkCardDef[] = [
-  { scope: "my_pending_tasks", label: "My Pending Tasks", summaryKey: "myPendingTasks", meaning: "Work you can act on now" },
-  { scope: "assigned_to_me", label: "Assigned to Me", summaryKey: "assignedToMe", meaning: "Every active job assigned to you" },
-  { scope: "my_in_progress", label: "My In Progress", summaryKey: "myInProgress", meaning: "Started and not yet completed" },
-  { scope: "waiting_approval", label: "Waiting Approval", summaryKey: "myWaitingApproval", meaning: "Awaiting an Owner/Admin decision" },
-  { scope: "waiting_customer", label: "Waiting Customer", summaryKey: "myWaitingCustomer", meaning: "Blocked on the customer" },
-  { scope: "waiting_vendor", label: "Waiting Vendor", summaryKey: "myWaitingVendor", meaning: "Blocked on a vendor" },
-  { scope: "my_followups", label: "My Follow-ups", summaryKey: "myFollowUps", meaning: "Completed, follow-up still open" },
-  { scope: "my_reopen_pending", label: "My Reopen Pending", summaryKey: "myReopenPending", meaning: "Reopen request awaiting decision" },
-  { scope: "resolved_by_me_today", label: "Resolved by Me Today", summaryKey: "resolvedByMeToday", meaning: "Credited to the actual resolver" },
+  {
+    scope: "my_pending_tasks",
+    label: "My Pending Tasks",
+    summaryKey: "myPendingTasks",
+    meaning: "Work you can act on now",
+  },
+  {
+    scope: "assigned_to_me",
+    label: "Assigned to Me",
+    summaryKey: "assignedToMe",
+    meaning: "Every active job assigned to you",
+  },
+  {
+    scope: "my_in_progress",
+    label: "My In Progress",
+    summaryKey: "myInProgress",
+    meaning: "Started and not yet completed",
+  },
+  {
+    scope: "waiting_approval",
+    label: "Waiting Approval",
+    summaryKey: "myWaitingApproval",
+    meaning: "Awaiting an Owner/Admin decision",
+  },
+  {
+    scope: "waiting_customer",
+    label: "Waiting Customer",
+    summaryKey: "myWaitingCustomer",
+    meaning: "Blocked on the customer",
+  },
+  {
+    scope: "waiting_vendor",
+    label: "Waiting Vendor",
+    summaryKey: "myWaitingVendor",
+    meaning: "Blocked on a vendor",
+  },
+  {
+    scope: "my_followups",
+    label: "My Follow-ups",
+    summaryKey: "myFollowUps",
+    meaning: "Completed, follow-up still open",
+  },
+  {
+    scope: "my_reopen_pending",
+    label: "My Reopen Pending",
+    summaryKey: "myReopenPending",
+    meaning: "Reopen request awaiting decision",
+  },
+  {
+    scope: "resolved_by_me_today",
+    label: "Resolved by Me Today",
+    summaryKey: "resolvedByMeToday",
+    meaning: "Credited to the actual resolver",
+  },
 ] as const;

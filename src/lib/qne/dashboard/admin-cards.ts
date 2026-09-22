@@ -46,35 +46,135 @@ export interface AdminCardDef {
 }
 
 export const ADMIN_ACTION_CENTRE: readonly AdminCardDef[] = [
-  { label: "Job Approvals", key: "pendingApproval", tone: "amber", meaning: "Jobs awaiting your approval", queueType: "pending_approval" },
-  { label: "Cancellation Requests", key: "cancellationRequests", tone: "rose", meaning: "Awaiting an Owner/Admin decision", queueType: "cancellation_requests" },
-  { label: "Reopen Requests", key: "reopenRequests", tone: "amber", meaning: "Completed jobs asked to reopen", queueType: "reopen_requests" },
-  { label: "Follow-up Open", key: "followUpOpen", tone: "orange", meaning: "Completed, follow-up not yet cleared", queueType: "follow_up_open" },
+  {
+    label: "Job Approvals",
+    key: "pendingApproval",
+    tone: "amber",
+    meaning: "Jobs awaiting your approval",
+    queueType: "pending_approval",
+  },
+  {
+    label: "Cancellation Requests",
+    key: "cancellationRequests",
+    tone: "rose",
+    meaning: "Awaiting an Owner/Admin decision",
+    queueType: "cancellation_requests",
+  },
+  {
+    label: "Reopen Requests",
+    key: "reopenRequests",
+    tone: "amber",
+    meaning: "Completed jobs asked to reopen",
+    queueType: "reopen_requests",
+  },
+  {
+    label: "Follow-up Open",
+    key: "followUpOpen",
+    tone: "orange",
+    meaning: "Completed, follow-up not yet cleared",
+    queueType: "follow_up_open",
+  },
 ] as const;
 
 export const ADMIN_LIVE_OPERATIONS: readonly AdminCardDef[] = [
-  { label: "Jobs Today", key: "jobsToday", tone: "blue", meaning: "Created today (Malaysia time)", queueType: "jobs_today" },
-  { label: "Active Jobs", key: "activeJobs", tone: "navy", meaning: "Every non-terminal job", queueType: "active" },
-  { label: "In Progress", key: "inProgress", tone: "cyan", meaning: "Being worked on right now", queueType: "in_progress" },
-  { label: "Waiting Customer", key: "waitingCustomer", tone: "amber", meaning: "Blocked on the customer", queueType: "waiting_customer" },
-  { label: "Waiting Vendor", key: "waitingVendor", tone: "violet", meaning: "Blocked on a vendor", queueType: "waiting_vendor" },
-  { label: "Resolved Today", key: "resolvedToday", tone: "emerald", meaning: "Resolved today (Malaysia time)", queueType: "resolved_today" },
+  {
+    label: "Jobs Today",
+    key: "jobsToday",
+    tone: "blue",
+    meaning: "Created today (Malaysia time)",
+    queueType: "jobs_today",
+  },
+  {
+    label: "Active Jobs",
+    key: "activeJobs",
+    tone: "navy",
+    meaning: "Every non-terminal job",
+    queueType: "active",
+  },
+  {
+    label: "In Progress",
+    key: "inProgress",
+    tone: "cyan",
+    meaning: "Being worked on right now",
+    queueType: "in_progress",
+  },
+  {
+    label: "Waiting Customer",
+    key: "waitingCustomer",
+    tone: "amber",
+    meaning: "Blocked on the customer",
+    queueType: "waiting_customer",
+  },
+  {
+    label: "Waiting Vendor",
+    key: "waitingVendor",
+    tone: "violet",
+    meaning: "Blocked on a vendor",
+    queueType: "waiting_vendor",
+  },
+  {
+    label: "Resolved Today",
+    key: "resolvedToday",
+    tone: "emerald",
+    meaning: "Resolved today (Malaysia time)",
+    queueType: "resolved_today",
+  },
 ] as const;
 
 export const ADMIN_COVERAGE: readonly AdminCardDef[] = [
-  { label: "Due Soon Customers", key: "dueSoonCustomers", tone: "amber", meaning: "Entitlements expiring soon", to: "/customers/due-soon" },
-  { label: "Overdue Customers", key: "overdueCustomers", tone: "rose", meaning: "Entitlements already expired", to: "/customers/overdue" },
+  {
+    label: "Due Soon Customers",
+    key: "dueSoonCustomers",
+    tone: "amber",
+    meaning: "Entitlements expiring soon",
+    to: "/customers/due-soon",
+  },
+  {
+    label: "Overdue Customers",
+    key: "overdueCustomers",
+    tone: "rose",
+    meaning: "Entitlements already expired",
+    to: "/customers/overdue",
+  },
 ] as const;
 
 export const ADMIN_COMPLETION_INTEGRITY: readonly AdminCardDef[] = [
-  { label: "Completed Current Cycle", key: "completedCurrentCycle", tone: "emerald", meaning: "Resolved + Follow-up Open + Reopen Pending", queueType: "completed_current_cycle" },
-  { label: "Legacy Completed / Evidence Missing", key: "legacyCompleted", tone: "navy", meaning: "Audit indicator — never counted as Resolved", queueType: "legacy_completed" },
+  {
+    label: "Completed Current Cycle",
+    key: "completedCurrentCycle",
+    tone: "emerald",
+    meaning: "Resolved + Follow-up Open + Reopen Pending",
+    queueType: "completed_current_cycle",
+  },
+  {
+    label: "Legacy Completed / Evidence Missing",
+    key: "legacyCompleted",
+    tone: "navy",
+    meaning: "Audit indicator — never counted as Resolved",
+    queueType: "legacy_completed",
+  },
 ] as const;
 
-export const ADMIN_CARD_GROUPS: readonly { title: string; description: string; cards: readonly AdminCardDef[] }[] = [
-  { title: "Action Centre", description: "Decisions waiting on an Owner or Administrator.", cards: ADMIN_ACTION_CENTRE },
-  { title: "Live Operations", description: "What the team is working on right now.", cards: ADMIN_LIVE_OPERATIONS },
-  { title: "Customer Coverage", description: "Entitlement attention across your customer base.", cards: ADMIN_COVERAGE },
+export const ADMIN_CARD_GROUPS: readonly {
+  title: string;
+  description: string;
+  cards: readonly AdminCardDef[];
+}[] = [
+  {
+    title: "Action Centre",
+    description: "Decisions waiting on an Owner or Administrator.",
+    cards: ADMIN_ACTION_CENTRE,
+  },
+  {
+    title: "Live Operations",
+    description: "What the team is working on right now.",
+    cards: ADMIN_LIVE_OPERATIONS,
+  },
+  {
+    title: "Customer Coverage",
+    description: "Entitlement attention across your customer base.",
+    cards: ADMIN_COVERAGE,
+  },
   {
     title: "Completion Integrity",
     description: "Completed = Resolved + Follow-up Open + Reopen Pending for the current cycle.",

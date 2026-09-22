@@ -22,10 +22,7 @@ import { useTabs } from "@/lib/tabs";
 import { formatMY, formatMYDateTime } from "@/lib/format-date";
 import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
 import { MyDayPanel } from "@/components/qne/DaySchedule";
-import {
-  MY_WORK_CARDS,
-  type MyWorkScope,
-} from "@/lib/qne/dashboard/my-work-scope";
+import { MY_WORK_CARDS, type MyWorkScope } from "@/lib/qne/dashboard/my-work-scope";
 import {
   DashboardAction,
   DashboardHero,
@@ -39,9 +36,15 @@ export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
       { title: "My Dashboard — ServiceHub" },
-      { name: "description", content: "Your personal service job workload, follow-ups and daily resolutions." },
+      {
+        name: "description",
+        content: "Your personal service job workload, follow-ups and daily resolutions.",
+      },
       { property: "og:title", content: "My Dashboard — ServiceHub" },
-      { property: "og:description", content: "Your personal service job workload, follow-ups and daily resolutions." },
+      {
+        property: "og:description",
+        content: "Your personal service job workload, follow-ups and daily resolutions.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -155,8 +158,12 @@ function loadFilters(): MyFilters {
     const p = JSON.parse(raw);
     return {
       q: typeof p.q === "string" ? p.q : "",
-      statuses: Array.isArray(p.statuses) ? p.statuses.filter((x: unknown) => typeof x === "string") : [],
-      priorities: Array.isArray(p.priorities) ? p.priorities.filter((x: unknown) => typeof x === "string") : [],
+      statuses: Array.isArray(p.statuses)
+        ? p.statuses.filter((x: unknown) => typeof x === "string")
+        : [],
+      priorities: Array.isArray(p.priorities)
+        ? p.priorities.filter((x: unknown) => typeof x === "string")
+        : [],
       from: typeof p.from === "string" ? p.from : "",
       to: typeof p.to === "string" ? p.to : "",
       includeCompleted: !!p.includeCompleted,
@@ -196,8 +203,7 @@ function UserDashboard() {
   const { openJobTab } = useTabs();
 
   const name = currentUser?.displayName || session?.email || "there";
-  const myUserId =
-    currentUser?.diagnostics?.matchedN3UserId ?? currentUser?.userCode ?? null;
+  const myUserId = currentUser?.diagnostics?.matchedN3UserId ?? currentUser?.userCode ?? null;
 
   const [filters, setFilters] = useState<MyFilters>(() => loadFilters());
   // The active card scope. The SERVER resolves it into the exact Job set the
@@ -339,8 +345,8 @@ function UserDashboard() {
 
       {!myUserId && (
         <div className="rounded-lg border border-dashboard-amber/40 bg-dashboard-amber-soft px-4 py-3 text-sm text-dashboard-ink">
-          Your account isn't linked to an N3 user, so personal counts are empty.
-          Ask an administrator to grant you access.
+          Your account isn't linked to an N3 user, so personal counts are empty. Ask an
+          administrator to grant you access.
         </div>
       )}
 
@@ -424,7 +430,10 @@ function UserDashboard() {
             <input
               type="text"
               value={filters.q}
-              onChange={(e) => { setPage(1); setFilters({ ...filters, q: e.target.value }); }}
+              onChange={(e) => {
+                setPage(1);
+                setFilters({ ...filters, q: e.target.value });
+              }}
               placeholder="Search job number, customer or subject"
               className="min-h-[44px] flex-1 min-w-[220px] rounded-md border bg-background px-3 text-sm"
             />
@@ -432,7 +441,10 @@ function UserDashboard() {
               <input
                 type="checkbox"
                 checked={filters.includeCompleted}
-                onChange={(e) => { setPage(1); setFilters({ ...filters, includeCompleted: e.target.checked }); }}
+                onChange={(e) => {
+                  setPage(1);
+                  setFilters({ ...filters, includeCompleted: e.target.checked });
+                }}
                 className="h-4 w-4"
               />
               Include Completed
@@ -444,7 +456,10 @@ function UserDashboard() {
                 <Pill
                   key={s}
                   active={filters.statuses.includes(s)}
-                  onClick={() => { setPage(1); setFilters({ ...filters, statuses: toggle(filters.statuses, s) }); }}
+                  onClick={() => {
+                    setPage(1);
+                    setFilters({ ...filters, statuses: toggle(filters.statuses, s) });
+                  }}
                 >
                   {s}
                 </Pill>
@@ -455,23 +470,46 @@ function UserDashboard() {
                 <Pill
                   key={p}
                   active={filters.priorities.includes(p)}
-                  onClick={() => { setPage(1); setFilters({ ...filters, priorities: toggle(filters.priorities, p) }); }}
+                  onClick={() => {
+                    setPage(1);
+                    setFilters({ ...filters, priorities: toggle(filters.priorities, p) });
+                  }}
                 >
                   {p}
                 </Pill>
               ))}
             </FilterGroup>
             <FilterGroup label="From">
-              <DateBox value={filters.from} onChange={(v) => { setPage(1); setFilters({ ...filters, from: v }); }} />
+              <DateBox
+                value={filters.from}
+                onChange={(v) => {
+                  setPage(1);
+                  setFilters({ ...filters, from: v });
+                }}
+              />
             </FilterGroup>
             <FilterGroup label="To">
-              <DateBox value={filters.to} onChange={(v) => { setPage(1); setFilters({ ...filters, to: v }); }} />
+              <DateBox
+                value={filters.to}
+                onChange={(v) => {
+                  setPage(1);
+                  setFilters({ ...filters, to: v });
+                }}
+              />
             </FilterGroup>
-            {(filters.q || filters.statuses.length || filters.priorities.length || filters.from || filters.to || filters.includeCompleted) ? (
+            {filters.q ||
+            filters.statuses.length ||
+            filters.priorities.length ||
+            filters.from ||
+            filters.to ||
+            filters.includeCompleted ? (
               <button
                 type="button"
                 className="min-h-[44px] rounded-md border px-3 text-sm text-muted-foreground hover:bg-accent"
-                onClick={() => { setPage(1); setFilters(DEFAULT_FILTERS); }}
+                onClick={() => {
+                  setPage(1);
+                  setFilters(DEFAULT_FILTERS);
+                }}
               >
                 Clear
               </button>
@@ -507,7 +545,9 @@ function UserDashboard() {
                   className="flex w-full flex-col gap-1 rounded-lg border bg-card p-3 text-left shadow-sm hover:bg-accent/40"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-sm font-semibold text-foreground">{r.job_number}</span>
+                    <span className="font-mono text-sm font-semibold text-foreground">
+                      {r.job_number}
+                    </span>
                     <PriorityBadge priority={r.priority} />
                   </div>
                   <div className="truncate text-sm font-medium text-foreground">{r.subject}</div>
@@ -548,14 +588,26 @@ function UserDashboard() {
                     onClick={() => openJob(r)}
                     className="cursor-pointer hover:bg-accent/40"
                   >
-                    <td className="px-3 py-2 font-mono font-semibold text-foreground">{r.job_number}</td>
-                    <td className="px-3 py-2 text-foreground">{r.customer_name_snapshot ?? r.customer_code_snapshot}</td>
+                    <td className="px-3 py-2 font-mono font-semibold text-foreground">
+                      {r.job_number}
+                    </td>
+                    <td className="px-3 py-2 text-foreground">
+                      {r.customer_name_snapshot ?? r.customer_code_snapshot}
+                    </td>
                     <td className="px-3 py-2 text-foreground">{r.subject}</td>
-                    <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                    <td className="px-3 py-2"><PriorityBadge priority={r.priority} /></td>
-                    <td className="px-3 py-2 text-muted-foreground">{waitingAge(r.assigned_at ?? r.created_at)}</td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={r.status} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <PriorityBadge priority={r.priority} />
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {waitingAge(r.assigned_at ?? r.created_at)}
+                    </td>
                     <td className="px-3 py-2 text-muted-foreground">{formatMY(r.created_at)}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{formatMYDateTime(r.updated_at ?? r.created_at)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {formatMYDateTime(r.updated_at ?? r.created_at)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -565,20 +617,26 @@ function UserDashboard() {
 
         {totalPages > 1 && (
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-            <div>Page {page} of {totalPages}</div>
+            <div>
+              Page {page} of {totalPages}
+            </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
                 className="min-h-9 rounded-md border px-3 disabled:opacity-40"
-              >Prev</button>
+              >
+                Prev
+              </button>
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
                 className="min-h-9 rounded-md border px-3 disabled:opacity-40"
-              >Next</button>
+              >
+                Next
+              </button>
             </div>
           </div>
         )}
@@ -592,13 +650,23 @@ function UserDashboard() {
 function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
       <div className="flex flex-wrap items-center gap-1">{children}</div>
     </div>
   );
 }
 
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function Pill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -625,7 +693,6 @@ function DateBox({ value, onChange }: { value: string; onChange: (v: string) => 
   );
 }
 
-
 function SectionTitle({ children }: { children: ReactNode }) {
   return (
     <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -639,14 +706,37 @@ function SectionTitle({ children }: { children: ReactNode }) {
 type Tone = "blue" | "green" | "amber" | "red" | "purple" | "grey";
 
 const toneClasses: Record<Tone, { ring: string; icon: string; badge: string }> = {
-  blue: { ring: "before:bg-blue-500", icon: "bg-blue-100 text-blue-700", badge: "bg-blue-50 text-blue-700 ring-blue-200" },
-  green: { ring: "before:bg-emerald-500", icon: "bg-emerald-100 text-emerald-700", badge: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-  amber: { ring: "before:bg-amber-500", icon: "bg-amber-100 text-amber-800", badge: "bg-amber-50 text-amber-800 ring-amber-200" },
-  red: { ring: "before:bg-red-500", icon: "bg-red-100 text-red-700", badge: "bg-red-50 text-red-700 ring-red-200" },
-  purple: { ring: "before:bg-purple-500", icon: "bg-purple-100 text-purple-700", badge: "bg-purple-50 text-purple-700 ring-purple-200" },
-  grey: { ring: "before:bg-slate-400", icon: "bg-slate-100 text-slate-700", badge: "bg-slate-100 text-slate-600 ring-slate-200" },
+  blue: {
+    ring: "before:bg-blue-500",
+    icon: "bg-blue-100 text-blue-700",
+    badge: "bg-blue-50 text-blue-700 ring-blue-200",
+  },
+  green: {
+    ring: "before:bg-emerald-500",
+    icon: "bg-emerald-100 text-emerald-700",
+    badge: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  },
+  amber: {
+    ring: "before:bg-amber-500",
+    icon: "bg-amber-100 text-amber-800",
+    badge: "bg-amber-50 text-amber-800 ring-amber-200",
+  },
+  red: {
+    ring: "before:bg-red-500",
+    icon: "bg-red-100 text-red-700",
+    badge: "bg-red-50 text-red-700 ring-red-200",
+  },
+  purple: {
+    ring: "before:bg-purple-500",
+    icon: "bg-purple-100 text-purple-700",
+    badge: "bg-purple-50 text-purple-700 ring-purple-200",
+  },
+  grey: {
+    ring: "before:bg-slate-400",
+    icon: "bg-slate-100 text-slate-700",
+    badge: "bg-slate-100 text-slate-600 ring-slate-200",
+  },
 };
-
 
 // Kept for /admin/dashboard which imports StatCard from this file.
 export function StatCard({
@@ -684,4 +774,3 @@ export function StatCard({
     </div>
   );
 }
-

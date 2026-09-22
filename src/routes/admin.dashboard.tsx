@@ -205,16 +205,13 @@ function AdminDashboard() {
   const healthMap = new Map<HealthRow["snapshot_type"], HealthRow>(
     (health?.snapshots ?? []).map((r) => [r.snapshot_type, r]),
   );
-  const failedCount =
-    health?.snapshots.filter((r) => r.health_status === "Error").length ?? 0;
+  const failedCount = health?.snapshots.filter((r) => r.health_status === "Error").length ?? 0;
   const lastSyncs = (health?.snapshots ?? [])
     .map((r) => r.last_successful_sync ?? null)
     .filter((x): x is string => !!x)
     .sort()
     .reverse();
-  const lastSyncLabel = lastSyncs.length > 0
-    ? new Date(lastSyncs[0]).toLocaleString()
-    : "—";
+  const lastSyncLabel = lastSyncs.length > 0 ? new Date(lastSyncs[0]).toLocaleString() : "—";
 
   const s = ops?.summary;
   const showSkeleton = opsLoading && !ops;
@@ -262,7 +259,8 @@ function AdminDashboard() {
         meta={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>
-              Tenant {session?.tenantCode || "—"} · {currentUser?.displayName || currentUser?.email || "administrator"}
+              Tenant {session?.tenantCode || "—"} ·{" "}
+              {currentUser?.displayName || currentUser?.email || "administrator"}
             </span>
             <span>
               {lastRefreshed
@@ -282,7 +280,12 @@ function AdminDashboard() {
         }
         actions={
           <>
-            <DashboardAction to="/admin/snapshots" label="Snapshot Console" icon={Database} primary />
+            <DashboardAction
+              to="/admin/snapshots"
+              label="Snapshot Console"
+              icon={Database}
+              primary
+            />
             <DashboardAction to="/support" label="Workspace" icon={LayoutList} />
             <DashboardAction to="/settings" label="Settings" icon={Settings} />
           </>
@@ -290,9 +293,7 @@ function AdminDashboard() {
       />
 
       {opsErr && (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {opsErr}
-        </p>
+        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{opsErr}</p>
       )}
 
       {ADMIN_CARD_GROUPS.map((group) => (
@@ -306,7 +307,7 @@ function AdminDashboard() {
       ))}
 
       <DashboardSection title="User workload" description="Active assignments per technician.">
-        {(!ops || ops.userWorkload.length === 0) ? (
+        {!ops || ops.userWorkload.length === 0 ? (
           <p className="rounded-lg border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
             No active assignments right now.
           </p>
@@ -332,11 +333,17 @@ function AdminDashboard() {
                     className="dashboard-card block w-full min-h-11 rounded-lg border bg-card p-3 text-left shadow-sm"
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="min-w-0 truncate text-sm font-bold text-dashboard-ink">{w.name}</span>
+                      <span className="min-w-0 truncate text-sm font-bold text-dashboard-ink">
+                        {w.name}
+                      </span>
                       <span className="text-sm font-bold text-dashboard-ink">{w.total}</span>
                     </div>
                     <div className="mt-2">
-                      <DashboardProgress value={w.total} max={maxWorkload} label={`${w.name} active jobs`} />
+                      <DashboardProgress
+                        value={w.total}
+                        max={maxWorkload}
+                        label={`${w.name} active jobs`}
+                      />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
                       <span>In Progress {w.inProgress}</span>
@@ -378,9 +385,15 @@ function AdminDashboard() {
                     >
                       <td className="px-3 py-2 font-medium text-foreground">{w.name}</td>
                       <td className="w-1/3 px-3 py-2">
-                        <DashboardProgress value={w.total} max={maxWorkload} label={`${w.name} active jobs`} />
+                        <DashboardProgress
+                          value={w.total}
+                          max={maxWorkload}
+                          label={`${w.name} active jobs`}
+                        />
                       </td>
-                      <td className="px-3 py-2 text-right font-semibold text-foreground">{w.total}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-foreground">
+                        {w.total}
+                      </td>
                       <td className="px-3 py-2 text-right text-muted-foreground">{w.inProgress}</td>
                       <td className="px-3 py-2 text-right text-muted-foreground">{w.waiting}</td>
                     </tr>
@@ -392,16 +405,25 @@ function AdminDashboard() {
         )}
       </DashboardSection>
 
-      <DashboardSection title="Integration health" description="Live N3 snapshot diagnostics for this tenant.">
+      <DashboardSection
+        title="Integration health"
+        description="Live N3 snapshot diagnostics for this tenant."
+      >
         {error && (
-          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
-          </p>
+          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <HealthCard title="Customer Snapshots" row={healthMap.get("Customers")} loading={loading} />
+          <HealthCard
+            title="Customer Snapshots"
+            row={healthMap.get("Customers")}
+            loading={loading}
+          />
           <HealthCard title="Stock Snapshots" row={healthMap.get("Stock")} loading={loading} />
-          <HealthCard title="Contract Snapshots" row={healthMap.get("Contract")} loading={loading} />
+          <HealthCard
+            title="Contract Snapshots"
+            row={healthMap.get("Contract")}
+            loading={loading}
+          />
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <DashboardStatCard
@@ -425,15 +447,7 @@ function AdminDashboard() {
   );
 }
 
-function HealthCard({
-  title,
-  row,
-  loading,
-}: {
-  title: string;
-  row?: HealthRow;
-  loading: boolean;
-}) {
+function HealthCard({ title, row, loading }: { title: string; row?: HealthRow; loading: boolean }) {
   const status = row?.health_status ?? "Unknown";
   const tone =
     status === "Healthy"
@@ -464,14 +478,10 @@ function HealthCard({
       </div>
       <div className="mt-2 text-xs text-muted-foreground">
         Last success:{" "}
-        {row?.last_successful_sync
-          ? new Date(row.last_successful_sync).toLocaleString()
-          : "—"}
+        {row?.last_successful_sync ? new Date(row.last_successful_sync).toLocaleString() : "—"}
       </div>
       {row?.error_message && (
-        <div className="mt-1 line-clamp-2 text-xs text-destructive">
-          {row.error_message}
-        </div>
+        <div className="mt-1 line-clamp-2 text-xs text-destructive">{row.error_message}</div>
       )}
     </div>
   );

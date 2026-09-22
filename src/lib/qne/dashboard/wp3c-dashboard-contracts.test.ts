@@ -73,7 +73,15 @@ describe("WP3C — User Dashboard cards", () => {
   it("keeps Assigned to Me parity across every non-terminal status", () => {
     const statuses = statusesForMyWorkScope("assigned_to_me");
     expect(statuses).toEqual(ASSIGNED_TO_ME_STATUSES);
-    for (const s of ["Draft", "Pending Approval", "Open", "Assigned", "In Progress", "Waiting Customer", "Waiting Vendor"]) {
+    for (const s of [
+      "Draft",
+      "Pending Approval",
+      "Open",
+      "Assigned",
+      "In Progress",
+      "Waiting Customer",
+      "Waiting Vendor",
+    ]) {
       expect(statuses).toContain(s);
     }
     // A count of 1 for an In Progress job can never open an empty list.
@@ -82,7 +90,9 @@ describe("WP3C — User Dashboard cards", () => {
   });
 
   it("routes only the three WP3B scopes through the outcome read model", () => {
-    const lifecycle = MY_WORK_CARDS.filter((c) => isLifecycleMyWorkScope(c.scope)).map((c) => c.scope);
+    const lifecycle = MY_WORK_CARDS.filter((c) => isLifecycleMyWorkScope(c.scope)).map(
+      (c) => c.scope,
+    );
     expect(lifecycle).toEqual(["my_followups", "my_reopen_pending", "resolved_by_me_today"]);
   });
 
@@ -118,7 +128,9 @@ describe("WP3C — My Work lifecycle membership", () => {
   it("counts My Follow-ups and My Reopen Pending by assigned technician", () => {
     const followup: ScopeRow = { ...base, outcome: "follow_up_open" };
     expect(matchesWp3bCard(followup, "myFollowUps", opts)).toBe(true);
-    expect(matchesWp3bCard({ ...followup, assigned_user_id: "other" }, "myFollowUps", opts)).toBe(false);
+    expect(matchesWp3bCard({ ...followup, assigned_user_id: "other" }, "myFollowUps", opts)).toBe(
+      false,
+    );
 
     const reopen: ScopeRow = { ...base, outcome: "reopen_pending" };
     expect(matchesWp3bCard(reopen, "myReopenPending", opts)).toBe(true);
@@ -189,10 +201,7 @@ describe("WP3C — Admin Dashboard cards", () => {
       "Waiting Vendor",
       "Resolved Today",
     ]);
-    expect(ADMIN_COVERAGE.map((c) => c.label)).toEqual([
-      "Due Soon Customers",
-      "Overdue Customers",
-    ]);
+    expect(ADMIN_COVERAGE.map((c) => c.label)).toEqual(["Due Soon Customers", "Overdue Customers"]);
     expect(ADMIN_COMPLETION_INTEGRITY.map((c) => c.label)).toEqual([
       "Completed Current Cycle",
       "Legacy Completed / Evidence Missing",
@@ -247,7 +256,13 @@ describe("WP3C — Admin Dashboard cards", () => {
       }
       expect(ui).toContain(`"${card.queueType}"`);
     }
-    for (const label of ["Jobs Today", "Active Jobs", "In Progress", "Resolved Today", "Legacy Completed"]) {
+    for (const label of [
+      "Jobs Today",
+      "Active Jobs",
+      "In Progress",
+      "Resolved Today",
+      "Legacy Completed",
+    ]) {
       expect(ui).toContain(label);
     }
   });
