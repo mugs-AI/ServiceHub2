@@ -265,8 +265,8 @@ describe("WP3B dashboard scopes", () => {
       followup_resolved_at: "2026-09-10T22:00:00.000Z",
       resolved_by_user_id: "ME",
     },
-
     {
+
       outcome: "follow_up_open" as const,
       assigned_user_id: "ME",
       completed_at: "2026-09-01T00:00:00.000Z",
