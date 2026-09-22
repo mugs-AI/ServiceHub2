@@ -12,17 +12,14 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/followup")({
   server: {
     handlers: {
       GET: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { loadCompletionRecord } = await import(
-          "@/lib/qne/service-jobs/wp3-completion.server"
-        );
+        const { loadCompletionRecord } =
+          await import("@/lib/qne/service-jobs/wp3-completion.server");
         const { loadFollowupForCycle } = await import("@/lib/qne/service-jobs/wp3b.server");
-        const { deriveOutcome, followupView, OUTCOME_LABEL, MAX_FOLLOWUP_NOTE } = await import(
-          "@/lib/qne/service-jobs/wp3b-followup"
-        );
+        const { deriveOutcome, followupView, OUTCOME_LABEL, MAX_FOLLOWUP_NOTE } =
+          await import("@/lib/qne/service-jobs/wp3b-followup");
         try {
           const user = await requireAuthenticatedN3User(request);
           const actorUserId = user.diagnostics.matchedN3UserId ?? user.userCode ?? null;
@@ -92,9 +89,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/followup")({
       },
 
       POST: async ({ request, params }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
         const { clearFollowupAtomic } = await import("@/lib/qne/service-jobs/wp3b.server");
         const { parseFollowupClearInput } = await import("@/lib/qne/service-jobs/wp3b-followup");
         try {

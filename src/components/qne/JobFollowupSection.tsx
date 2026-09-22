@@ -124,7 +124,9 @@ export function JobFollowupSection({
         <dl data-testid="followup-resolved" className="space-y-1 text-xs">
           <div className="min-w-0">
             <dt className="text-muted-foreground">Follow-up result</dt>
-            <dd className="break-words whitespace-pre-wrap">{view.record.resolution_note ?? "—"}</dd>
+            <dd className="break-words whitespace-pre-wrap">
+              {view.record.resolution_note ?? "—"}
+            </dd>
           </div>
           <div className="min-w-0">
             <dt className="text-muted-foreground">Cleared by</dt>

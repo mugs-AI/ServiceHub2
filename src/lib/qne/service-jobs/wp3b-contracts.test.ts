@@ -69,7 +69,9 @@ describe("WP3B candidate migration", () => {
     expect(SQL).toMatch(/CREATE OR REPLACE FUNCTION public\.sh_followup_clear/);
     expect(SQL).toMatch(/pg_advisory_xact_lock\([\s\S]*?':followup:'/);
     expect(SQL).toMatch(/FROM public\.service_jobs[\s\S]*?FOR UPDATE/);
-    expect(SQL).toMatch(/Only the assigned technician or an administrator can clear this follow-up/);
+    expect(SQL).toMatch(
+      /Only the assigned technician or an administrator can clear this follow-up/,
+    );
     expect(SQL).toMatch(/A follow-up result is required/);
     expect(SQL).toMatch(/'idempotent', true/);
     expect(SQL).toMatch(/concurrent_followup/);

@@ -124,10 +124,7 @@ export interface FollowupActorFacts {
 }
 
 /** Only the Job's assigned technician or an Owner/Admin may clear. */
-export function canClearFollowup(
-  actor: FollowupActorFacts,
-  job: FollowupJobFacts,
-): boolean {
+export function canClearFollowup(actor: FollowupActorFacts, job: FollowupJobFacts): boolean {
   if (!actor.actorUserId) return false;
   if (actor.isAdmin) return true;
   return job.assigned_user_id === actor.actorUserId;

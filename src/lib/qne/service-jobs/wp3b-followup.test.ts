@@ -156,9 +156,7 @@ describe("WP3B outcome derivation", () => {
     expect(totals.followUpOpen).toBe(1);
     expect(totals.reopenPending).toBe(1);
     expect(totals.legacyUnknown).toBe(1);
-    expect(totals.completed).toBe(
-      totals.resolved + totals.followUpOpen + totals.reopenPending,
-    );
+    expect(totals.completed).toBe(totals.resolved + totals.followUpOpen + totals.reopenPending);
   });
 });
 
@@ -183,9 +181,9 @@ describe("WP3B clear follow-up rules", () => {
 
   it("blocks clearing outside a Completed Job with an open follow-up", () => {
     expect(followupBlockedReason(completedJob, followup())).toBeNull();
-    expect(
-      followupBlockedReason({ ...completedJob, status: "In Progress" }, followup()),
-    ).toMatch(/Completed/);
+    expect(followupBlockedReason({ ...completedJob, status: "In Progress" }, followup())).toMatch(
+      /Completed/,
+    );
     expect(followupBlockedReason({ ...completedJob, is_deleted: true }, followup())).toMatch(
       /Deleted/,
     );
