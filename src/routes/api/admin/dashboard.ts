@@ -12,6 +12,7 @@
 // Tenant-scoped. Admin-only.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { ADMIN_ACTIVE_STATUSES } from "@/lib/qne/dashboard/admin-scope";
 
 function malaysiaTodayUtcRange(): { fromIso: string; toIso: string } {
   const OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -47,13 +48,15 @@ export const Route = createFileRoute("/api/admin/dashboard")({
               .eq("tenant_code", user.tenantCode)
               .eq("is_deleted", false);
 
-          const [rToday, rApproval, rWaitCust, rWaitVend] = await Promise.all([
+          const [rToday, rApproval, rWaitCust, rWaitVend, rActive, rInProgress] = await Promise.all([
             jobs().gte("created_at", fromIso).lt("created_at", toIso),
             jobs().eq("status", "Pending Approval"),
             jobs().eq("status", "Waiting Customer"),
             jobs().eq("status", "Waiting Vendor"),
+            jobs().in("status", [...ADMIN_ACTIVE_STATUSES]),
+            jobs().eq("status", "In Progress"),
           ]);
-          for (const r of [rToday, rApproval, rWaitCust, rWaitVend]) {
+          for (const r of [rToday, rApproval, rWaitCust, rWaitVend, rActive, rInProgress]) {
             if (r.error) throw r.error;
           }
 
@@ -157,6 +160,8 @@ export const Route = createFileRoute("/api/admin/dashboard")({
             summary: {
 
               jobsToday: rToday.count ?? 0,
+              activeJobs: rActive.count ?? 0,
+              inProgress: rInProgress.count ?? 0,
               pendingApproval: rApproval.count ?? 0,
               cancellationRequests,
               reopenRequests,
