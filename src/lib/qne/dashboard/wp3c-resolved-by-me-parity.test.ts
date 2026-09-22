@@ -73,9 +73,7 @@ describe("resolved-by-me membership survives reassignment", () => {
       resolved_by_user_id: null,
     };
     expect(matchesWp3bCard(followUp, "myFollowUps", OPTS)).toBe(false);
-    expect(
-      matchesWp3bCard({ ...followUp, assigned_user_id: ME }, "myFollowUps", OPTS),
-    ).toBe(true);
+    expect(matchesWp3bCard({ ...followUp, assigned_user_id: ME }, "myFollowUps", OPTS)).toBe(true);
   });
 });
 
