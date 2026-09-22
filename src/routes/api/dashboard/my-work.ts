@@ -24,6 +24,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   ASSIGNED_TO_ME_STATUSES,
   MY_PENDING_STATUSES,
+  isLifecycleMyWorkScope,
+  isMyWorkScope,
+  statusesForMyWorkScope,
 } from "@/lib/qne/dashboard/my-work-scope";
 
 function trim(v: unknown, max = 200): string | null {
@@ -102,6 +105,11 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           const includeCompleted =
             sp.get("includeCompleted") === "1" ||
             sp.get("includeCompleted") === "true";
+          const rawScope = sp.get("scope");
+          if (rawScope !== null && !isMyWorkScope(rawScope)) {
+            return Response.json({ error: "Invalid My Work scope." }, { status: 400 });
+          }
+          const scope = rawScope && isMyWorkScope(rawScope) ? rawScope : null;
           const page = Math.max(Number(sp.get("page") ?? 1) || 1, 1);
           const pageSize = Math.min(
             Math.max(Number(sp.get("pageSize") ?? 25) || 25, 1),
@@ -161,14 +169,15 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
           const { countScopes } = await import("@/lib/qne/dashboard/followup-scope");
           const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
-          const wp3b = countScopes(
-            outcomeRows.map((r) => ({
+          const scopeRows = outcomeRows.map((r) => ({
               outcome: r.outcome,
               assigned_user_id: r.assigned_user_id,
               completed_at: r.completed_at,
               followup_resolved_at: r.followup?.resolved_at ?? null,
               resolved_by_user_id: r.resolved_by_user_id,
-            })),
+            }));
+          const wp3b = countScopes(
+            scopeRows,
             { meUserId: myUserId, todayFromIso: mytFrom, todayToIso: mytTo },
           );
 
@@ -197,13 +206,43 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
             .eq("is_deleted", false)
             .eq("assigned_user_id", myUserId);
 
-          const effectiveStatuses =
-            statuses.length > 0
+          if (scope && isLifecycleMyWorkScope(scope)) {
+            const { matchesWp3bCard } = await import("@/lib/qne/dashboard/followup-scope");
+            const card = scope === "my_followups"
+              ? "myFollowUps"
+              : scope === "my_reopen_pending"
+                ? "myReopenPending"
+                : "resolvedByMeToday";
+            const keep = new Set(
+              outcomeRows
+                .filter((row, index) => matchesWp3bCard(scopeRows[index], card, {
+                  meUserId: myUserId,
+                  todayFromIso: mytFrom,
+                  todayToIso: mytTo,
+                }))
+                .map((row) => row.id),
+            );
+            if (keep.size === 0) {
+              return Response.json({ summary, items: [], total: 0, page, pageSize, me: {
+                userId: myUserId,
+                displayName: user.displayName || user.email || "",
+                reason: user.diagnostics.reason,
+              } });
+            }
+            query = query.in("id", [...keep]);
+          }
+
+          const scopedStatuses = scope ? statusesForMyWorkScope(scope) : null;
+          const effectiveStatuses = scopedStatuses
+            ? [...scopedStatuses]
+            : statuses.length > 0
               ? statuses
               : includeCompleted
                 ? [...ASSIGNED_TO_ME_STATUSES, "Completed"]
                 : [...ASSIGNED_TO_ME_STATUSES];
-          query = query.in("status", effectiveStatuses as string[]);
+          if (!scope || !isLifecycleMyWorkScope(scope)) {
+            query = query.in("status", effectiveStatuses as string[]);
+          }
 
           if (priorities.length > 0) query = query.in("priority", priorities);
           if (from) query = query.gte("created_at", from);

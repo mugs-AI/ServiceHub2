@@ -6,6 +6,11 @@
 // technician (or "__unassigned__"), from, to, status, q.
 
 import { createFileRoute } from "@tanstack/react-router";
+import {
+  ADMIN_DASHBOARD_QUEUE_KEYS,
+  isAdminDashboardQueueKey,
+  statusesForAdminQueue,
+} from "@/lib/qne/dashboard/admin-scope";
 
 type QueueType =
   | "draft"
@@ -22,6 +27,11 @@ type QueueType =
   | "follow_up_open"
   | "reopen_pending"
   | "resolved";
+  | "jobs_today"
+  | "active"
+  | "in_progress"
+  | "resolved_today"
+  | "legacy_completed";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
@@ -44,6 +54,15 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           const user = await requireAuthenticatedN3User(request);
           const sp = new URL(request.url).searchParams;
           const queueType = trim(sp.get("queueType"), 40) as QueueType | null;
+          const validQueueTypes = new Set([
+            "draft", "pending_approval", "open_unassigned", "assigned_not_started",
+            "waiting_customer", "waiting_vendor", "cancellation_requested",
+            "completed_followup", "completed", "follow_up_open", "reopen_pending", "resolved",
+            ...ADMIN_DASHBOARD_QUEUE_KEYS,
+          ]);
+          if (queueType && !validQueueTypes.has(queueType)) {
+            return Response.json({ error: "Invalid queue scope." }, { status: 400 });
+          }
           const customerCode = trim(sp.get("customerCode"), 100);
           const jobNumber = trim(sp.get("jobNumber"), 40);
           const priority = trim(sp.get("priority"), 20);
@@ -82,6 +101,15 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             query = query.eq("status", "Waiting Customer");
           } else if (queueType === "waiting_vendor") {
             query = query.eq("status", "Waiting Vendor");
+          } else if (queueType && isAdminDashboardQueueKey(queueType)) {
+            const statuses = statusesForAdminQueue(queueType);
+            if (statuses) query = query.in("status", [...statuses]);
+            if (queueType === "jobs_today") {
+              const offset = 8 * 60 * 60 * 1000;
+              const nowMy = new Date(Date.now() + offset);
+              const start = Date.UTC(nowMy.getUTCFullYear(), nowMy.getUTCMonth(), nowMy.getUTCDate()) - offset;
+              query = query.gte("created_at", new Date(start).toISOString()).lt("created_at", new Date(start + 86_400_000).toISOString());
+            }
           } else if (
             queueType === "completed" ||
             queueType === "completed_followup" ||
@@ -146,7 +174,7 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             queueType === "completed_followup" ||
             queueType === "follow_up_open" ||
             queueType === "reopen_pending" ||
-            queueType === "resolved"
+             queueType === "resolved" || queueType === "resolved_today" || queueType === "legacy_completed"
           ) {
             rows = rows
               .slice()
@@ -169,15 +197,25 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           if (
             queueType === "follow_up_open" ||
             queueType === "reopen_pending" ||
-            queueType === "resolved"
+            queueType === "resolved" || queueType === "resolved_today" || queueType === "legacy_completed"
           ) {
             followUpOnly = true;
             const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
             const { outcomesForQueue } = await import("@/lib/qne/dashboard/followup-scope");
-            const wanted = new Set<string>(outcomesForQueue(queueType));
+            const wanted = new Set<string>(
+              queueType === "legacy_completed" ? ["legacy_unknown"] : outcomesForQueue("resolved"),
+            );
             const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
             const keep = new Set(
-              outcomeRows.filter((r) => wanted.has(r.outcome)).map((r) => r.id),
+              outcomeRows.filter((r) => {
+                if (!wanted.has(r.outcome)) return false;
+                if (queueType !== "resolved_today") return true;
+                const resolvedAt = r.outcome === "resolved_after_follow_up" ? r.followup?.resolved_at : r.completed_at;
+                const offset = 8 * 60 * 60 * 1000;
+                const nowMy = new Date(Date.now() + offset);
+                const start = Date.UTC(nowMy.getUTCFullYear(), nowMy.getUTCMonth(), nowMy.getUTCDate()) - offset;
+                return !!resolvedAt && resolvedAt >= new Date(start).toISOString() && resolvedAt < new Date(start + 86_400_000).toISOString();
+              }).map((r) => r.id),
             );
             rows = rows.filter((r) => keep.has(r.id));
           }
