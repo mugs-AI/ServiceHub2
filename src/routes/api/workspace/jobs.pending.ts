@@ -84,7 +84,10 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             query = query.eq("status", "Waiting Vendor");
           } else if (
             queueType === "completed" ||
-            queueType === "completed_followup"
+            queueType === "completed_followup" ||
+            queueType === "follow_up_open" ||
+            queueType === "reopen_pending" ||
+            queueType === "resolved"
           ) {
             // WP3A — Completed lists. is_deleted = false is already applied
             // above, so a soft-deleted Job can never appear here.
