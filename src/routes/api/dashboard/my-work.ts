@@ -26,6 +26,7 @@ import {
   MY_PENDING_STATUSES,
   isLifecycleMyWorkScope,
   isMyWorkScope,
+  myWorkScopeRequiresCurrentAssignee,
   statusesForMyWorkScope,
 } from "@/lib/qne/dashboard/my-work-scope";
 
