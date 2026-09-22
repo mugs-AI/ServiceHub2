@@ -103,6 +103,29 @@ const QUEUE_TABS = [
     adminOnly: false,
   },
   { key: QUEUE_COMPLETED, label: "Completed", emptyMsg: "No completed jobs.", adminOnly: false },
+  // WP3B outcome scopes — membership comes from the shared completion read
+  // model, the same derivation the dashboard cards count with.
+  { key: "follow_up_open", label: "Follow-up Open", emptyMsg: "No open follow-ups.", adminOnly: false },
+  { key: "reopen_pending", label: "Reopen Pending", emptyMsg: "No reopen-pending jobs.", adminOnly: false },
+  { key: "resolved", label: "Resolved", emptyMsg: "No resolved jobs.", adminOnly: false },
+  // WP3C Admin Dashboard destinations. Each key is the exact scope the
+  // matching Admin card counted.
+  { key: "jobs_today", label: "Jobs Today", emptyMsg: "No jobs created today.", adminOnly: false },
+  { key: "active", label: "Active Jobs", emptyMsg: "No active jobs.", adminOnly: false },
+  { key: "in_progress", label: "In Progress", emptyMsg: "No jobs in progress.", adminOnly: false },
+  { key: "resolved_today", label: "Resolved Today", emptyMsg: "Nothing resolved today yet.", adminOnly: false },
+  {
+    key: "completed_current_cycle",
+    label: "Completed (Current Cycle)",
+    emptyMsg: "No completed jobs in the current cycle.",
+    adminOnly: false,
+  },
+  {
+    key: "legacy_completed",
+    label: "Legacy Completed",
+    emptyMsg: "No legacy completed jobs without modern evidence.",
+    adminOnly: false,
+  },
 ] as const;
 
 export const Route = createFileRoute("/jobs/pending")({
@@ -150,8 +173,16 @@ function PendingQueuePage() {
   const cancellationView = isCancellationTab && isAdmin;
   // WP3A — the Reopen Requests tab reads its own tenant-scoped request list.
   const reopenView = queueType === QUEUE_REOPEN_REQUESTS;
-  const isCompletedTab =
-    queueType === QUEUE_COMPLETED || queueType === QUEUE_COMPLETED_FOLLOWUP;
+  const isCompletedTab = [
+    QUEUE_COMPLETED,
+    QUEUE_COMPLETED_FOLLOWUP,
+    "follow_up_open",
+    "reopen_pending",
+    "resolved",
+    "resolved_today",
+    "completed_current_cycle",
+    "legacy_completed",
+  ].includes(queueType);
 
   const reload = useCallback(async () => {
     setLoading(true);

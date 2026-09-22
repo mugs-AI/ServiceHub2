@@ -1,15 +1,64 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import {
+  Activity,
+  AlertTriangle,
+  Archive,
+  CalendarPlus,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock,
+  Database,
+  Flag,
+  LayoutList,
+  PlayCircle,
+  RefreshCw,
+  RotateCcw,
+  Settings,
+  ShieldAlert,
+  Truck,
+  UserX,
+  type LucideIcon,
+} from "lucide-react";
 
 import { AdminOnly } from "@/components/qne/AdminOnly";
 import { StatCard } from "./dashboard";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
-import { QUEUE_REOPEN_REQUESTS } from "@/lib/qne/service-jobs/wp3a-queues";
-
+import {
+  ADMIN_CARD_GROUPS,
+  type AdminCardDef,
+  type AdminSummaryKey,
+} from "@/lib/qne/dashboard/admin-cards";
+import {
+  DashboardAction,
+  DashboardHero,
+  DashboardProgress,
+  DashboardSection,
+  DashboardSkeletonGrid,
+  DashboardStatCard,
+  type DashboardTone,
+} from "@/components/qne/dashboard/DashboardPrimitives";
 
 export const Route = createFileRoute("/admin/dashboard")({
+  head: () => ({
+    meta: [
+      { title: "Administrator Command Centre — ServiceHub" },
+      {
+        name: "description",
+        content:
+          "Tenant-wide service operations: approvals, live job flow, customer coverage and completion integrity.",
+      },
+      { property: "og:title", content: "Administrator Command Centre — ServiceHub" },
+      {
+        property: "og:description",
+        content:
+          "Tenant-wide service operations: approvals, live job flow, customer coverage and completion integrity.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: () => (
     <AdminOnly>
       <AdminDashboard />
@@ -29,13 +78,20 @@ interface HealthResponse {
   snapshots: HealthRow[];
 }
 
-
 interface AdminSummary {
   jobsToday: number;
+  activeJobs: number;
+  inProgress: number;
   pendingApproval: number;
   cancellationRequests: number;
   /** WP3A — pending reopen requests awaiting an Owner/Admin decision. */
   reopenRequests: number;
+  /** WP3B — current-cycle completion outcomes. */
+  followUpOpen: number;
+  reopenPending: number;
+  resolvedToday: number;
+  completedCurrentCycle: number;
+  legacyCompleted: number;
   waitingCustomer: number;
   waitingVendor: number;
   dueSoonCustomers: number;
@@ -55,6 +111,29 @@ interface AdminDashboardResponse {
 }
 
 const AUTO_REFRESH_MS = 30_000;
+
+/**
+ * WP3C — card icons only. Label, counted field and destination scope come from
+ * the shared catalogue, so a card's list can never be broader or narrower than
+ * the number it showed.
+ */
+const CARD_ICONS: Record<AdminSummaryKey, LucideIcon> = {
+  pendingApproval: ClipboardCheck,
+  cancellationRequests: ShieldAlert,
+  reopenRequests: RotateCcw,
+  followUpOpen: Flag,
+  jobsToday: CalendarPlus,
+  activeJobs: Activity,
+  inProgress: PlayCircle,
+  waitingCustomer: Clock,
+  waitingVendor: Truck,
+  resolvedToday: CheckCircle2,
+  reopenPending: RotateCcw,
+  completedCurrentCycle: CheckCircle2,
+  legacyCompleted: Archive,
+  dueSoonCustomers: Clock,
+  overdueCustomers: UserX,
+};
 
 function AdminDashboard() {
   const { session, currentUser } = useSession();
@@ -138,84 +217,107 @@ function AdminDashboard() {
     : "—";
 
   const s = ops?.summary;
+  const showSkeleton = opsLoading && !ops;
+
+  const openCard = (card: AdminCardDef) => {
+    if (card.to) {
+      void navigate({ to: card.to });
+      return;
+    }
+    void navigate({
+      to: "/jobs/pending",
+      search: {
+        scope: undefined,
+        queueType: card.queueType,
+        technician: undefined,
+        technicianName: undefined,
+      },
+    });
+  };
+
+  const renderCards = (cards: readonly AdminCardDef[]) => (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+      {cards.map((card) => (
+        <DashboardStatCard
+          key={card.label}
+          label={card.label}
+          value={s ? (s[card.key] ?? 0) : "—"}
+          meaning={card.meaning}
+          icon={CARD_ICONS[card.key]}
+          tone={card.tone as DashboardTone}
+          onClick={() => openCard(card)}
+        />
+      ))}
+    </div>
+  );
+
+  const maxWorkload = Math.max(1, ...(ops?.userWorkload ?? []).map((w) => w.total));
 
   return (
-    <div className="space-y-6">
-      <header className="flex w-full min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="w-full min-w-0 sm:flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Administrator dashboard
-          </p>
-          <h1 className="mt-1 break-words text-2xl font-semibold text-foreground sm:truncate sm:text-3xl">
-            {session?.companyName || "—"}
-          </h1>
-          <p className="mt-1 break-words text-sm text-muted-foreground">
-            Tenant {session?.tenantCode || "—"} · Signed in as{" "}
-            {currentUser?.displayName || currentUser?.email || "administrator"}
-          </p>
-        </div>
-        <div className="w-full min-w-0 sm:w-auto">
-          <div className="mb-2 text-[11px] text-muted-foreground sm:mr-2 sm:text-right">
-            {lastRefreshed
-              ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-              : "—"}
-          </div>
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+    <div className="min-w-0 space-y-6">
+      <DashboardHero
+        eyebrow="Administrator command centre"
+        title={session?.companyName || "—"}
+        subtitle="Approvals, live job flow, customer coverage and completion integrity for your whole tenant."
+        meta={
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>
+              Tenant {session?.tenantCode || "—"} · {currentUser?.displayName || currentUser?.email || "administrator"}
+            </span>
+            <span>
+              {lastRefreshed
+                ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                : "Loading…"}
+            </span>
             <button
               type="button"
               onClick={() => void loadOps()}
               disabled={opsLoading}
-              className="min-h-11 w-full rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50 sm:min-h-9 sm:w-auto"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border bg-card/90 px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50 sm:min-h-9"
             >
+              <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
               {opsLoading ? "Refreshing…" : "Refresh"}
             </button>
-            <QuickLink to="/support" label="Workspace" />
-            <QuickLink to="/admin/snapshots" label="Snapshot Console" primary />
-            <QuickLink to="/settings" label="Settings" />
-          </div>
-        </div>
-      </header>
+          </span>
+        }
+        actions={
+          <>
+            <DashboardAction to="/admin/snapshots" label="Snapshot Console" icon={Database} primary />
+            <DashboardAction to="/support" label="Workspace" icon={LayoutList} />
+            <DashboardAction to="/settings" label="Settings" icon={Settings} />
+          </>
+        }
+      />
 
-      <Section title="Operations">
-        {opsErr && (
-          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {opsErr}
-          </p>
-        )}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-8">
-          <StatLink to="/support"><StatCard label="Jobs Today" value={s?.jobsToday ?? "—"} tone="blue" /></StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "pending_approval" }}><StatCard label="Job Approvals" value={s?.pendingApproval ?? "—"} tone="amber" /></StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "cancellation_requests" }}><StatCard label="Cancellation Requests" value={s?.cancellationRequests ?? "—"} tone="red" /></StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: QUEUE_REOPEN_REQUESTS }}><StatCard label="Reopen Requests" value={s?.reopenRequests ?? "—"} tone="amber" /></StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "waiting_customer" }}><StatCard label="Waiting Customer" value={s?.waitingCustomer ?? "—"} tone="amber" /></StatLink>
-          <StatLink to="/jobs/pending" search={{ queueType: "waiting_vendor" }}><StatCard label="Waiting Vendor" value={s?.waitingVendor ?? "—"} tone="purple" /></StatLink>
-          <StatLink to="/customers/due-soon"><StatCard label="Due Soon Customers" value={s?.dueSoonCustomers ?? "—"} tone="amber" /></StatLink>
-          <StatLink to="/customers/overdue"><StatCard label="Overdue Customers" value={s?.overdueCustomers ?? "—"} tone="red" /></StatLink>
+      {opsErr && (
+        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {opsErr}
+        </p>
+      )}
 
-        </div>
-      </Section>
+      {ADMIN_CARD_GROUPS.map((group) => (
+        <DashboardSection key={group.title} title={group.title} description={group.description}>
+          {showSkeleton ? (
+            <DashboardSkeletonGrid count={group.cards.length} />
+          ) : (
+            renderCards(group.cards)
+          )}
+        </DashboardSection>
+      ))}
 
-      <Section title="User workload">
+      <DashboardSection title="User workload" description="Active assignments per technician.">
         {(!ops || ops.userWorkload.length === 0) ? (
           <p className="rounded-lg border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
             No active assignments right now.
           </p>
         ) : (
-          <div className="max-w-full overflow-x-auto rounded-xl border bg-card shadow-sm">
-            <table className="min-w-[36rem] w-full text-left text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Technician</th>
-                  <th className="px-3 py-2 text-right">Active jobs</th>
-                  <th className="px-3 py-2 text-right">In Progress</th>
-                  <th className="px-3 py-2 text-right">Waiting</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {ops.userWorkload.map((w) => (
-                  <tr
-                    key={w.user_id}
-                    className="cursor-pointer hover:bg-accent/40"
+          <>
+            {/* Mobile — stacked cards, no horizontal scrolling. */}
+            <ul className="space-y-2 md:hidden">
+              {ops.userWorkload.map((w) => (
+                <li key={w.user_id}>
+                  <button
+                    type="button"
                     onClick={() =>
                       navigate({
                         to: "/jobs/pending",
@@ -227,20 +329,70 @@ function AdminDashboard() {
                         },
                       })
                     }
+                    className="dashboard-card block w-full min-h-11 rounded-lg border bg-card p-3 text-left shadow-sm"
                   >
-                    <td className="px-3 py-2 text-foreground">{w.name}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-foreground">{w.total}</td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">{w.inProgress}</td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">{w.waiting}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm font-bold text-dashboard-ink">{w.name}</span>
+                      <span className="text-sm font-bold text-dashboard-ink">{w.total}</span>
+                    </div>
+                    <div className="mt-2">
+                      <DashboardProgress value={w.total} max={maxWorkload} label={`${w.name} active jobs`} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+                      <span>In Progress {w.inProgress}</span>
+                      <span>Waiting {w.waiting}</span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
 
-      <Section title="System health">
+            {/* Desktop — compact table. */}
+            <div className="hidden max-w-full overflow-hidden rounded-lg border bg-card shadow-sm md:block">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Technician</th>
+                    <th className="px-3 py-2">Load</th>
+                    <th className="px-3 py-2 text-right">Active jobs</th>
+                    <th className="px-3 py-2 text-right">In Progress</th>
+                    <th className="px-3 py-2 text-right">Waiting</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {ops.userWorkload.map((w) => (
+                    <tr
+                      key={w.user_id}
+                      className="cursor-pointer hover:bg-accent/40"
+                      onClick={() =>
+                        navigate({
+                          to: "/jobs/pending",
+                          search: {
+                            scope: undefined,
+                            queueType: undefined,
+                            technician: w.user_id,
+                            technicianName: w.name,
+                          },
+                        })
+                      }
+                    >
+                      <td className="px-3 py-2 font-medium text-foreground">{w.name}</td>
+                      <td className="w-1/3 px-3 py-2">
+                        <DashboardProgress value={w.total} max={maxWorkload} label={`${w.name} active jobs`} />
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold text-foreground">{w.total}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">{w.inProgress}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">{w.waiting}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </DashboardSection>
+
+      <DashboardSection title="Integration health" description="Live N3 snapshot diagnostics for this tenant.">
         {error && (
           <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}
@@ -250,36 +402,26 @@ function AdminDashboard() {
           <HealthCard title="Customer Snapshots" row={healthMap.get("Customers")} loading={loading} />
           <HealthCard title="Stock Snapshots" row={healthMap.get("Stock")} loading={loading} />
           <HealthCard title="Contract Snapshots" row={healthMap.get("Contract")} loading={loading} />
-
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <StatCard label="Last Synchronization" value={lastSyncLabel} tone="blue" />
-          <StatCard
+        <div className="grid gap-3 sm:grid-cols-3">
+          <DashboardStatCard
+            label="Last Synchronization"
+            value={lastSyncLabel}
+            icon={Database}
+            tone="blue"
+          />
+          <DashboardStatCard
             label="Failed Synchronizations"
             value={failedCount}
-            tone={failedCount > 0 ? "red" : "green"}
+            icon={AlertTriangle}
+            tone={failedCount > 0 ? "rose" : "emerald"}
           />
-          <StatCard label="Calculation Errors" tone="amber" comingSoon />
+          <div className="opacity-70">
+            <StatCard label="Calculation Errors" tone="grey" comingSoon />
+          </div>
         </div>
-      </Section>
-
-      <p className="rounded-lg border bg-card px-4 py-3 text-xs text-muted-foreground shadow-sm">
-        Full operational KPIs, approvals and reports arrive with Phase 1
-        business modules. System-health tiles are already live and read from
-        this tenant's diagnostics API.
-      </p>
+      </DashboardSection>
     </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h2>
-      {children}
-    </section>
   );
 }
 
@@ -295,26 +437,26 @@ function HealthCard({
   const status = row?.health_status ?? "Unknown";
   const tone =
     status === "Healthy"
-      ? "bg-emerald-100 text-emerald-800 ring-emerald-200"
+      ? "bg-dashboard-emerald-soft text-dashboard-ink ring-dashboard-emerald/30"
       : status === "Warning"
-        ? "bg-amber-100 text-amber-800 ring-amber-200"
+        ? "bg-dashboard-amber-soft text-dashboard-ink ring-dashboard-amber/40"
         : status === "Error"
-          ? "bg-red-100 text-red-800 ring-red-200"
+          ? "bg-dashboard-rose-soft text-dashboard-ink ring-dashboard-rose/30"
           : "bg-muted text-muted-foreground ring-border";
   const dot =
     status === "Healthy"
-      ? "bg-emerald-500"
+      ? "bg-dashboard-emerald"
       : status === "Warning"
-        ? "bg-amber-500"
+        ? "bg-dashboard-amber"
         : status === "Error"
-          ? "bg-red-500"
+          ? "bg-dashboard-rose"
           : "bg-muted-foreground/60";
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
+    <div className="min-w-0 rounded-lg border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-sm font-semibold text-foreground">{title}</div>
+        <div className="min-w-0 break-words text-sm font-semibold text-foreground">{title}</div>
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${tone}`}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${tone}`}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
           {loading ? "Loading" : status}
@@ -327,42 +469,22 @@ function HealthCard({
           : "—"}
       </div>
       {row?.error_message && (
-        <div className="mt-1 line-clamp-2 text-xs text-red-700">
+        <div className="mt-1 line-clamp-2 text-xs text-destructive">
           {row.error_message}
         </div>
       )}
     </div>
   );
-
 }
 
-function QuickLink({ to, label, primary }: { to: string; label: string; primary?: boolean }) {
+/** Kept so existing deep links from other pages keep type-checking. */
+export function AdminQuickLink({ to, label }: { to: string; label: string }) {
   return (
     <Link
       to={to}
-      className={
-        primary
-          ? "inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-3 text-center text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-auto sm:px-4"
-          : "inline-flex min-h-11 w-full items-center justify-center rounded-lg border bg-card px-3 text-center text-sm font-medium text-foreground shadow-sm hover:bg-accent sm:w-auto sm:px-4"
-      }
+      className="inline-flex min-h-11 items-center justify-center rounded-lg border bg-card px-3 text-sm font-medium text-foreground shadow-sm hover:bg-accent"
     >
       {label}
-    </Link>
-  );
-}
-
-function StatLink({
-  to,
-  search,
-  children,
-}: {
-  to: string;
-  search?: Record<string, string>;
-  children: ReactNode;
-}) {
-  return (
-    <Link to={to} search={search as never} className="block transition-transform hover:scale-[1.01]">
-      {children}
     </Link>
   );
 }

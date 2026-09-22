@@ -26,18 +26,32 @@ type QueueType =
   // WP3B outcome categories (same stable-key rule).
   | "follow_up_open"
   | "reopen_pending"
-  | "resolved";
+  | "resolved"
+  // WP3C — Admin Dashboard deep-link scopes (bounded, server-validated).
   | "jobs_today"
   | "active"
   | "in_progress"
   | "resolved_today"
-  | "legacy_completed";
+  | "legacy_completed"
+  | "completed_current_cycle";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
   const s = v.trim();
   if (!s) return null;
   return s.length > max ? s.slice(0, max) : s;
+}
+
+/** [start, end) as ISO strings for today's Malaysia calendar day (UTC+8). */
+function malaysiaTodayUtcRange(): { fromIso: string; toIso: string } {
+  const OFFSET_MS = 8 * 60 * 60 * 1000;
+  const nowMy = new Date(Date.now() + OFFSET_MS);
+  const startMs =
+    Date.UTC(nowMy.getUTCFullYear(), nowMy.getUTCMonth(), nowMy.getUTCDate()) - OFFSET_MS;
+  return {
+    fromIso: new Date(startMs).toISOString(),
+    toIso: new Date(startMs + 24 * 60 * 60 * 1000).toISOString(),
+  };
 }
 
 export const Route = createFileRoute("/api/workspace/jobs/pending")({
@@ -105,10 +119,8 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             const statuses = statusesForAdminQueue(queueType);
             if (statuses) query = query.in("status", [...statuses]);
             if (queueType === "jobs_today") {
-              const offset = 8 * 60 * 60 * 1000;
-              const nowMy = new Date(Date.now() + offset);
-              const start = Date.UTC(nowMy.getUTCFullYear(), nowMy.getUTCMonth(), nowMy.getUTCDate()) - offset;
-              query = query.gte("created_at", new Date(start).toISOString()).lt("created_at", new Date(start + 86_400_000).toISOString());
+              const { fromIso, toIso } = malaysiaTodayUtcRange();
+              query = query.gte("created_at", fromIso).lt("created_at", toIso);
             }
           } else if (
             queueType === "completed" ||
@@ -168,14 +180,17 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             return a.created_at.localeCompare(b.created_at);
           });
 
-          // WP3A — Completed lists read newest completion first.
-          if (
+          // WP3A/WP3C — Completed lists read newest completion first.
+          const isCompletedList =
             queueType === "completed" ||
             queueType === "completed_followup" ||
             queueType === "follow_up_open" ||
             queueType === "reopen_pending" ||
-             queueType === "resolved" || queueType === "resolved_today" || queueType === "legacy_completed"
-          ) {
+            queueType === "resolved" ||
+            queueType === "resolved_today" ||
+            queueType === "legacy_completed" ||
+            queueType === "completed_current_cycle";
+          if (isCompletedList) {
             rows = rows
               .slice()
               .sort((a, b) =>
@@ -190,32 +205,48 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           // flag can never leak into a later cycle.
           let followUpOnly = false;
 
-          // WP3B — outcome lists (Follow-up Open / Reopen Pending / Resolved).
-          // The SAME shared derivation the dashboard cards count with decides
-          // membership here, so a card count and its list always agree.
-          // Legacy Completed jobs without modern evidence are never included.
+          // WP3B/WP3C — outcome lists. The SAME shared derivation the dashboard
+          // cards count with decides membership here, so a card count and the
+          // list it opens always agree. Legacy Completed jobs without modern
+          // evidence only ever appear in the explicit legacy scope.
           if (
             queueType === "follow_up_open" ||
             queueType === "reopen_pending" ||
-            queueType === "resolved" || queueType === "resolved_today" || queueType === "legacy_completed"
+            queueType === "resolved" ||
+            queueType === "resolved_today" ||
+            queueType === "legacy_completed" ||
+            queueType === "completed_current_cycle"
           ) {
             followUpOnly = true;
             const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
-            const { outcomesForQueue } = await import("@/lib/qne/dashboard/followup-scope");
-            const wanted = new Set<string>(
-              queueType === "legacy_completed" ? ["legacy_unknown"] : outcomesForQueue("resolved"),
+            const { outcomesForQueue, matchesWp3bCard } = await import(
+              "@/lib/qne/dashboard/followup-scope"
             );
             const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
+            const { fromIso, toIso } = malaysiaTodayUtcRange();
             const keep = new Set(
-              outcomeRows.filter((r) => {
-                if (!wanted.has(r.outcome)) return false;
-                if (queueType !== "resolved_today") return true;
-                const resolvedAt = r.outcome === "resolved_after_follow_up" ? r.followup?.resolved_at : r.completed_at;
-                const offset = 8 * 60 * 60 * 1000;
-                const nowMy = new Date(Date.now() + offset);
-                const start = Date.UTC(nowMy.getUTCFullYear(), nowMy.getUTCMonth(), nowMy.getUTCDate()) - offset;
-                return !!resolvedAt && resolvedAt >= new Date(start).toISOString() && resolvedAt < new Date(start + 86_400_000).toISOString();
-              }).map((r) => r.id),
+              outcomeRows
+                .filter((r) => {
+                  if (queueType === "legacy_completed") return r.outcome === "legacy_unknown";
+                  if (queueType === "completed_current_cycle") {
+                    return r.outcome !== "legacy_unknown";
+                  }
+                  if (queueType === "resolved_today") {
+                    return matchesWp3bCard(
+                      {
+                        outcome: r.outcome,
+                        assigned_user_id: r.assigned_user_id,
+                        completed_at: r.completed_at,
+                        followup_resolved_at: r.followup?.resolved_at ?? null,
+                        resolved_by_user_id: r.resolved_by_user_id,
+                      },
+                      "resolvedToday",
+                      { todayFromIso: fromIso, todayToIso: toIso },
+                    );
+                  }
+                  return (outcomesForQueue(queueType) as string[]).includes(r.outcome);
+                })
+                .map((r) => r.id),
             );
             rows = rows.filter((r) => keep.has(r.id));
           }
