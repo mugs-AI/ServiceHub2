@@ -61,20 +61,22 @@ describe("attendance map action contract", () => {
 });
 
 describe("administrator dashboard mobile header contract", () => {
-  it("stacks a full-width identity block above a full-width two-column action grid", () => {
-    expect(DASHBOARD).toContain(
-      'className="flex w-full min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"',
-    );
-    expect(DASHBOARD).toContain('className="w-full min-w-0 sm:flex-1"');
-    expect(DASHBOARD).toContain(
-      'className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center"',
-    );
+  // WP3C replaced the hand-rolled header with the shared DashboardHero, which
+  // owns the stacking rules. The intent is unchanged: nothing overflows a
+  // 320px screen and the identity block wraps instead of clipping.
+  it("stacks a full-width identity block above a full-width action grid", () => {
+    const HERO = readFileSync("src/components/qne/dashboard/DashboardPrimitives.tsx", "utf8");
+    expect(DASHBOARD).toContain("<DashboardHero");
+    expect(DASHBOARD).toContain('className="min-w-0 space-y-6"');
+    expect(HERO).toContain("grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_auto]");
+    expect(HERO).toContain('className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end"');
   });
 
   it("keeps company and identity text readable on narrow screens", () => {
-    expect(DASHBOARD).toContain("break-words text-2xl");
-    expect(DASHBOARD).toContain("sm:truncate sm:text-3xl");
-    expect(DASHBOARD).toContain("break-words text-sm text-muted-foreground");
+    const HERO = readFileSync("src/components/qne/dashboard/DashboardPrimitives.tsx", "utf8");
+    expect(HERO).toContain("mt-2 break-words text-2xl");
+    expect(HERO).toContain("sm:text-3xl");
+    expect(DASHBOARD).toContain("flex flex-wrap items-center gap-x-3 gap-y-1");
   });
 
   it("keeps exactly the four existing actions and their destinations", () => {
@@ -87,8 +89,9 @@ describe("administrator dashboard mobile header contract", () => {
     expect(DASHBOARD).toContain('{opsLoading ? "Refreshing…" : "Refresh"}');
   });
 
-  it("contains the workload table locally instead of widening the page", () => {
-    expect(DASHBOARD).toContain("max-w-full overflow-x-auto");
-    expect(DASHBOARD).toContain('className="min-w-[36rem] w-full text-left text-sm"');
+  it("shows workload as stacked cards on mobile and a table only on desktop", () => {
+    expect(DASHBOARD).toContain('className="space-y-2 md:hidden"');
+    expect(DASHBOARD).toContain("hidden max-w-full overflow-hidden rounded-lg border bg-card shadow-sm md:block");
+    expect(DASHBOARD).not.toContain("min-w-[36rem]");
   });
 });

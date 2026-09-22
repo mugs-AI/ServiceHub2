@@ -69,3 +69,81 @@ export function isLifecycleMyWorkScope(scope: MyWorkScope): boolean {
 export function cardStatusScope(card: "assignedToMe" | "myPendingTasks"): string[] {
   return card === "assignedToMe" ? [...ASSIGNED_TO_ME_STATUSES] : [...MY_PENDING_STATUSES];
 }
+
+/**
+ * WP3C — the nine User Dashboard cards. Label, count field and destination
+ * scope are declared once so the card a user clicks always opens exactly the
+ * Job set it counted.
+ */
+export interface MyWorkCardDef {
+  scope: MyWorkScope;
+  label: string;
+  summaryKey:
+    | "myPendingTasks"
+    | "assignedToMe"
+    | "myInProgress"
+    | "myWaitingApproval"
+    | "myWaitingCustomer"
+    | "myWaitingVendor"
+    | "myFollowUps"
+    | "myReopenPending"
+    | "resolvedByMeToday";
+  meaning: string;
+}
+
+export const MY_WORK_CARDS: readonly MyWorkCardDef[] = [
+  {
+    scope: "my_pending_tasks",
+    label: "My Pending Tasks",
+    summaryKey: "myPendingTasks",
+    meaning: "Work you can act on now",
+  },
+  {
+    scope: "assigned_to_me",
+    label: "Assigned to Me",
+    summaryKey: "assignedToMe",
+    meaning: "Every active job assigned to you",
+  },
+  {
+    scope: "my_in_progress",
+    label: "My In Progress",
+    summaryKey: "myInProgress",
+    meaning: "Started and not yet completed",
+  },
+  {
+    scope: "waiting_approval",
+    label: "Waiting Approval",
+    summaryKey: "myWaitingApproval",
+    meaning: "Awaiting an Owner/Admin decision",
+  },
+  {
+    scope: "waiting_customer",
+    label: "Waiting Customer",
+    summaryKey: "myWaitingCustomer",
+    meaning: "Blocked on the customer",
+  },
+  {
+    scope: "waiting_vendor",
+    label: "Waiting Vendor",
+    summaryKey: "myWaitingVendor",
+    meaning: "Blocked on a vendor",
+  },
+  {
+    scope: "my_followups",
+    label: "My Follow-ups",
+    summaryKey: "myFollowUps",
+    meaning: "Completed, follow-up still open",
+  },
+  {
+    scope: "my_reopen_pending",
+    label: "My Reopen Pending",
+    summaryKey: "myReopenPending",
+    meaning: "Reopen request awaiting decision",
+  },
+  {
+    scope: "resolved_by_me_today",
+    label: "Resolved by Me Today",
+    summaryKey: "resolvedByMeToday",
+    meaning: "Credited to the actual resolver",
+  },
+] as const;

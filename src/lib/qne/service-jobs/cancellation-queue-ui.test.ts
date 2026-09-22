@@ -9,17 +9,21 @@ import { describe, expect, it } from "vitest";
 const dashboard = readFileSync("src/routes/admin.dashboard.tsx", "utf8");
 const pending = readFileSync("src/routes/jobs.pending.tsx", "utf8");
 
+// WP3C moved the card catalogue into a shared pure module; the Admin route
+// renders it. Card labels, counted fields and destinations are asserted there.
+const adminCards = readFileSync("src/lib/qne/dashboard/admin-cards.ts", "utf8");
+
 describe("Admin Dashboard source contract", () => {
   it("shows Job Approvals and a separate Cancellation Requests card", () => {
-    expect(dashboard).toContain('label="Job Approvals"');
-    expect(dashboard).toContain('label="Cancellation Requests"');
-    expect(dashboard).toContain("s?.cancellationRequests");
+    expect(adminCards).toContain('label: "Job Approvals"');
+    expect(adminCards).toContain('label: "Cancellation Requests"');
+    expect(adminCards).toContain('key: "cancellationRequests"');
     expect(dashboard).toContain("cancellationRequests: number");
   });
 
   it("links each card to its own queue and preserves the other KPIs", () => {
-    expect(dashboard).toContain('queueType: "pending_approval"');
-    expect(dashboard).toContain('queueType: "cancellation_requests"');
+    expect(adminCards).toContain('queueType: "pending_approval"');
+    expect(adminCards).toContain('queueType: "cancellation_requests"');
     for (const label of [
       "Jobs Today",
       "Waiting Customer",
@@ -27,7 +31,7 @@ describe("Admin Dashboard source contract", () => {
       "Due Soon Customers",
       "Overdue Customers",
     ]) {
-      expect(dashboard).toContain(`label="${label}"`);
+      expect(adminCards).toContain(`label: "${label}"`);
     }
   });
 

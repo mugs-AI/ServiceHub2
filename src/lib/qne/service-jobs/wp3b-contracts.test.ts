@@ -198,10 +198,10 @@ describe("WP3B dashboard and queue data contract", () => {
     );
     // The shared count credits the resolver; workload scopes keep the assignee.
     expect(SCOPE).toMatch(/export function resolvedByFor/);
-    expect(SCOPE).toMatch(/resolvedByFor\(row\) === me\) counts\.resolvedByMeToday/);
-    expect(SCOPE).not.toMatch(/if \(mine\) counts\.resolvedByMeToday/);
-    expect(SCOPE).toMatch(/if \(mine\) counts\.myFollowUps/);
-    expect(SCOPE).toMatch(/if \(mine\) counts\.myReopenPending/);
+    expect(SCOPE).toMatch(/resolvedByMeToday"\) return me !== null && resolvedByFor\(row\) === me/);
+    expect(SCOPE).toMatch(/matchesWp3bCard\(row, "resolvedByMeToday", opts\)\) counts\.resolvedByMeToday/);
+    expect(SCOPE).toMatch(/matchesWp3bCard\(row, "myFollowUps", opts\)\) counts\.myFollowUps/);
+    expect(SCOPE).toMatch(/matchesWp3bCard\(row, "myReopenPending", opts\)\) counts\.myReopenPending/);
     // Both dashboards pass the resolver through the shared scope rows.
     for (const src of [ADMIN, MYWORK]) {
       expect(src).toMatch(/resolved_by_user_id: r\.resolved_by_user_id/);
