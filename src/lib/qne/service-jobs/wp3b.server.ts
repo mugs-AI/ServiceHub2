@@ -126,7 +126,7 @@ export async function loadCompletionOutcomes(tenantCode: string): Promise<Outcom
     await Promise.all([
       supabaseAdmin
         .from("service_job_completions")
-        .select("service_job_id, completion_cycle, follow_up_required")
+        .select("service_job_id, completion_cycle, follow_up_required, completed_by_user_id")
         .eq("tenant_code", tenantCode)
         .in("service_job_id", ids),
       supabaseAdmin
@@ -140,13 +140,17 @@ export async function loadCompletionOutcomes(tenantCode: string): Promise<Outcom
   if (evErr) throw evErr;
   if (roErr) throw roErr;
 
-  const evidenceByJob = new Map<string, { follow_up_required: boolean }>();
+  const evidenceByJob = new Map<
+    string,
+    { follow_up_required: boolean; completed_by_user_id: string | null }
+  >();
   for (const e of evidence ?? []) {
     const cycle =
       typeof e.completion_cycle === "number" && e.completion_cycle > 0 ? e.completion_cycle : 1;
     if (cycleByJob.get(e.service_job_id) === cycle) {
       evidenceByJob.set(e.service_job_id, {
         follow_up_required: e.follow_up_required === true,
+        completed_by_user_id: e.completed_by_user_id ?? null,
       });
     }
   }
@@ -156,14 +160,24 @@ export async function loadCompletionOutcomes(tenantCode: string): Promise<Outcom
   for (const j of rows) {
     const cycle = cycleByJob.get(j.id) ?? 1;
     const followup = followups.get(j.id) ?? null;
+    const completion = evidenceByJob.get(j.id) ?? null;
     const outcome = deriveOutcome({
       jobStatus: j.status,
       isDeleted: j.is_deleted === true,
-      completion: evidenceByJob.get(j.id) ?? null,
+      completion,
       followup,
       hasPendingReopen: pendingReopen.has(j.id),
     });
     if (!outcome) continue;
+    // Performance credit follows the ACTUAL resolution actor, never the
+    // current assignee: the completion actor when the cycle resolved at
+    // completion, the clearing actor when it resolved after a follow-up.
+    const resolvedBy =
+      outcome === "resolved_at_completion"
+        ? (completion?.completed_by_user_id ?? null)
+        : outcome === "resolved_after_follow_up"
+          ? (followup?.resolved_by_user_id ?? null)
+          : null;
     out.push({
       id: j.id,
       job_number: j.job_number ?? null,
@@ -172,10 +186,13 @@ export async function loadCompletionOutcomes(tenantCode: string): Promise<Outcom
       assigned_user_id: j.assigned_user_id ?? null,
       completed_at: j.completed_at ?? null,
       completion_cycle: cycle,
+      completed_by_user_id: completion?.completed_by_user_id ?? null,
+      resolved_by_user_id: resolvedBy,
       outcome,
       followup,
     });
   }
+
   return out;
 }
 
