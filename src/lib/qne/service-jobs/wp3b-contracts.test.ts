@@ -78,8 +78,8 @@ describe("WP3B candidate migration", () => {
 
   it("clearing never changes the Job status", () => {
     const fn = SQL.slice(
-      SQL.indexOf("FUNCTION public.sh_followup_clear"),
-      SQL.indexOf("FUNCTION public.sh_job_reopen_decide"),
+      SQL.indexOf("CREATE OR REPLACE FUNCTION public.sh_followup_clear"),
+      SQL.indexOf("CREATE OR REPLACE FUNCTION public.sh_job_reopen_decide"),
     );
     expect(fn).not.toMatch(/UPDATE public\.service_jobs/);
   });
