@@ -84,9 +84,19 @@ export interface OutcomeJob {
   assigned_user_id: string | null;
   completed_at: string | null;
   completion_cycle: number;
+  /** Actor who wrote the CURRENT cycle's completion evidence. */
+  completed_by_user_id: string | null;
+  /**
+   * The actual resolution actor for this cycle: the completion actor when the
+   * cycle resolved at completion, the clearing actor when it resolved after a
+   * follow-up, and null while it is not resolved. Never the current assignee,
+   * so reassignment after completion cannot move performance credit.
+   */
+  resolved_by_user_id: string | null;
   outcome: CompletionOutcome;
   followup: FollowupRow | null;
 }
+
 
 /**
  * The single central derivation of EVERY completed cycle for a tenant, used by
