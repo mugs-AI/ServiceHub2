@@ -135,6 +135,8 @@ export function countScopes(
   };
 
   for (const row of rows) {
+    // Workload scopes ("My Follow-ups", "My Reopen Pending") follow the
+    // currently assigned technician. The performance scope below does not.
     const mine = me !== null && row.assigned_user_id === me;
     if (row.outcome === "legacy_unknown") {
       counts.legacyUnknown += 1;
@@ -151,9 +153,11 @@ export function countScopes(
       counts.resolved += 1;
       if (inToday(resolvedAtFor(row))) {
         counts.resolvedToday += 1;
-        if (mine) counts.resolvedByMeToday += 1;
+        // "Resolved by Me Today" credits the ACTUAL resolution actor.
+        if (me !== null && resolvedByFor(row) === me) counts.resolvedByMeToday += 1;
       }
     }
   }
+
   return counts;
 }
