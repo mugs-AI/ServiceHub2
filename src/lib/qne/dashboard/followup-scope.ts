@@ -65,6 +65,12 @@ export interface ScopeRow {
   completed_at: string | null;
   /** Follow-up clear timestamp, when the cycle had a follow-up. */
   followup_resolved_at?: string | null;
+  /**
+   * The ACTUAL resolution actor for this cycle — completion actor when it
+   * resolved at completion, clearing actor when it resolved after a follow-up.
+   * Never the current assignee.
+   */
+  resolved_by_user_id?: string | null;
 }
 
 /**
@@ -76,6 +82,19 @@ export function resolvedAtFor(row: ScopeRow): string | null {
   if (row.outcome === "resolved_at_completion") return row.completed_at ?? null;
   return null;
 }
+
+/**
+ * Who gets performance credit for a resolved cycle. Reassigning a Job after
+ * completion must never move this away from the person who actually resolved
+ * it, so the assignee is deliberately not consulted here.
+ */
+export function resolvedByFor(row: ScopeRow): string | null {
+  if (row.outcome === "resolved_at_completion" || row.outcome === "resolved_after_follow_up") {
+    return row.resolved_by_user_id ?? null;
+  }
+  return null;
+}
+
 
 export interface ScopeCounts {
   completed: number;
