@@ -4,9 +4,13 @@
 // authenticated N3 session; request bodies never supply identity, role,
 // status or timestamps. The single mutation path is the atomic RPC.
 //
-// The WP3B candidate migration is not applied yet, so every read degrades
-// safely: a missing table yields "no follow-up evidence", which the pure
-// derivation treats exactly like a completion that was never ticked.
+// Until the WP3B candidate migration is applied, follow-up reads degrade
+// safely to "no follow-up row". That is NOT the same as "never ticked": the
+// outcome derivation also reads completion.follow_up_required, so a ticked
+// completion still derives as Follow-up Open — it simply has no durable
+// evidence yet and therefore cannot be cleared. The candidate migration's
+// additive materialisation creates exactly those missing rows on apply.
+
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { deriveOutcome } from "./wp3b-followup";
