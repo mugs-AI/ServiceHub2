@@ -27,9 +27,16 @@
 --
 -- Safe-forward notes:
 --   * Re-runnable: every object is created with IF NOT EXISTS / OR REPLACE.
---   * Applying it to a database that already has WP3A completion cycles needs
---     no backfill: cycles completed before WP3B simply have no follow-up row,
---     and the projection derives their outcome from the evidence alone.
+--   * Applying it to a database that already has WP3A completion cycles DOES
+--     require the additive compatibility materialisation in section 1b.
+--     Without it, a Job already completed with follow_up_required = true
+--     derives as Follow-up Open but has no durable row, so it could never be
+--     cleared. Section 1b is INSERT-only: it opens exactly the missing rows,
+--     never updates or deletes completion evidence or existing follow-up rows,
+--     and is not a destructive backfill.
+--   * Cycles completed with no tick stay row-less; the projection derives their
+--     outcome from the completion evidence alone.
+
 -- Rollback notes:
 --   * DROP FUNCTION public.sh_followup_clear(text, uuid, text, text, text, boolean);
 --   * DROP VIEW public.service_job_completion_outcomes;
