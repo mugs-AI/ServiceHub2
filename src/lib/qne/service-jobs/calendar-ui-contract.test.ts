@@ -147,8 +147,10 @@ describe("Role Diagnostics relocation", () => {
   });
 
   it("keeps operations, User workload, integration health and quick links on the Dashboard", () => {
+    const adminCards = readFileSync("src/lib/qne/dashboard/admin-cards.ts", "utf8");
+    expect(adminCards).toContain('title: "Live Operations"');
     for (const token of [
-      "Live Operations",
+      "ADMIN_CARD_GROUPS",
       'title="User workload"',
       'title="Integration health"',
       "<DashboardAction",

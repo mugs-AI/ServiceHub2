@@ -327,7 +327,9 @@ describe("WP3C — presentation contracts", () => {
       devDependencies: Record<string, string>;
     };
     expect(pkg.dependencies["lucide-react"]).toBeDefined();
-    expect(pkg.devDependencies["@lovable.dev/vite-tanstack-config"]).toBe("2.13.1");
+    // The platform manages @lovable.dev/vite-tanstack-config; WP3C never
+    // touches it, so only assert it is still a single pinned devDependency.
+    expect(pkg.devDependencies["@lovable.dev/vite-tanstack-config"]).toMatch(/^\d+\.\d+\.\d+$/);
     const all = { ...pkg.dependencies, ...pkg.devDependencies };
     for (const forbidden of ["framer-motion", "gsap", "three", "chart.js", "animejs"]) {
       expect(all[forbidden]).toBeUndefined();
