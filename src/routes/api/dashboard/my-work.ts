@@ -70,6 +70,9 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           if (!myUserId) {
             return Response.json({
               summary: {
+                myFollowUps: 0,
+                myReopenPending: 0,
+                resolvedByMeToday: 0,
                 assignedToMe: 0,
                 myPendingTasks: 0,
                 myInProgress: 0,

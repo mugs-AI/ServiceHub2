@@ -17,7 +17,11 @@ type QueueType =
   | "cancellation_requested"
   // WP3A queue categories (stable URL keys for dashboard deep links).
   | "completed_followup"
-  | "completed";
+  | "completed"
+  // WP3B outcome categories (same stable-key rule).
+  | "follow_up_open"
+  | "reopen_pending"
+  | "resolved";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
