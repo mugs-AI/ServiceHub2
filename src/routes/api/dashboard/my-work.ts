@@ -196,6 +196,10 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           };
 
           // --- Items ---
+          // Tenant + soft-delete are always enforced. The current-assignee
+          // constraint is applied only for scopes that are defined by current
+          // assignment; "Resolved by Me Today" is credited to the actual
+          // resolver, so a Job reassigned after resolution must stay listed.
           let query = supabaseAdmin
             .from("service_jobs")
             .select(
@@ -203,8 +207,10 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
               { count: "exact" },
             )
             .eq("tenant_code", user.tenantCode)
-            .eq("is_deleted", false)
-            .eq("assigned_user_id", myUserId);
+            .eq("is_deleted", false);
+          if (myWorkScopeRequiresCurrentAssignee(scope)) {
+            query = query.eq("assigned_user_id", myUserId);
+          }
 
           if (scope && isLifecycleMyWorkScope(scope)) {
             const { matchesWp3bCard } = await import("@/lib/qne/dashboard/followup-scope");
