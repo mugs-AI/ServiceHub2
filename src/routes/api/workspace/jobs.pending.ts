@@ -172,12 +172,8 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             queueType === "resolved"
           ) {
             followUpOnly = true;
-            const { loadCompletionOutcomes } = await import(
-              "@/lib/qne/service-jobs/wp3b.server"
-            );
-            const { outcomesForQueue } = await import(
-              "@/lib/qne/dashboard/followup-scope"
-            );
+            const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
+            const { outcomesForQueue } = await import("@/lib/qne/dashboard/followup-scope");
             const wanted = new Set<string>(outcomesForQueue(queueType));
             const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
             const keep = new Set(

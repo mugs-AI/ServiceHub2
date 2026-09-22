@@ -156,9 +156,7 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
           // WP3B — personal follow-up / reopen / resolved scopes, derived once
           // from the shared completion-outcome read model so each card count
           // matches the list it opens.
-          const { loadCompletionOutcomes } = await import(
-            "@/lib/qne/service-jobs/wp3b.server"
-          );
+          const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
           const { countScopes } = await import("@/lib/qne/dashboard/followup-scope");
           const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
           const wp3b = countScopes(

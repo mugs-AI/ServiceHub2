@@ -139,9 +139,7 @@ export const Route = createFileRoute("/api/admin/dashboard")({
           // open both come from this one shared derivation, so they can never
           // disagree. Legacy Completed jobs without modern completion evidence
           // are counted separately and are never reported as Resolved.
-          const { loadCompletionOutcomes } = await import(
-            "@/lib/qne/service-jobs/wp3b.server"
-          );
+          const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
           const { countScopes } = await import("@/lib/qne/dashboard/followup-scope");
           const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
           const wp3b = countScopes(
