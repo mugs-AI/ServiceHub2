@@ -59,6 +59,25 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-dashboard-navy: var(--dashboard-navy);
+  --color-dashboard-blue: var(--dashboard-blue);
+  --color-dashboard-cyan: var(--dashboard-cyan);
+  --color-dashboard-emerald: var(--dashboard-emerald);
+  --color-dashboard-amber: var(--dashboard-amber);
+  --color-dashboard-orange: var(--dashboard-orange);
+  --color-dashboard-violet: var(--dashboard-violet);
+  --color-dashboard-rose: var(--dashboard-rose);
+  --color-dashboard-ink: var(--dashboard-ink);
+  --color-dashboard-on-accent: var(--dashboard-on-accent);
+  --color-dashboard-navy-soft: var(--dashboard-navy-soft);
+  --color-dashboard-blue-soft: var(--dashboard-blue-soft);
+  --color-dashboard-cyan-soft: var(--dashboard-cyan-soft);
+  --color-dashboard-emerald-soft: var(--dashboard-emerald-soft);
+  --color-dashboard-amber-soft: var(--dashboard-amber-soft);
+  --color-dashboard-orange-soft: var(--dashboard-orange-soft);
+  --color-dashboard-violet-soft: var(--dashboard-violet-soft);
+  --color-dashboard-rose-soft: var(--dashboard-rose-soft);
+  --background-image-dashboard-hero: var(--dashboard-hero);
 }
 
 :root {
@@ -95,6 +114,25 @@
   --sidebar-accent-foreground: oklch(0.28 0.08 255);
   --sidebar-border: oklch(0.9 0.015 250);
   --sidebar-ring: oklch(0.65 0.15 255);
+  --dashboard-navy: oklch(0.29 0.09 260);
+  --dashboard-blue: oklch(0.56 0.18 255);
+  --dashboard-cyan: oklch(0.68 0.13 215);
+  --dashboard-emerald: oklch(0.61 0.14 155);
+  --dashboard-amber: oklch(0.79 0.15 82);
+  --dashboard-orange: oklch(0.68 0.17 52);
+  --dashboard-violet: oklch(0.58 0.17 295);
+  --dashboard-rose: oklch(0.62 0.18 15);
+  --dashboard-ink: oklch(0.22 0.06 258);
+  --dashboard-on-accent: oklch(0.99 0.004 250);
+  --dashboard-navy-soft: oklch(0.965 0.018 260);
+  --dashboard-blue-soft: oklch(0.965 0.025 250);
+  --dashboard-cyan-soft: oklch(0.97 0.03 215);
+  --dashboard-emerald-soft: oklch(0.97 0.03 155);
+  --dashboard-amber-soft: oklch(0.975 0.04 85);
+  --dashboard-orange-soft: oklch(0.97 0.035 55);
+  --dashboard-violet-soft: oklch(0.965 0.03 295);
+  --dashboard-rose-soft: oklch(0.97 0.025 15);
+  --dashboard-hero: linear-gradient(120deg, oklch(0.98 0.025 245), oklch(0.97 0.035 205), oklch(0.985 0.02 155));
 }
 
 .dark {
@@ -130,6 +168,45 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+  --dashboard-navy: oklch(0.72 0.12 255);
+  --dashboard-blue: oklch(0.69 0.15 250);
+  --dashboard-cyan: oklch(0.75 0.12 210);
+  --dashboard-emerald: oklch(0.72 0.13 155);
+  --dashboard-amber: oklch(0.8 0.14 82);
+  --dashboard-orange: oklch(0.74 0.15 52);
+  --dashboard-violet: oklch(0.72 0.15 295);
+  --dashboard-rose: oklch(0.72 0.16 15);
+  --dashboard-ink: oklch(0.96 0.01 250);
+  --dashboard-on-accent: oklch(0.14 0.03 255);
+  --dashboard-navy-soft: oklch(0.24 0.04 260);
+  --dashboard-blue-soft: oklch(0.24 0.04 250);
+  --dashboard-cyan-soft: oklch(0.24 0.04 215);
+  --dashboard-emerald-soft: oklch(0.24 0.04 155);
+  --dashboard-amber-soft: oklch(0.25 0.04 85);
+  --dashboard-orange-soft: oklch(0.25 0.04 55);
+  --dashboard-violet-soft: oklch(0.24 0.04 295);
+  --dashboard-rose-soft: oklch(0.24 0.04 15);
+  --dashboard-hero: linear-gradient(120deg, oklch(0.2 0.055 260), oklch(0.2 0.045 220), oklch(0.2 0.04 170));
+}
+
+@keyframes dashboard-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@utility dashboard-enter {
+  animation: dashboard-enter 320ms ease-out both;
+}
+
+@utility dashboard-card {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+  &:hover { transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-enter { animation: none; }
+  .dashboard-card { transition: none; }
+  .dashboard-card:hover { transform: none; }
 }
 
 @layer base {

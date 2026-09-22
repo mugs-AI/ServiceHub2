@@ -30,6 +30,38 @@ export type MyWorkStatus = (typeof ASSIGNED_TO_ME_STATUSES)[number];
 /** Terminal statuses are never part of a My Work card scope. */
 export const TERMINAL_STATUSES = ["Completed", "Cancelled"] as const;
 
+export const MY_WORK_SCOPES = [
+  "my_pending_tasks",
+  "assigned_to_me",
+  "my_in_progress",
+  "waiting_approval",
+  "waiting_customer",
+  "waiting_vendor",
+  "my_followups",
+  "my_reopen_pending",
+  "resolved_by_me_today",
+] as const;
+
+export type MyWorkScope = (typeof MY_WORK_SCOPES)[number];
+
+export function isMyWorkScope(value: unknown): value is MyWorkScope {
+  return typeof value === "string" && (MY_WORK_SCOPES as readonly string[]).includes(value);
+}
+
+export function statusesForMyWorkScope(scope: MyWorkScope): readonly string[] | null {
+  if (scope === "my_pending_tasks") return MY_PENDING_STATUSES;
+  if (scope === "assigned_to_me") return ASSIGNED_TO_ME_STATUSES;
+  if (scope === "my_in_progress") return ["In Progress"];
+  if (scope === "waiting_approval") return ["Pending Approval"];
+  if (scope === "waiting_customer") return ["Waiting Customer"];
+  if (scope === "waiting_vendor") return ["Waiting Vendor"];
+  return null;
+}
+
+export function isLifecycleMyWorkScope(scope: MyWorkScope): boolean {
+  return statusesForMyWorkScope(scope) === null;
+}
+
 /**
  * The status list a My Work card must apply when it is clicked. Returning a
  * copy keeps callers from mutating the shared constant.

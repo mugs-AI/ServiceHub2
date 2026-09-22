@@ -95,6 +95,33 @@ export function resolvedByFor(row: ScopeRow): string | null {
   return null;
 }
 
+export function matchesWp3bCard(
+  row: ScopeRow,
+  card: Wp3bCard,
+  opts: { meUserId?: string | null; todayFromIso?: string; todayToIso?: string } = {},
+): boolean {
+  const me = opts.meUserId ?? null;
+  if (card === "followUpOpen") return row.outcome === "follow_up_open";
+  if (card === "reopenPending") return row.outcome === "reopen_pending";
+  if (card === "myFollowUps") {
+    return row.outcome === "follow_up_open" && me !== null && row.assigned_user_id === me;
+  }
+  if (card === "myReopenPending") {
+    return row.outcome === "reopen_pending" && me !== null && row.assigned_user_id === me;
+  }
+  const resolved =
+    row.outcome === "resolved_at_completion" || row.outcome === "resolved_after_follow_up";
+  if (!resolved || !isWithinRange(resolvedAtFor(row), opts.todayFromIso, opts.todayToIso)) {
+    return false;
+  }
+  if (card === "resolvedByMeToday") return me !== null && resolvedByFor(row) === me;
+  return card === "resolvedToday";
+}
+
+function isWithinRange(iso: string | null, from?: string, to?: string): boolean {
+  return !!iso && !!from && !!to && iso >= from && iso < to;
+}
+
 export interface ScopeCounts {
   completed: number;
   resolved: number;
@@ -116,11 +143,6 @@ export function countScopes(
   opts: { meUserId?: string | null; todayFromIso?: string; todayToIso?: string } = {},
 ): ScopeCounts {
   const me = opts.meUserId ?? null;
-  const inToday = (iso: string | null): boolean => {
-    if (!iso || !opts.todayFromIso || !opts.todayToIso) return false;
-    return iso >= opts.todayFromIso && iso < opts.todayToIso;
-  };
-
   const counts: ScopeCounts = {
     completed: 0,
     resolved: 0,
@@ -136,7 +158,6 @@ export function countScopes(
   for (const row of rows) {
     // Workload scopes ("My Follow-ups", "My Reopen Pending") follow the
     // currently assigned technician. The performance scope below does not.
-    const mine = me !== null && row.assigned_user_id === me;
     if (row.outcome === "legacy_unknown") {
       counts.legacyUnknown += 1;
       continue;
@@ -144,16 +165,16 @@ export function countScopes(
     counts.completed += 1;
     if (row.outcome === "follow_up_open") {
       counts.followUpOpen += 1;
-      if (mine) counts.myFollowUps += 1;
+      if (matchesWp3bCard(row, "myFollowUps", opts)) counts.myFollowUps += 1;
     } else if (row.outcome === "reopen_pending") {
       counts.reopenPending += 1;
-      if (mine) counts.myReopenPending += 1;
+      if (matchesWp3bCard(row, "myReopenPending", opts)) counts.myReopenPending += 1;
     } else {
       counts.resolved += 1;
-      if (inToday(resolvedAtFor(row))) {
+      if (matchesWp3bCard(row, "resolvedToday", opts)) {
         counts.resolvedToday += 1;
         // "Resolved by Me Today" credits the ACTUAL resolution actor.
-        if (me !== null && resolvedByFor(row) === me) counts.resolvedByMeToday += 1;
+        if (matchesWp3bCard(row, "resolvedByMeToday", opts)) counts.resolvedByMeToday += 1;
       }
     }
   }
