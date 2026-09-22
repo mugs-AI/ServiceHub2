@@ -172,8 +172,8 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
             { meUserId: myUserId, todayFromIso: mytFrom, todayToIso: mytTo },
           );
 
-
           const summary = {
+
             myFollowUps: wp3b.myFollowUps,
             myReopenPending: wp3b.myReopenPending,
             resolvedByMeToday: wp3b.resolvedByMeToday,

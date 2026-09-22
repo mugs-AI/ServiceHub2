@@ -153,8 +153,8 @@ export const Route = createFileRoute("/api/admin/dashboard")({
             { todayFromIso: fromIso, todayToIso: toIso },
           );
 
-
           return Response.json({
+
             summary: {
               jobsToday: rToday.count ?? 0,
               pendingApproval: rApproval.count ?? 0,
