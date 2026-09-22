@@ -63,6 +63,20 @@ export function isLifecycleMyWorkScope(scope: MyWorkScope): boolean {
 }
 
 /**
+ * Whether the Job list for a scope must be constrained to the caller's CURRENT
+ * assignment.
+ *
+ * Every workload scope follows the current assignee: the work is only "mine"
+ * while it is assigned to me. "Resolved by Me Today" is a performance scope
+ * credited to the actual resolver, so reassigning a Job after it was resolved
+ * must not drop it from the list — otherwise the card counts a Job the list
+ * omits. Tenant and soft-delete filters remain mandatory in every case.
+ */
+export function myWorkScopeRequiresCurrentAssignee(scope: MyWorkScope | null): boolean {
+  return scope !== "resolved_by_me_today";
+}
+
+/**
  * The status list a My Work card must apply when it is clicked. Returning a
  * copy keeps callers from mutating the shared constant.
  */
