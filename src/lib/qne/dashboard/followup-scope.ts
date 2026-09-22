@@ -65,6 +65,12 @@ export interface ScopeRow {
   completed_at: string | null;
   /** Follow-up clear timestamp, when the cycle had a follow-up. */
   followup_resolved_at?: string | null;
+  /**
+   * The ACTUAL resolution actor for this cycle — completion actor when it
+   * resolved at completion, clearing actor when it resolved after a follow-up.
+   * Never the current assignee.
+   */
+  resolved_by_user_id?: string | null;
 }
 
 /**
@@ -74,6 +80,18 @@ export interface ScopeRow {
 export function resolvedAtFor(row: ScopeRow): string | null {
   if (row.outcome === "resolved_after_follow_up") return row.followup_resolved_at ?? null;
   if (row.outcome === "resolved_at_completion") return row.completed_at ?? null;
+  return null;
+}
+
+/**
+ * Who gets performance credit for a resolved cycle. Reassigning a Job after
+ * completion must never move this away from the person who actually resolved
+ * it, so the assignee is deliberately not consulted here.
+ */
+export function resolvedByFor(row: ScopeRow): string | null {
+  if (row.outcome === "resolved_at_completion" || row.outcome === "resolved_after_follow_up") {
+    return row.resolved_by_user_id ?? null;
+  }
   return null;
 }
 
@@ -116,6 +134,8 @@ export function countScopes(
   };
 
   for (const row of rows) {
+    // Workload scopes ("My Follow-ups", "My Reopen Pending") follow the
+    // currently assigned technician. The performance scope below does not.
     const mine = me !== null && row.assigned_user_id === me;
     if (row.outcome === "legacy_unknown") {
       counts.legacyUnknown += 1;
@@ -132,9 +152,11 @@ export function countScopes(
       counts.resolved += 1;
       if (inToday(resolvedAtFor(row))) {
         counts.resolvedToday += 1;
-        if (mine) counts.resolvedByMeToday += 1;
+        // "Resolved by Me Today" credits the ACTUAL resolution actor.
+        if (me !== null && resolvedByFor(row) === me) counts.resolvedByMeToday += 1;
       }
     }
   }
+
   return counts;
 }

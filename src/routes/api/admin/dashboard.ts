@@ -148,12 +148,14 @@ export const Route = createFileRoute("/api/admin/dashboard")({
               assigned_user_id: r.assigned_user_id,
               completed_at: r.completed_at,
               followup_resolved_at: r.followup?.resolved_at ?? null,
+              resolved_by_user_id: r.resolved_by_user_id,
             })),
             { todayFromIso: fromIso, todayToIso: toIso },
           );
 
           return Response.json({
             summary: {
+
               jobsToday: rToday.count ?? 0,
               pendingApproval: rApproval.count ?? 0,
               cancellationRequests,

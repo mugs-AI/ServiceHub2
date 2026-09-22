@@ -30,6 +30,38 @@ describe("WP3B candidate migration", () => {
     expect(SQL).not.toMatch(/DROP TABLE public\.service_job_completions/);
   });
 
+  it("materialises the missing rows for existing ticked current cycles", () => {
+    const block = SQL.slice(
+      SQL.indexOf("1b. Additive compatibility materialisation"),
+      SQL.indexOf("2. Central outcome projection"),
+    );
+    expect(block).toMatch(/INSERT INTO public\.service_job_followups/);
+    // Identity comes from canonical Job + completion evidence.
+    expect(block).toMatch(/FROM public\.service_jobs j/);
+    expect(block).toMatch(/JOIN public\.service_job_completions c/);
+    expect(block).toMatch(
+      /coalesce\(c\.completion_cycle, 1\) = coalesce\(j\.completion_cycle, 1\)/,
+    );
+    // Only non-deleted, currently Completed, ticked cycles with no row.
+    expect(block).toMatch(/j\.is_deleted = false/);
+    expect(block).toMatch(/j\.status = 'Completed'/);
+    expect(block).toMatch(/coalesce\(c\.follow_up_required, false\) = true/);
+    expect(block).toMatch(/NOT EXISTS/);
+    // Trusted timestamps and actor snapshots, server now() only as a fallback.
+    expect(block).toMatch(/coalesce\(c\.completed_at, j\.completed_at, now\(\)\)/);
+    expect(block).toMatch(/c\.completed_by_user_id/);
+    expect(block).toMatch(/c\.completed_by_name_snapshot/);
+    // Existing follow-up evidence is preserved; nothing is rewritten.
+    expect(block).toMatch(
+      /ON CONFLICT \(tenant_code, service_job_id, completion_cycle\) DO NOTHING/,
+    );
+    expect(block).not.toMatch(/UPDATE /);
+    expect(block).not.toMatch(/DELETE /);
+    // The safe-forward note no longer claims no backfill is needed.
+    expect(SQL).not.toMatch(/needs\s+no backfill/);
+    expect(SQL).toMatch(/not a destructive backfill/);
+  });
+
   it("never rewrites completion evidence", () => {
     expect(SQL).not.toMatch(/UPDATE public\.service_job_completions/);
     expect(SQL).not.toMatch(/DELETE FROM public\.service_job_completions/);
@@ -151,6 +183,41 @@ describe("WP3B dashboard and queue data contract", () => {
     expect(PENDING).toMatch(/loadCompletionOutcomes/);
     expect(PENDING).toMatch(/outcomesForQueue/);
     expect(PENDING).toMatch(/eq\("tenant_code", user\.tenantCode\)/);
+  });
+
+  it("Resolved by Me is attributed to the actual actor, not the assignee", () => {
+    const SCOPE = read("src/lib/qne/dashboard/followup-scope.ts");
+    // The read model retains the completion actor and derives the resolver.
+    expect(SERVER).toMatch(/completed_by_user_id/);
+    expect(SERVER).toMatch(/resolved_by_user_id: resolvedBy/);
+    expect(SERVER).toMatch(
+      /outcome === "resolved_at_completion"[\s\S]*?completion\?\.completed_by_user_id/,
+    );
+    expect(SERVER).toMatch(
+      /outcome === "resolved_after_follow_up"[\s\S]*?followup\?\.resolved_by_user_id/,
+    );
+    // The shared count credits the resolver; workload scopes keep the assignee.
+    expect(SCOPE).toMatch(/export function resolvedByFor/);
+    expect(SCOPE).toMatch(/resolvedByFor\(row\) === me\) counts\.resolvedByMeToday/);
+    expect(SCOPE).not.toMatch(/if \(mine\) counts\.resolvedByMeToday/);
+    expect(SCOPE).toMatch(/if \(mine\) counts\.myFollowUps/);
+    expect(SCOPE).toMatch(/if \(mine\) counts\.myReopenPending/);
+    // Both dashboards pass the resolver through the shared scope rows.
+    for (const src of [ADMIN, MYWORK]) {
+      expect(src).toMatch(/resolved_by_user_id: r\.resolved_by_user_id/);
+    }
+  });
+
+  it("an open follow-up is only actionable with durable current-cycle evidence", () => {
+    const RULES = read("src/lib/qne/service-jobs/wp3b-followup.ts");
+    // UI: no row -> no control, whatever the derived outcome says.
+    expect(RULES).toMatch(
+      /const fu = input\.followup;\s*\n\s*if \(!fu\) return \{ mode: "hidden" \}/,
+    );
+    // Server: the RPC rejects a clear with no follow-up row for the cycle.
+    expect(SQL).toMatch(/This Job has no open follow-up for its current completion cycle/);
+    // The card only renders the action for the "open" view mode.
+    expect(SECTION).toMatch(/view\.mode === "open" && view\.canClear/);
   });
 });
 

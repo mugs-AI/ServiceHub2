@@ -172,7 +172,16 @@ export type FollowupView =
   | { mode: "resolved"; record: FollowupRow }
   | { mode: "reopened" };
 
-/** What the locked completion card should render for the follow-up area. */
+/**
+ * What the locked completion card should render for the follow-up area.
+ *
+ * Defensive rule: an action is offered ONLY when durable follow-up evidence
+ * exists for the current cycle. A ticked completion with no row still shows a
+ * "Follow-up Open" badge (the outcome derivation owns that), but it is never
+ * presented as actionable, because the server would reject the clear. The
+ * candidate migration's additive materialisation creates the missing rows, at
+ * which point those jobs become both open and clearable.
+ */
 export function followupView(input: {
   job: FollowupJobFacts;
   followup: FollowupRow | null;

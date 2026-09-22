@@ -155,7 +155,9 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
 
           // WP3B — personal follow-up / reopen / resolved scopes, derived once
           // from the shared completion-outcome read model so each card count
-          // matches the list it opens.
+          // matches the list it opens. "Resolved by Me Today" is credited to
+          // the actual completion / follow-up-clearing actor, so reassigning a
+          // Job after it was completed never moves that credit.
           const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
           const { countScopes } = await import("@/lib/qne/dashboard/followup-scope");
           const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
@@ -165,12 +167,14 @@ export const Route = createFileRoute("/api/dashboard/my-work")({
               assigned_user_id: r.assigned_user_id,
               completed_at: r.completed_at,
               followup_resolved_at: r.followup?.resolved_at ?? null,
+              resolved_by_user_id: r.resolved_by_user_id,
             })),
             { meUserId: myUserId, todayFromIso: mytFrom, todayToIso: mytTo },
           );
 
           const summary = {
             myFollowUps: wp3b.myFollowUps,
+
             myReopenPending: wp3b.myReopenPending,
             resolvedByMeToday: wp3b.resolvedByMeToday,
             assignedToMe: rAssignedToMe.count ?? 0,
