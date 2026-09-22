@@ -317,3 +317,113 @@ describe("WP3B dashboard scopes", () => {
     }
   });
 });
+
+describe("WP3B Resolved by Me uses the actual resolution actor", () => {
+  const from = "2026-09-10T16:00:00.000Z";
+  const to = "2026-09-11T16:00:00.000Z";
+
+  it("credits the completion actor, not the current assignee, after reassignment", () => {
+    // The Job was completed by ME and later reassigned to OTHER.
+    const rows = [
+      {
+        outcome: "resolved_at_completion" as const,
+        assigned_user_id: "OTHER",
+        completed_at: "2026-09-10T20:00:00.000Z",
+        followup_resolved_at: null,
+        resolved_by_user_id: "ME",
+      },
+    ];
+    expect(resolvedByFor(rows[0]!)).toBe("ME");
+    expect(
+      countScopes(rows, { meUserId: "ME", todayFromIso: from, todayToIso: to }).resolvedByMeToday,
+    ).toBe(1);
+    // The new assignee gets no credit for work they did not do.
+    expect(
+      countScopes(rows, { meUserId: "OTHER", todayFromIso: from, todayToIso: to })
+        .resolvedByMeToday,
+    ).toBe(0);
+  });
+
+  it("credits the clearing actor for a follow-up resolved after completion", () => {
+    const rows = [
+      {
+        outcome: "resolved_after_follow_up" as const,
+        assigned_user_id: "ME",
+        completed_at: "2026-08-01T00:00:00.000Z",
+        followup_resolved_at: "2026-09-10T22:00:00.000Z",
+        resolved_by_user_id: "CLEARER",
+      },
+    ];
+    expect(resolvedByFor(rows[0]!)).toBe("CLEARER");
+    const forClearer = countScopes(rows, {
+      meUserId: "CLEARER",
+      todayFromIso: from,
+      todayToIso: to,
+    });
+    expect(forClearer.resolvedByMeToday).toBe(1);
+    const forAssignee = countScopes(rows, { meUserId: "ME", todayFromIso: from, todayToIso: to });
+    expect(forAssignee.resolvedByMeToday).toBe(0);
+    // Workload scopes still follow the current assignee.
+    expect(forAssignee.resolvedToday).toBe(1);
+  });
+
+  it("never credits an unresolved cycle and keeps assignee-based workload scopes", () => {
+    const rows = [
+      {
+        outcome: "follow_up_open" as const,
+        assigned_user_id: "ME",
+        completed_at: "2026-09-10T20:00:00.000Z",
+        followup_resolved_at: null,
+        resolved_by_user_id: null,
+      },
+      {
+        outcome: "reopen_pending" as const,
+        assigned_user_id: "ME",
+        completed_at: "2026-09-10T20:00:00.000Z",
+        followup_resolved_at: null,
+        resolved_by_user_id: null,
+      },
+    ];
+    expect(resolvedByFor(rows[0]!)).toBeNull();
+    const c = countScopes(rows, { meUserId: "ME", todayFromIso: from, todayToIso: to });
+    expect(c).toMatchObject({ resolvedByMeToday: 0, myFollowUps: 1, myReopenPending: 1 });
+  });
+});
+
+describe("WP3B follow-up evidence is required before an action is offered", () => {
+  it("a ticked completion with no durable row is Open but never actionable", () => {
+    // Pre-migration state: outcome derivation reports Follow-up Open ...
+    expect(
+      deriveOutcome({
+        jobStatus: "Completed",
+        isDeleted: false,
+        completion: { follow_up_required: true },
+        followup: null,
+        hasPendingReopen: false,
+      }),
+    ).toBe("follow_up_open");
+    // ... but no Clear control is offered, and the pure rule blocks clearing,
+    // matching the server, which would reject it.
+    expect(
+      followupView({
+        job: completedJob,
+        followup: null,
+        actor: { actorUserId: "TECH1", isAdmin: true },
+      }),
+    ).toEqual({ mode: "hidden" });
+    expect(followupBlockedReason(completedJob, null)).toMatch(/no follow-up/);
+  });
+
+  it("the same completion is clearable once the materialised row exists", () => {
+    const materialised = followup({ state: "open" });
+    expect(
+      followupView({
+        job: completedJob,
+        followup: materialised,
+        actor: { actorUserId: "TECH1", isAdmin: false },
+      }),
+    ).toEqual({ mode: "open", canClear: true });
+    expect(followupBlockedReason(completedJob, materialised)).toBeNull();
+  });
+});
+
