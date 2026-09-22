@@ -7,7 +7,9 @@ import {
   outcomesForQueue,
   queueForCard,
   resolvedAtFor,
+  resolvedByFor,
 } from "@/lib/qne/dashboard/followup-scope";
+
 import {
   canClearFollowup,
   deriveOutcome,
