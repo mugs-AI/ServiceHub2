@@ -214,24 +214,13 @@ export function EntitlementCustomerScreen({
             ))}
           </select>
         </label>
-        <label className="block text-xs font-semibold text-muted-foreground">
-          Expiry From
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
-          />
-        </label>
-        <label className="block text-xs font-semibold text-muted-foreground">
-          Expiry To
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm font-normal text-foreground"
-          />
-        </label>
+        <MalaysiaDateInput
+          id="expiry-from"
+          label="Expiry From"
+          value={from}
+          onChange={setFrom}
+        />
+        <MalaysiaDateInput id="expiry-to" label="Expiry To" value={to} onChange={setTo} />
         <div className="grid grid-cols-2 gap-2">
           <label className="block text-xs font-semibold text-muted-foreground">
             Sort

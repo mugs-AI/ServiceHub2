@@ -481,6 +481,7 @@ function UserDashboard() {
             </FilterGroup>
             <FilterGroup label="From">
               <DateBox
+                label="From date (dd/mm/yyyy)"
                 value={filters.from}
                 onChange={(v) => {
                   setPage(1);
@@ -490,6 +491,7 @@ function UserDashboard() {
             </FilterGroup>
             <FilterGroup label="To">
               <DateBox
+                label="To date (dd/mm/yyyy)"
                 value={filters.to}
                 onChange={(v) => {
                   setPage(1);
@@ -682,13 +684,22 @@ function Pill({
   );
 }
 
-function DateBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function DateBox({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+}) {
+  // Malaysian standard: visible DD/MM/YYYY, ISO yyyy-mm-dd kept for the API.
   return (
-    <input
-      type="date"
+    <MalaysiaDateInput
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="min-h-[44px] rounded-md border bg-background px-2 text-sm"
+      onChange={onChange}
+      aria-label={label}
+      className="w-[10.5rem]"
     />
   );
 }
