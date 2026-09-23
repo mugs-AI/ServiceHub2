@@ -908,6 +908,13 @@ export type Database = {
             foreignKeyName: "service_job_activity_log_service_job_id_fkey"
             columns: ["service_job_id"]
             isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
+          {
+            foreignKeyName: "service_job_activity_log_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
             referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
@@ -960,6 +967,13 @@ export type Database = {
           tenant_code?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_job_assignment_history_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
           {
             foreignKeyName: "service_job_assignment_history_service_job_id_fkey"
             columns: ["service_job_id"]
@@ -1056,6 +1070,13 @@ export type Database = {
             foreignKeyName: "service_job_attachments_service_job_id_fkey"
             columns: ["service_job_id"]
             isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
+          {
+            foreignKeyName: "service_job_attachments_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
             referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
@@ -1127,6 +1148,13 @@ export type Database = {
             foreignKeyName: "service_job_cancellation_requests_service_job_id_fkey"
             columns: ["service_job_id"]
             isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
+          {
+            foreignKeyName: "service_job_cancellation_requests_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
             referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
@@ -1164,6 +1192,13 @@ export type Database = {
           visibility?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_job_comments_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
           {
             foreignKeyName: "service_job_comments_service_job_id_fkey"
             columns: ["service_job_id"]
@@ -1302,6 +1337,13 @@ export type Database = {
             foreignKeyName: "service_job_completions_service_job_id_fkey"
             columns: ["service_job_id"]
             isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
+          {
+            foreignKeyName: "service_job_completions_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
             referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
@@ -1310,6 +1352,92 @@ export type Database = {
             columns: ["signature_attachment_id"]
             isOneToOne: false
             referencedRelation: "service_job_attachments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_job_followups: {
+        Row: {
+          completion_cycle: number
+          completion_id: string
+          created_at: string
+          id: string
+          opened_at: string
+          opened_by_name_snapshot: string | null
+          opened_by_user_id: string | null
+          reopened_at: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by_name_snapshot: string | null
+          resolved_by_user_id: string | null
+          service_job_id: string
+          state: string
+          tenant_code: string
+          updated_at: string
+        }
+        Insert: {
+          completion_cycle: number
+          completion_id: string
+          created_at?: string
+          id?: string
+          opened_at?: string
+          opened_by_name_snapshot?: string | null
+          opened_by_user_id?: string | null
+          reopened_at?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by_name_snapshot?: string | null
+          resolved_by_user_id?: string | null
+          service_job_id: string
+          state?: string
+          tenant_code: string
+          updated_at?: string
+        }
+        Update: {
+          completion_cycle?: number
+          completion_id?: string
+          created_at?: string
+          id?: string
+          opened_at?: string
+          opened_by_name_snapshot?: string | null
+          opened_by_user_id?: string | null
+          reopened_at?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by_name_snapshot?: string | null
+          resolved_by_user_id?: string | null
+          service_job_id?: string
+          state?: string
+          tenant_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_job_followups_completion_id_fkey"
+            columns: ["completion_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["completion_id"]
+          },
+          {
+            foreignKeyName: "service_job_followups_completion_id_fkey"
+            columns: ["completion_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_job_followups_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
+          {
+            foreignKeyName: "service_job_followups_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -1349,6 +1477,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_job_job_folders_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
           {
             foreignKeyName: "service_job_job_folders_service_job_id_fkey"
             columns: ["service_job_id"]
@@ -1445,6 +1580,13 @@ export type Database = {
             foreignKeyName: "service_job_onsite_attendance_service_job_id_fkey"
             columns: ["service_job_id"]
             isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
+          {
+            foreignKeyName: "service_job_onsite_attendance_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
             referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
@@ -1506,6 +1648,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_job_reopen_requests_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
           {
             foreignKeyName: "service_job_reopen_requests_service_job_id_fkey"
             columns: ["service_job_id"]
@@ -1650,6 +1799,13 @@ export type Database = {
             foreignKeyName: "service_job_waiting_periods_service_job_id_fkey"
             columns: ["service_job_id"]
             isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
+          {
+            foreignKeyName: "service_job_waiting_periods_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
             referencedRelation: "service_jobs"
             referencedColumns: ["id"]
           },
@@ -1690,6 +1846,13 @@ export type Database = {
           visibility?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_job_work_notes_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
           {
             foreignKeyName: "service_job_work_notes_service_job_id_fkey"
             columns: ["service_job_id"]
@@ -1743,6 +1906,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_job_work_sessions_service_job_id_fkey"
+            columns: ["service_job_id"]
+            isOneToOne: false
+            referencedRelation: "service_job_completion_outcomes"
+            referencedColumns: ["service_job_id"]
+          },
           {
             foreignKeyName: "service_job_work_sessions_service_job_id_fkey"
             columns: ["service_job_id"]
@@ -2612,7 +2782,27 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      service_job_completion_outcomes: {
+        Row: {
+          assigned_user_id: string | null
+          completed_at: string | null
+          completed_by_user_id: string | null
+          completion_cycle: number | null
+          completion_id: string | null
+          follow_up_required: boolean | null
+          followup_id: string | null
+          followup_state: string | null
+          has_pending_reopen: boolean | null
+          job_number: string | null
+          job_status: string | null
+          outcome: string | null
+          resolved_at: string | null
+          resolved_by_user_id: string | null
+          service_job_id: string | null
+          tenant_code: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       sh_cancellation_cancel_direct: {
@@ -2656,6 +2846,17 @@ export type Database = {
           p_is_admin: boolean
           p_job_id: string
           p_payload?: Json
+          p_tenant_code: string
+        }
+        Returns: Json
+      }
+      sh_followup_clear: {
+        Args: {
+          p_actor_name: string
+          p_actor_user_id: string
+          p_is_admin: boolean
+          p_job_id: string
+          p_note: string
           p_tenant_code: string
         }
         Returns: Json
