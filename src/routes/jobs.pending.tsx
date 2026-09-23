@@ -189,6 +189,20 @@ function PendingQueuePage() {
     "legacy_completed",
   ].includes(queueType);
 
+  // WP3C UAT — mobile keeps a compact primary set; every other scope stays
+  // reachable through More Filters with the exact same scope key.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const mobilePrimaryTabs = primaryMobileQueues(visibleTabs);
+  const mobileSecondaryTabs = secondaryMobileQueues(visibleTabs);
+  const isTabActive = (key: string) =>
+    key === CANCELLATION_QUEUE ? isCancellationTab : key === queueType;
+  const activeSecondaryTab = mobileSecondaryTabs.find((t) => isTabActive(t.key)) ?? null;
+  const selectQueue = (key: string) => {
+    setQueueType(key);
+    setPage(1);
+  };
+
+
   const reload = useCallback(async () => {
     setLoading(true);
     setErr(null);
