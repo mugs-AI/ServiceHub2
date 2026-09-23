@@ -408,7 +408,7 @@ function AdminDashboard() {
 
       <DashboardSection
         title="Integration health"
-        description="Live N3 snapshot diagnostics for this tenant."
+        description="Live N3 snapshot diagnostics and data checks for this tenant."
       >
         {error && (
           <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
