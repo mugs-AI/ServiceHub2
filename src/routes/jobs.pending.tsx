@@ -312,18 +312,15 @@ function PendingQueuePage() {
         </Link>
       </header>
 
-      <div className="flex flex-wrap gap-1 rounded-lg border bg-card p-1">
+      {/* Desktop / tablet — the full scope set, unchanged. */}
+      <div className="hidden flex-wrap gap-1 rounded-lg border bg-card p-1 sm:flex">
         {visibleTabs.map((t) => {
-          const active =
-            t.key === CANCELLATION_QUEUE ? isCancellationTab : t.key === queueType;
+          const active = isTabActive(t.key);
           return (
             <button
               key={t.key || "all"}
               type="button"
-              onClick={() => {
-                setQueueType(t.key);
-                setPage(1);
-              }}
+              onClick={() => selectQueue(t.key)}
               className={`min-h-9 rounded-md px-3 text-xs font-semibold transition-colors ${
                 active
                   ? "bg-primary text-primary-foreground"
@@ -334,6 +331,85 @@ function PendingQueuePage() {
             </button>
           );
         })}
+      </div>
+
+      {/* Mobile — compact primary set, everything else in More Filters. */}
+      <div className="space-y-2 sm:hidden">
+        <div className="grid grid-cols-2 gap-1 rounded-lg border bg-card p-1">
+          {mobilePrimaryTabs.map((t) => {
+            const active = isTabActive(t.key);
+            return (
+              <button
+                key={t.key || "all"}
+                type="button"
+                onClick={() => selectQueue(t.key)}
+                className={`min-h-11 rounded-md px-3 text-xs font-semibold transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground ring-2 ring-primary/40"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="More filters"
+                className="inline-flex min-h-11 items-center gap-2 rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent"
+              >
+                More Filters
+                {activeSecondaryTab ? (
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                    1
+                  </span>
+                ) : null}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64 p-1">
+              <ul className="max-h-72 overflow-y-auto">
+                {mobileSecondaryTabs.map((t) => (
+                  <li key={t.key}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        selectQueue(t.key);
+                        setMoreOpen(false);
+                      }}
+                      className={`block w-full min-h-11 rounded-md px-3 text-left text-xs font-semibold ${
+                        isTabActive(t.key)
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+
+          {/* A non-primary scope stays visible outside the hidden list. */}
+          {activeSecondaryTab && (
+            <span className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary">
+              <span className="truncate">{activeSecondaryTab.label}</span>
+              <button
+                type="button"
+                aria-label="Clear filter"
+                onClick={() => selectQueue("")}
+                className="text-primary/70 hover:text-primary"
+              >
+                clear
+              </button>
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-3">
