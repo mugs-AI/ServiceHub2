@@ -9,6 +9,7 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EntitlementBadge, Skeleton } from "@/components/qne/badges";
+import { MalaysiaDateInput } from "@/components/qne/MalaysiaDateInput";
 import { formatMY } from "@/lib/format-date";
 import { getStoredToken } from "@/lib/qne/tokens";
 import type { EntitlementRecord } from "@/lib/qne/entitlements/types";
