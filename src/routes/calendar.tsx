@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { DaySchedule, useDaySchedule } from "@/components/qne/DaySchedule";
+import { MalaysiaDateInput } from "@/components/qne/MalaysiaDateInput";
 import { MonthSchedule, WeekSchedule, useRangeSchedule } from "@/components/qne/CalendarRangeViews";
 import {
   type CalendarView,
