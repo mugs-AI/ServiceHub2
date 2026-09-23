@@ -494,7 +494,7 @@ function HealthCard({ title, row, loading }: { title: string; row?: HealthRow; l
       </div>
       <div className="mt-2 text-xs text-muted-foreground">
         Last success:{" "}
-        {row?.last_successful_sync ? new Date(row.last_successful_sync).toLocaleString() : "—"}
+        {row?.last_successful_sync ? formatMYDateTime(row.last_successful_sync) : "—"}
       </div>
       {row?.error_message && (
         <div className="mt-1 line-clamp-2 text-xs text-destructive">{row.error_message}</div>
