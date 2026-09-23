@@ -45,7 +45,8 @@ function authHeaders(): Record<string, string> {
 
 function dueLabel(status: "due_soon" | "overdue", days: number | null): string {
   if (days == null) return "—";
-  if (status === "overdue") return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
+  if (status === "overdue")
+    return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
   return `${Math.max(days, 0)} day${Math.max(days, 0) === 1 ? "" : "s"} until due`;
 }
 
@@ -128,16 +129,13 @@ export function EntitlementCustomerScreen({
     return `${t.customers} customer${t.customers === 1 ? "" : "s"} · ${t.entitlements} entitlement record${t.entitlements === 1 ? "" : "s"}`;
   }, [data]);
 
-  const filtersActive =
-    Boolean(debounced.q || debounced.stock || category || from || to);
+  const filtersActive = Boolean(debounced.q || debounced.stock || category || from || to);
 
   return (
     <div className="space-y-4">
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:flex sm:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Entitlements
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Entitlements</p>
           <h1 className="mt-1 text-xl font-semibold text-foreground sm:text-2xl">{title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
           <p className="mt-2 text-sm font-semibold text-foreground">
@@ -215,12 +213,7 @@ export function EntitlementCustomerScreen({
             ))}
           </select>
         </label>
-        <MalaysiaDateInput
-          id="expiry-from"
-          label="Expiry From"
-          value={from}
-          onChange={setFrom}
-        />
+        <MalaysiaDateInput id="expiry-from" label="Expiry From" value={from} onChange={setFrom} />
         <MalaysiaDateInput id="expiry-to" label="Expiry To" value={to} onChange={setTo} />
         <div className="grid grid-cols-2 gap-2">
           <label className="block text-xs font-semibold text-muted-foreground">

@@ -80,19 +80,49 @@ interface ReopenRow {
 }
 
 const QUEUE_TABS = [
-  { key: "", label: "All Pending", emptyMsg: "No jobs currently require action.", adminOnly: false },
+  {
+    key: "",
+    label: "All Pending",
+    emptyMsg: "No jobs currently require action.",
+    adminOnly: false,
+  },
   { key: "draft", label: "Draft", emptyMsg: "No Draft jobs.", adminOnly: false },
-  { key: "pending_approval", label: "Job Approvals", emptyMsg: "No Job Approvals pending.", adminOnly: false },
+  {
+    key: "pending_approval",
+    label: "Job Approvals",
+    emptyMsg: "No Job Approvals pending.",
+    adminOnly: false,
+  },
   {
     key: CANCELLATION_QUEUE,
     label: "Cancellation Requested",
     emptyMsg: "No jobs with a pending cancellation request.",
     adminOnly: false,
   },
-  { key: "open_unassigned", label: "Open · Unassigned", emptyMsg: "No Open unassigned jobs.", adminOnly: false },
-  { key: "assigned_not_started", label: "Assigned", emptyMsg: "No Assigned jobs.", adminOnly: false },
-  { key: "waiting_customer", label: "Waiting Customer", emptyMsg: "No jobs waiting on customer.", adminOnly: false },
-  { key: "waiting_vendor", label: "Waiting Vendor", emptyMsg: "No jobs waiting on vendor.", adminOnly: false },
+  {
+    key: "open_unassigned",
+    label: "Open · Unassigned",
+    emptyMsg: "No Open unassigned jobs.",
+    adminOnly: false,
+  },
+  {
+    key: "assigned_not_started",
+    label: "Assigned",
+    emptyMsg: "No Assigned jobs.",
+    adminOnly: false,
+  },
+  {
+    key: "waiting_customer",
+    label: "Waiting Customer",
+    emptyMsg: "No jobs waiting on customer.",
+    adminOnly: false,
+  },
+  {
+    key: "waiting_vendor",
+    label: "Waiting Vendor",
+    emptyMsg: "No jobs waiting on vendor.",
+    adminOnly: false,
+  },
   // WP3A categories. The keys are the stable URL values used by dashboard
   // deep links, so a bookmarked link keeps working.
   {
@@ -110,15 +140,30 @@ const QUEUE_TABS = [
   { key: QUEUE_COMPLETED, label: "Completed", emptyMsg: "No completed jobs.", adminOnly: false },
   // WP3B outcome scopes — membership comes from the shared completion read
   // model, the same derivation the dashboard cards count with.
-  { key: "follow_up_open", label: "Follow-up Open", emptyMsg: "No open follow-ups.", adminOnly: false },
-  { key: "reopen_pending", label: "Reopen Pending", emptyMsg: "No reopen-pending jobs.", adminOnly: false },
+  {
+    key: "follow_up_open",
+    label: "Follow-up Open",
+    emptyMsg: "No open follow-ups.",
+    adminOnly: false,
+  },
+  {
+    key: "reopen_pending",
+    label: "Reopen Pending",
+    emptyMsg: "No reopen-pending jobs.",
+    adminOnly: false,
+  },
   { key: "resolved", label: "Resolved", emptyMsg: "No resolved jobs.", adminOnly: false },
   // WP3C Admin Dashboard destinations. Each key is the exact scope the
   // matching Admin card counted.
   { key: "jobs_today", label: "Jobs Today", emptyMsg: "No jobs created today.", adminOnly: false },
   { key: "active", label: "Active Jobs", emptyMsg: "No active jobs.", adminOnly: false },
   { key: "in_progress", label: "In Progress", emptyMsg: "No jobs in progress.", adminOnly: false },
-  { key: "resolved_today", label: "Resolved Today", emptyMsg: "Nothing resolved today yet.", adminOnly: false },
+  {
+    key: "resolved_today",
+    label: "Resolved Today",
+    emptyMsg: "Nothing resolved today yet.",
+    adminOnly: false,
+  },
   {
     key: "completed_current_cycle",
     label: "Completed (Current Cycle)",
@@ -138,8 +183,7 @@ export const Route = createFileRoute("/jobs/pending")({
     scope: s.scope === "team" ? ("team" as const) : undefined,
     queueType: typeof s.queueType === "string" ? s.queueType : undefined,
     technician: typeof s.technician === "string" ? s.technician : undefined,
-    technicianName:
-      typeof s.technicianName === "string" ? s.technicianName : undefined,
+    technicianName: typeof s.technicianName === "string" ? s.technicianName : undefined,
   }),
   component: PendingQueuePage,
 });
@@ -201,7 +245,6 @@ function PendingQueuePage() {
     setQueueType(key);
     setPage(1);
   };
-
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -294,9 +337,7 @@ function PendingQueuePage() {
     <div className="space-y-4">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Workspace
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Workspace</p>
           <h1 className="mt-1 text-2xl font-semibold text-foreground">
             {excludeMe ? "Pending from My Team" : "Pending Queue"}
           </h1>
@@ -323,10 +364,7 @@ function PendingQueuePage() {
             </p>
           )}
         </div>
-        <Link
-          to="/support"
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
+        <Link to="/support" className="text-sm text-muted-foreground hover:text-foreground">
           ← Workspace
         </Link>
       </header>
@@ -457,9 +495,7 @@ function PendingQueuePage() {
       </div>
 
       {err && (
-        <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {err}
-        </div>
+        <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>
       )}
       {loading && (
         <div className="space-y-2">
@@ -661,4 +697,3 @@ function PendingQueuePage() {
     </div>
   );
 }
-
