@@ -146,14 +146,21 @@ export const ADMIN_COMPLETION_INTEGRITY: readonly AdminCardDef[] = [
     meaning: "Resolved + Follow-up Open + Reopen Pending",
     queueType: "completed_current_cycle",
   },
-  {
-    label: "Legacy Completed / Evidence Missing",
-    key: "legacyCompleted",
-    tone: "navy",
-    meaning: "Audit indicator — never counted as Resolved",
-    queueType: "legacy_completed",
-  },
 ] as const;
+
+/**
+ * WP3C UAT — audit-oriented alert. It keeps its exact count and click-through
+ * scope (`legacy_completed`), but lives in the lower System / Integration
+ * health area instead of the prospect-facing business card groups. It is never
+ * hidden when non-zero.
+ */
+export const ADMIN_COMPLETION_DATA_ALERT: AdminCardDef = {
+  label: "Completion Data Alert",
+  key: "legacyCompleted",
+  tone: "navy",
+  meaning: "Completed jobs missing completion records",
+  queueType: "legacy_completed",
+} as const;
 
 export const ADMIN_CARD_GROUPS: readonly {
   title: string;
@@ -182,4 +189,7 @@ export const ADMIN_CARD_GROUPS: readonly {
   },
 ] as const;
 
-export const ALL_ADMIN_CARDS: readonly AdminCardDef[] = ADMIN_CARD_GROUPS.flatMap((g) => g.cards);
+export const ALL_ADMIN_CARDS: readonly AdminCardDef[] = [
+  ...ADMIN_CARD_GROUPS.flatMap((g) => g.cards),
+  ADMIN_COMPLETION_DATA_ALERT,
+];

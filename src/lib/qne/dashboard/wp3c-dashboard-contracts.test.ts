@@ -29,6 +29,7 @@ import {
   ADMIN_LIVE_OPERATIONS,
   ADMIN_COVERAGE,
   ADMIN_COMPLETION_INTEGRITY,
+  ADMIN_COMPLETION_DATA_ALERT,
 } from "./admin-cards";
 import { countScopes, matchesWp3bCard, type ScopeRow } from "./followup-scope";
 
@@ -202,10 +203,25 @@ describe("WP3C — Admin Dashboard cards", () => {
       "Resolved Today",
     ]);
     expect(ADMIN_COVERAGE.map((c) => c.label)).toEqual(["Due Soon Customers", "Overdue Customers"]);
-    expect(ADMIN_COMPLETION_INTEGRITY.map((c) => c.label)).toEqual([
-      "Completed Current Cycle",
-      "Legacy Completed / Evidence Missing",
-    ]);
+    expect(ADMIN_COMPLETION_INTEGRITY.map((c) => c.label)).toEqual(["Completed Current Cycle"]);
+  });
+
+  it("keeps the audit alert out of the business groups but fully actionable", () => {
+    // Renamed for clarity, moved to the System / Integration health area, and
+    // still counting and opening the exact same server-authoritative scope.
+    expect(ADMIN_COMPLETION_DATA_ALERT.label).toBe("Completion Data Alert");
+    expect(ADMIN_COMPLETION_DATA_ALERT.key).toBe("legacyCompleted");
+    expect(ADMIN_COMPLETION_DATA_ALERT.queueType).toBe("legacy_completed");
+    for (const group of ADMIN_CARD_GROUPS) {
+      expect(group.cards.some((c) => c.key === "legacyCompleted")).toBe(false);
+    }
+    expect(ALL_ADMIN_CARDS).toContain(ADMIN_COMPLETION_DATA_ALERT);
+
+    const ui = read("src/routes/admin.dashboard.tsx");
+    expect(ui).toContain("ADMIN_COMPLETION_DATA_ALERT");
+    expect(ui).toContain("Integration health");
+    // Never hidden when non-zero: rendered unconditionally with a click-through.
+    expect(ui).toContain("openCard(ADMIN_COMPLETION_DATA_ALERT)");
   });
 
   it("gives every card exactly one destination", () => {

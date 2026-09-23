@@ -154,7 +154,10 @@ describe("Pending Queue categories", () => {
     expect(pendingUi).toContain("QUEUE_COMPLETED");
     expect(pendingUi).toContain('label: "Reopen Requests"');
     expect(pendingUi).toContain('label: "Completed Follow-up"');
-    expect(pendingUi).toMatch(/setQueueType\(t\.key\);\s*\n\s*setPage\(1\)/);
+    // Both the desktop tab bar and the mobile compact set select through the
+    // one handler, which resets paging.
+    expect(pendingUi).toMatch(/setQueueType\(key\);\s*\n\s*setPage\(1\)/);
+    expect(pendingUi).toContain("selectQueue(t.key)");
   });
 
   it("keeps the existing queue tabs", () => {

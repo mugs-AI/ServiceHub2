@@ -22,11 +22,13 @@ import {
 } from "lucide-react";
 
 import { AdminOnly } from "@/components/qne/AdminOnly";
+import { formatMYDateTime } from "@/lib/format-date";
 import { StatCard } from "./dashboard";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 import {
   ADMIN_CARD_GROUPS,
+  ADMIN_COMPLETION_DATA_ALERT,
   type AdminCardDef,
   type AdminSummaryKey,
 } from "@/lib/qne/dashboard/admin-cards";
@@ -211,7 +213,8 @@ function AdminDashboard() {
     .filter((x): x is string => !!x)
     .sort()
     .reverse();
-  const lastSyncLabel = lastSyncs.length > 0 ? new Date(lastSyncs[0]).toLocaleString() : "—";
+  // Malaysian standard: dd/mm/yyyy, Malaysia time.
+  const lastSyncLabel = lastSyncs.length > 0 ? formatMYDateTime(lastSyncs[0]) : "—";
 
   const s = ops?.summary;
   const showSkeleton = opsLoading && !ops;
@@ -407,7 +410,7 @@ function AdminDashboard() {
 
       <DashboardSection
         title="Integration health"
-        description="Live N3 snapshot diagnostics for this tenant."
+        description="Live N3 snapshot diagnostics and data checks for this tenant."
       >
         {error && (
           <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
@@ -425,7 +428,7 @@ function AdminDashboard() {
             loading={loading}
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           <DashboardStatCard
             label="Last Synchronization"
             value={lastSyncLabel}
@@ -437,6 +440,19 @@ function AdminDashboard() {
             value={failedCount}
             icon={AlertTriangle}
             tone={failedCount > 0 ? "rose" : "emerald"}
+          />
+          {/* Audit alert — same count, same click-through scope, never hidden. */}
+          <DashboardStatCard
+            label={ADMIN_COMPLETION_DATA_ALERT.label}
+            value={s ? (s[ADMIN_COMPLETION_DATA_ALERT.key] ?? 0) : "—"}
+            meaning={ADMIN_COMPLETION_DATA_ALERT.meaning}
+            icon={CARD_ICONS[ADMIN_COMPLETION_DATA_ALERT.key]}
+            tone={
+              s && (s[ADMIN_COMPLETION_DATA_ALERT.key] ?? 0) > 0
+                ? "rose"
+                : (ADMIN_COMPLETION_DATA_ALERT.tone as DashboardTone)
+            }
+            onClick={() => openCard(ADMIN_COMPLETION_DATA_ALERT)}
           />
           <div className="opacity-70">
             <StatCard label="Calculation Errors" tone="grey" comingSoon />
@@ -477,8 +493,7 @@ function HealthCard({ title, row, loading }: { title: string; row?: HealthRow; l
         </span>
       </div>
       <div className="mt-2 text-xs text-muted-foreground">
-        Last success:{" "}
-        {row?.last_successful_sync ? new Date(row.last_successful_sync).toLocaleString() : "—"}
+        Last success: {row?.last_successful_sync ? formatMYDateTime(row.last_successful_sync) : "—"}
       </div>
       {row?.error_message && (
         <div className="mt-1 line-clamp-2 text-xs text-destructive">{row.error_message}</div>

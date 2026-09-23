@@ -11,6 +11,11 @@ import {
   QUEUE_COMPLETED_FOLLOWUP,
   QUEUE_REOPEN_REQUESTS,
 } from "@/lib/qne/service-jobs/wp3a-queues";
+import {
+  primaryMobileQueues,
+  secondaryMobileQueues,
+} from "@/lib/qne/dashboard/pending-queue-mobile";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /** Owner/Admin decision queue row (GET /api/admin/cancellation-requests). */
 interface CancellationRow {
@@ -75,19 +80,49 @@ interface ReopenRow {
 }
 
 const QUEUE_TABS = [
-  { key: "", label: "All Pending", emptyMsg: "No jobs currently require action.", adminOnly: false },
+  {
+    key: "",
+    label: "All Pending",
+    emptyMsg: "No jobs currently require action.",
+    adminOnly: false,
+  },
   { key: "draft", label: "Draft", emptyMsg: "No Draft jobs.", adminOnly: false },
-  { key: "pending_approval", label: "Job Approvals", emptyMsg: "No Job Approvals pending.", adminOnly: false },
+  {
+    key: "pending_approval",
+    label: "Job Approvals",
+    emptyMsg: "No Job Approvals pending.",
+    adminOnly: false,
+  },
   {
     key: CANCELLATION_QUEUE,
     label: "Cancellation Requested",
     emptyMsg: "No jobs with a pending cancellation request.",
     adminOnly: false,
   },
-  { key: "open_unassigned", label: "Open · Unassigned", emptyMsg: "No Open unassigned jobs.", adminOnly: false },
-  { key: "assigned_not_started", label: "Assigned", emptyMsg: "No Assigned jobs.", adminOnly: false },
-  { key: "waiting_customer", label: "Waiting Customer", emptyMsg: "No jobs waiting on customer.", adminOnly: false },
-  { key: "waiting_vendor", label: "Waiting Vendor", emptyMsg: "No jobs waiting on vendor.", adminOnly: false },
+  {
+    key: "open_unassigned",
+    label: "Open · Unassigned",
+    emptyMsg: "No Open unassigned jobs.",
+    adminOnly: false,
+  },
+  {
+    key: "assigned_not_started",
+    label: "Assigned",
+    emptyMsg: "No Assigned jobs.",
+    adminOnly: false,
+  },
+  {
+    key: "waiting_customer",
+    label: "Waiting Customer",
+    emptyMsg: "No jobs waiting on customer.",
+    adminOnly: false,
+  },
+  {
+    key: "waiting_vendor",
+    label: "Waiting Vendor",
+    emptyMsg: "No jobs waiting on vendor.",
+    adminOnly: false,
+  },
   // WP3A categories. The keys are the stable URL values used by dashboard
   // deep links, so a bookmarked link keeps working.
   {
@@ -105,15 +140,30 @@ const QUEUE_TABS = [
   { key: QUEUE_COMPLETED, label: "Completed", emptyMsg: "No completed jobs.", adminOnly: false },
   // WP3B outcome scopes — membership comes from the shared completion read
   // model, the same derivation the dashboard cards count with.
-  { key: "follow_up_open", label: "Follow-up Open", emptyMsg: "No open follow-ups.", adminOnly: false },
-  { key: "reopen_pending", label: "Reopen Pending", emptyMsg: "No reopen-pending jobs.", adminOnly: false },
+  {
+    key: "follow_up_open",
+    label: "Follow-up Open",
+    emptyMsg: "No open follow-ups.",
+    adminOnly: false,
+  },
+  {
+    key: "reopen_pending",
+    label: "Reopen Pending",
+    emptyMsg: "No reopen-pending jobs.",
+    adminOnly: false,
+  },
   { key: "resolved", label: "Resolved", emptyMsg: "No resolved jobs.", adminOnly: false },
   // WP3C Admin Dashboard destinations. Each key is the exact scope the
   // matching Admin card counted.
   { key: "jobs_today", label: "Jobs Today", emptyMsg: "No jobs created today.", adminOnly: false },
   { key: "active", label: "Active Jobs", emptyMsg: "No active jobs.", adminOnly: false },
   { key: "in_progress", label: "In Progress", emptyMsg: "No jobs in progress.", adminOnly: false },
-  { key: "resolved_today", label: "Resolved Today", emptyMsg: "Nothing resolved today yet.", adminOnly: false },
+  {
+    key: "resolved_today",
+    label: "Resolved Today",
+    emptyMsg: "Nothing resolved today yet.",
+    adminOnly: false,
+  },
   {
     key: "completed_current_cycle",
     label: "Completed (Current Cycle)",
@@ -133,8 +183,7 @@ export const Route = createFileRoute("/jobs/pending")({
     scope: s.scope === "team" ? ("team" as const) : undefined,
     queueType: typeof s.queueType === "string" ? s.queueType : undefined,
     technician: typeof s.technician === "string" ? s.technician : undefined,
-    technicianName:
-      typeof s.technicianName === "string" ? s.technicianName : undefined,
+    technicianName: typeof s.technicianName === "string" ? s.technicianName : undefined,
   }),
   component: PendingQueuePage,
 });
@@ -183,6 +232,19 @@ function PendingQueuePage() {
     "completed_current_cycle",
     "legacy_completed",
   ].includes(queueType);
+
+  // WP3C UAT — mobile keeps a compact primary set; every other scope stays
+  // reachable through More Filters with the exact same scope key.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const mobilePrimaryTabs = primaryMobileQueues(visibleTabs);
+  const mobileSecondaryTabs = secondaryMobileQueues(visibleTabs);
+  const isTabActive = (key: string) =>
+    key === CANCELLATION_QUEUE ? isCancellationTab : key === queueType;
+  const activeSecondaryTab = mobileSecondaryTabs.find((t) => isTabActive(t.key)) ?? null;
+  const selectQueue = (key: string) => {
+    setQueueType(key);
+    setPage(1);
+  };
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -275,9 +337,7 @@ function PendingQueuePage() {
     <div className="space-y-4">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Workspace
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Workspace</p>
           <h1 className="mt-1 text-2xl font-semibold text-foreground">
             {excludeMe ? "Pending from My Team" : "Pending Queue"}
           </h1>
@@ -304,26 +364,20 @@ function PendingQueuePage() {
             </p>
           )}
         </div>
-        <Link
-          to="/support"
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
+        <Link to="/support" className="text-sm text-muted-foreground hover:text-foreground">
           ← Workspace
         </Link>
       </header>
 
-      <div className="flex flex-wrap gap-1 rounded-lg border bg-card p-1">
+      {/* Desktop / tablet — the full scope set, unchanged. */}
+      <div className="hidden flex-wrap gap-1 rounded-lg border bg-card p-1 sm:flex">
         {visibleTabs.map((t) => {
-          const active =
-            t.key === CANCELLATION_QUEUE ? isCancellationTab : t.key === queueType;
+          const active = isTabActive(t.key);
           return (
             <button
               key={t.key || "all"}
               type="button"
-              onClick={() => {
-                setQueueType(t.key);
-                setPage(1);
-              }}
+              onClick={() => selectQueue(t.key)}
               className={`min-h-9 rounded-md px-3 text-xs font-semibold transition-colors ${
                 active
                   ? "bg-primary text-primary-foreground"
@@ -334,6 +388,85 @@ function PendingQueuePage() {
             </button>
           );
         })}
+      </div>
+
+      {/* Mobile — compact primary set, everything else in More Filters. */}
+      <div className="space-y-2 sm:hidden">
+        <div className="grid grid-cols-2 gap-1 rounded-lg border bg-card p-1">
+          {mobilePrimaryTabs.map((t) => {
+            const active = isTabActive(t.key);
+            return (
+              <button
+                key={t.key || "all"}
+                type="button"
+                onClick={() => selectQueue(t.key)}
+                className={`min-h-11 rounded-md px-3 text-xs font-semibold transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground ring-2 ring-primary/40"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="More filters"
+                className="inline-flex min-h-11 items-center gap-2 rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent"
+              >
+                More Filters
+                {activeSecondaryTab ? (
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                    1
+                  </span>
+                ) : null}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64 p-1">
+              <ul className="max-h-72 overflow-y-auto">
+                {mobileSecondaryTabs.map((t) => (
+                  <li key={t.key}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        selectQueue(t.key);
+                        setMoreOpen(false);
+                      }}
+                      className={`block w-full min-h-11 rounded-md px-3 text-left text-xs font-semibold ${
+                        isTabActive(t.key)
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+
+          {/* A non-primary scope stays visible outside the hidden list. */}
+          {activeSecondaryTab && (
+            <span className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary">
+              <span className="truncate">{activeSecondaryTab.label}</span>
+              <button
+                type="button"
+                aria-label="Clear filter"
+                onClick={() => selectQueue("")}
+                className="text-primary/70 hover:text-primary"
+              >
+                clear
+              </button>
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-3">
@@ -362,9 +495,7 @@ function PendingQueuePage() {
       </div>
 
       {err && (
-        <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {err}
-        </div>
+        <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>
       )}
       {loading && (
         <div className="space-y-2">
@@ -566,4 +697,3 @@ function PendingQueuePage() {
     </div>
   );
 }
-

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { DaySchedule, useDaySchedule } from "@/components/qne/DaySchedule";
+import { MalaysiaDateInput } from "@/components/qne/MalaysiaDateInput";
 import { MonthSchedule, WeekSchedule, useRangeSchedule } from "@/components/qne/CalendarRangeViews";
 import {
   type CalendarView,
@@ -143,11 +144,11 @@ function CalendarPage() {
           >
             ← Prev
           </button>
-          <input
-            type="date"
+          <MalaysiaDateInput
             value={date}
-            onChange={(e) => setDate(e.target.value || myDayKey())}
-            className="min-h-11 rounded-md border bg-background px-3 text-sm text-foreground"
+            onChange={(iso) => setDate(iso || myDayKey())}
+            aria-label="Calendar date (dd/mm/yyyy)"
+            className="w-[10.5rem]"
           />
           <button
             type="button"
