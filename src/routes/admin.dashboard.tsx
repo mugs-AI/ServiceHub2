@@ -212,7 +212,8 @@ function AdminDashboard() {
     .filter((x): x is string => !!x)
     .sort()
     .reverse();
-  const lastSyncLabel = lastSyncs.length > 0 ? new Date(lastSyncs[0]).toLocaleString() : "—";
+  // Malaysian standard: dd/mm/yyyy, Malaysia time.
+  const lastSyncLabel = lastSyncs.length > 0 ? formatMYDateTime(lastSyncs[0]) : "—";
 
   const s = ops?.summary;
   const showSkeleton = opsLoading && !ops;
@@ -426,7 +427,7 @@ function AdminDashboard() {
             loading={loading}
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           <DashboardStatCard
             label="Last Synchronization"
             value={lastSyncLabel}
@@ -438,6 +439,19 @@ function AdminDashboard() {
             value={failedCount}
             icon={AlertTriangle}
             tone={failedCount > 0 ? "rose" : "emerald"}
+          />
+          {/* Audit alert — same count, same click-through scope, never hidden. */}
+          <DashboardStatCard
+            label={ADMIN_COMPLETION_DATA_ALERT.label}
+            value={s ? (s[ADMIN_COMPLETION_DATA_ALERT.key] ?? 0) : "—"}
+            meaning={ADMIN_COMPLETION_DATA_ALERT.meaning}
+            icon={CARD_ICONS[ADMIN_COMPLETION_DATA_ALERT.key]}
+            tone={
+              s && (s[ADMIN_COMPLETION_DATA_ALERT.key] ?? 0) > 0
+                ? "rose"
+                : (ADMIN_COMPLETION_DATA_ALERT.tone as DashboardTone)
+            }
+            onClick={() => openCard(ADMIN_COMPLETION_DATA_ALERT)}
           />
           <div className="opacity-70">
             <StatCard label="Calculation Errors" tone="grey" comingSoon />
