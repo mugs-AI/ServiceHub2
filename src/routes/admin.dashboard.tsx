@@ -27,6 +27,7 @@ import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 import {
   ADMIN_CARD_GROUPS,
+  ADMIN_COMPLETION_DATA_ALERT,
   type AdminCardDef,
   type AdminSummaryKey,
 } from "@/lib/qne/dashboard/admin-cards";

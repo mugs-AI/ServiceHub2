@@ -189,4 +189,7 @@ export const ADMIN_CARD_GROUPS: readonly {
   },
 ] as const;
 
-export const ALL_ADMIN_CARDS: readonly AdminCardDef[] = ADMIN_CARD_GROUPS.flatMap((g) => g.cards);
+export const ALL_ADMIN_CARDS: readonly AdminCardDef[] = [
+  ...ADMIN_CARD_GROUPS.flatMap((g) => g.cards),
+  ADMIN_COMPLETION_DATA_ALERT,
+];
