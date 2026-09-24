@@ -6,16 +6,22 @@ import { useTabs } from "@/lib/tabs";
 import { useSession } from "@/lib/qne/session-context";
 import { formatMYDateTime } from "@/lib/format-date";
 import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
+import { QUEUE_REOPEN_REQUESTS } from "@/lib/qne/service-jobs/wp3a-queues";
 import {
-  QUEUE_COMPLETED,
-  QUEUE_COMPLETED_FOLLOWUP,
-  QUEUE_REOPEN_REQUESTS,
-} from "@/lib/qne/service-jobs/wp3a-queues";
-import {
-  primaryMobileQueues,
-  secondaryMobileQueues,
-} from "@/lib/qne/dashboard/pending-queue-mobile";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+  APPROVAL_TYPES,
+  COMPLETED_PAGE_SIZES,
+  COMPLETED_SUBFILTERS,
+  QUEUE_GROUPS,
+  WAITING_SUBFILTERS,
+  type QueueGroup,
+  type QueueView,
+  defaultCompletedRange,
+  defaultScopeForGroup,
+  serverQueueTypeFor,
+  usesDefaultCompletedRange,
+  viewForQueueKey,
+} from "@/lib/qne/dashboard/pending-queue-groups";
+import { MalaysiaDateInput } from "@/components/qne/MalaysiaDateInput";
 
 /** Owner/Admin decision queue row (GET /api/admin/cancellation-requests). */
 interface CancellationRow {
@@ -60,6 +66,8 @@ interface QueueRow {
   completed_at?: string | null;
   /** Owner/Admin only — set by the server for Jobs with an active request. */
   has_active_cancellation_request?: boolean;
+  /** Completion outcome indicator, when decided by the outcome read model. */
+  outcome?: string | null;
 }
 
 /** WP3A — pending reopen request row (GET /api/workspace/reopen-requests). */
@@ -135,12 +143,17 @@ function authHeaders(): Record<string, string> {
 function PendingQueuePage() {
   const { scope, queueType: qtInit, technician: techInit, technicianName } = Route.useSearch();
   const excludeMe = scope === "team";
-  const [queueType, setQueueType] = useState<string>(qtInit ?? "");
+  const [view, setView] = useState<QueueView>(() => viewForQueueKey(qtInit));
   const [q, setQ] = useState("");
   const [priority, setPriority] = useState("");
   const [technicianFilter] = useState<string>(techInit ?? "");
   const [page, setPage] = useState(1);
-  const pageSize = 25;
+  const [completedPageSize, setCompletedPageSize] = useState<number>(20);
+  // WP3C-2 — Completed is server-bounded: latest three Malaysia months by
+  // default; dashboard deep links open without a window to keep count parity.
+  const [completedRange, setCompletedRange] = useState<{ from: string; to: string }>(() =>
+    usesDefaultCompletedRange(qtInit) ? defaultCompletedRange() : { from: "", to: "" },
+  );
 
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [cancelRows, setCancelRows] = useState<CancellationRow[]>([]);
@@ -153,132 +166,171 @@ function PendingQueuePage() {
   const { openJobTab } = useTabs();
   const { currentUser } = useSession();
   const isAdmin = !!currentUser?.isAdministrator;
-  const visibleTabs = QUEUE_TABS.filter((t) => !t.adminOnly || isAdmin);
-  const isCancellationTab =
-    queueType === CANCELLATION_QUEUE || queueType === CANCELLATION_WORKSPACE_QUEUE;
-  // Owner/Admin keep the rich decision queue; Normal Users get the safe,
-  // Job-state-only Workspace view of the very same tab.
-  const cancellationView = isCancellationTab && isAdmin;
-  // WP3A — the Reopen Requests tab reads its own tenant-scoped request list.
-  const reopenView = queueType === QUEUE_REOPEN_REQUESTS;
-  const isCompletedTab = [
-    QUEUE_COMPLETED,
-    QUEUE_COMPLETED_FOLLOWUP,
-    "follow_up_open",
-    "reopen_pending",
-    "resolved",
-    "resolved_today",
-    "completed_current_cycle",
-    "legacy_completed",
-  ].includes(queueType);
 
-  // WP3C UAT — mobile keeps a compact primary set; every other scope stays
-  // reachable through More Filters with the exact same scope key.
-  const [moreOpen, setMoreOpen] = useState(false);
-  const mobilePrimaryTabs = primaryMobileQueues(visibleTabs);
-  const mobileSecondaryTabs = secondaryMobileQueues(visibleTabs);
-  const isTabActive = (key: string) =>
-    key === CANCELLATION_QUEUE ? isCancellationTab : key === queueType;
-  const activeSecondaryTab = mobileSecondaryTabs.find((t) => isTabActive(t.key)) ?? null;
-  const selectQueue = (key: string) => {
-    setQueueType(key);
+  const isCompletedGroup = view.group === "completed";
+  const pageSize = isCompletedGroup ? completedPageSize : 25;
+  const approvalsAll = view.group === "approvals" && view.scope === "";
+  const isCancellationScope = view.group === "approvals" && view.scope === CANCELLATION_QUEUE;
+  const reopenScope = view.group === "approvals" && view.scope === QUEUE_REOPEN_REQUESTS;
+  const serverQueueType = serverQueueTypeFor(view);
+
+  const selectGroup = (group: QueueGroup) => {
+    setView({ group, scope: defaultScopeForGroup(group), chip: null });
+    if (group === "completed" && !completedRange.from && !completedRange.to) {
+      setCompletedRange(defaultCompletedRange());
+    }
     setPage(1);
   };
+  const selectScope = (scopeKey: string) => {
+    setView((v) => ({ group: v.group, scope: scopeKey, chip: null }));
+    setPage(1);
+  };
+  const clearChip = () => selectGroup(view.group);
 
   const reload = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
-      const sp = new URLSearchParams();
-      sp.set("page", String(page));
-      sp.set("pageSize", String(pageSize));
-      if (q.trim()) sp.set("q", q.trim());
-      if (priority) sp.set("priority", priority);
+      const base = new URLSearchParams();
+      base.set("page", String(page));
+      base.set("pageSize", String(pageSize));
+      if (q.trim()) base.set("q", q.trim());
+      if (priority) base.set("priority", priority);
 
-      if (cancellationView) {
-        const res = await fetch(`/api/admin/cancellation-requests?${sp.toString()}`, {
-          headers: authHeaders(),
-        });
+      const loadCancellations = async (sp: URLSearchParams) => {
+        if (isAdmin) {
+          const res = await fetch(`/api/admin/cancellation-requests?${sp.toString()}`, {
+            headers: authHeaders(),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body?.error ?? "Failed to load cancellation requests");
+          return { admin: (body.requests ?? []) as CancellationRow[], jobs: [] as QueueRow[], total: Number(body.total ?? 0) };
+        }
+        // Normal Users see the safe, Job-state-only view of the same scope.
+        const js = new URLSearchParams(sp);
+        js.set("queueType", CANCELLATION_WORKSPACE_QUEUE);
+        if (technicianFilter) js.set("technician", technicianFilter);
+        if (excludeMe) js.set("excludeMe", "1");
+        const res = await fetch(`/api/workspace/jobs/pending?${js.toString()}`, { headers: authHeaders() });
         const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body?.error ?? "Failed to load cancellation requests");
-        setCancelRows(body.requests ?? []);
-        setRows([]);
-        setReopenRows([]);
-        setTotal(body.total ?? 0);
-        return;
-      }
-
-      if (reopenView) {
+        if (!res.ok) throw new Error(body?.error ?? "Failed to load queue");
+        return { admin: [] as CancellationRow[], jobs: (body.jobs ?? []) as QueueRow[], total: Number(body.total ?? 0) };
+      };
+      const loadReopens = async (sp: URLSearchParams) => {
         const res = await fetch(`/api/workspace/reopen-requests?${sp.toString()}`, {
           headers: authHeaders(),
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body?.error ?? "Failed to load reopen requests");
-        setReopenRows(body.requests ?? []);
-        setRows([]);
-        setCancelRows([]);
-        setTotal(body.total ?? 0);
+        return { rows: (body.requests ?? []) as ReopenRow[], total: Number(body.total ?? 0) };
+      };
+      const loadJobs = async (queue: string) => {
+        const sp = new URLSearchParams(base);
+        if (queue) sp.set("queueType", queue);
+        if (technicianFilter) sp.set("technician", technicianFilter);
+        if (excludeMe) sp.set("excludeMe", "1");
+        if (isCompletedGroup) {
+          if (completedRange.from) sp.set("completedFrom", completedRange.from);
+          if (completedRange.to) sp.set("completedTo", completedRange.to);
+        }
+        const res = await fetch(`/api/workspace/jobs/pending?${sp.toString()}`, {
+          headers: authHeaders(),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error ?? "Failed to load queue");
+        return { rows: (body.jobs ?? []) as QueueRow[], total: Number(body.total ?? 0) };
+      };
+
+      if (approvalsAll) {
+        // Approvals > All: every pending approval type, each with its type
+        // indicator. Each source stays tenant/role scoped by its own API.
+        const [jobs, cancels, reopens] = await Promise.all([
+          loadJobs("pending_approval"),
+          loadCancellations(base),
+          loadReopens(base),
+        ]);
+        setRows([...jobs.rows, ...cancels.jobs]);
+        setCancelRows(cancels.admin);
+        setReopenRows(reopens.rows);
+        setTotal(Math.max(jobs.total, cancels.total, reopens.total));
         return;
       }
-
-      if (isCancellationTab) sp.set("queueType", CANCELLATION_WORKSPACE_QUEUE);
-      else if (queueType) sp.set("queueType", queueType);
-      if (technicianFilter) sp.set("technician", technicianFilter);
-      if (excludeMe) sp.set("excludeMe", "1");
-      const res = await fetch(`/api/workspace/jobs/pending?${sp.toString()}`, {
-        headers: authHeaders(),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.error ?? "Failed to load queue");
-      setRows(body.jobs ?? []);
+      if (isCancellationScope) {
+        const c = await loadCancellations(base);
+        setCancelRows(c.admin);
+        setRows(c.jobs);
+        setReopenRows([]);
+        setTotal(c.total);
+        return;
+      }
+      if (reopenScope) {
+        const r = await loadReopens(base);
+        setReopenRows(r.rows);
+        setRows([]);
+        setCancelRows([]);
+        setTotal(r.total);
+        return;
+      }
+      const j = await loadJobs(serverQueueType ?? "");
+      setRows(j.rows);
       setCancelRows([]);
       setReopenRows([]);
-      setTotal(body.total ?? 0);
+      setTotal(j.total);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
     } finally {
       setLoading(false);
     }
   }, [
-    queueType,
+    page,
+    pageSize,
     q,
     priority,
     technicianFilter,
     excludeMe,
-    page,
-    cancellationView,
-    isCancellationTab,
-    reopenView,
+    isAdmin,
+    approvalsAll,
+    isCancellationScope,
+    reopenScope,
+    serverQueueType,
+    isCompletedGroup,
+    completedRange.from,
+    completedRange.to,
   ]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  const open = (r: QueueRow) => {
-    openJobTab(r.id, r.job_number);
-    navigate({ to: "/jobs/$jobId", params: { jobId: r.id } });
-  };
-
-  const openRequest = (r: CancellationRow) => {
-    openJobTab(r.service_job_id, r.job_number);
-    navigate({ to: "/jobs/$jobId", params: { jobId: r.service_job_id } });
-  };
-
-  const openReopen = (r: ReopenRow) => {
-    openJobTab(r.service_job_id, r.job_number);
-    navigate({ to: "/jobs/$jobId", params: { jobId: r.service_job_id } });
+  const openJob = (id: string, jobNumber: string) => {
+    openJobTab(id, jobNumber);
+    navigate({ to: "/jobs/$jobId", params: { jobId: id } });
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const emptyKey = approvalsAll ? "approvals" : (serverQueueType ?? view.scope);
+  const subFilters =
+    view.group === "waiting"
+      ? WAITING_SUBFILTERS
+      : view.group === "approvals"
+        ? APPROVAL_TYPES
+        : view.group === "completed"
+          ? COMPLETED_SUBFILTERS
+          : null;
+  const chipClass = (active: boolean) =>
+    `min-h-11 shrink-0 rounded-full border px-3 text-xs font-semibold transition-colors sm:min-h-9 ${
+      active
+        ? "border-primary bg-primary text-primary-foreground"
+        : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+    }`;
 
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Workspace</p>
           <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            {excludeMe ? "Pending from My Team" : "Pending Queue"}
+            {excludeMe ? "Pending from My Team" : "Pending"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {excludeMe
@@ -303,110 +355,66 @@ function PendingQueuePage() {
             </p>
           )}
         </div>
-        <Link to="/support" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Workspace
-        </Link>
       </header>
 
-      {/* Desktop / tablet — the full scope set, unchanged. */}
-      <div className="hidden flex-wrap gap-1 rounded-lg border bg-card p-1 sm:flex">
-        {visibleTabs.map((t) => {
-          const active = isTabActive(t.key);
+      {/* WP3C-2 — six primary groups (3×2 on phones, one row on desktop). */}
+      <div
+        role="tablist"
+        aria-label="Queue groups"
+        className="grid grid-cols-3 gap-1 rounded-lg border bg-card p-1 sm:flex sm:flex-wrap"
+      >
+        {QUEUE_GROUPS.map((g) => {
+          const active = view.group === g.key;
           return (
             <button
-              key={t.key || "all"}
+              key={g.key}
               type="button"
-              onClick={() => selectQueue(t.key)}
-              className={`min-h-9 rounded-md px-3 text-xs font-semibold transition-colors ${
+              role="tab"
+              aria-selected={active}
+              onClick={() => selectGroup(g.key)}
+              className={`min-h-11 rounded-md px-2 text-xs font-semibold transition-colors sm:min-h-9 sm:px-3 ${
                 active
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground ring-2 ring-primary/40"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
-              {t.label}
+              {g.label}
             </button>
           );
         })}
       </div>
 
-      {/* Mobile — compact primary set, everything else in More Filters. */}
-      <div className="space-y-2 sm:hidden">
-        <div className="grid grid-cols-2 gap-1 rounded-lg border bg-card p-1">
-          {mobilePrimaryTabs.map((t) => {
-            const active = isTabActive(t.key);
-            return (
-              <button
-                key={t.key || "all"}
-                type="button"
-                onClick={() => selectQueue(t.key)}
-                className={`min-h-11 rounded-md px-3 text-xs font-semibold transition-colors ${
-                  active
-                    ? "bg-primary text-primary-foreground ring-2 ring-primary/40"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                }`}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-            <PopoverTrigger asChild>
+      {(subFilters || view.chip) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {subFilters?.map((f) => (
+            <button
+              key={f.key || "all"}
+              type="button"
+              aria-pressed={!view.chip && view.scope === f.key}
+              onClick={() => selectScope(f.key)}
+              className={chipClass(!view.chip && view.scope === f.key)}
+            >
+              {f.label}
+            </button>
+          ))}
+          {view.chip && (
+            <span
+              data-testid="active-filter-chip"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary sm:min-h-9"
+            >
+              Filter: {view.chip}
               <button
                 type="button"
-                aria-label="More filters"
-                className="inline-flex min-h-11 items-center gap-2 rounded-md border bg-card px-3 text-xs font-semibold text-foreground hover:bg-accent"
-              >
-                More Filters
-                {activeSecondaryTab ? (
-                  <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
-                    1
-                  </span>
-                ) : null}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-64 p-1">
-              <ul className="max-h-72 overflow-y-auto">
-                {mobileSecondaryTabs.map((t) => (
-                  <li key={t.key}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        selectQueue(t.key);
-                        setMoreOpen(false);
-                      }}
-                      className={`block w-full min-h-11 rounded-md px-3 text-left text-xs font-semibold ${
-                        isTabActive(t.key)
-                          ? "bg-primary text-primary-foreground"
-                          : "text-foreground hover:bg-accent"
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </PopoverContent>
-          </Popover>
-
-          {/* A non-primary scope stays visible outside the hidden list. */}
-          {activeSecondaryTab && (
-            <span className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary">
-              <span className="truncate">{activeSecondaryTab.label}</span>
-              <button
-                type="button"
-                aria-label="Clear filter"
-                onClick={() => selectQueue("")}
+                aria-label={`Clear ${view.chip} filter`}
+                onClick={clearChip}
                 className="text-primary/70 hover:text-primary"
               >
-                clear
+                ✕
               </button>
             </span>
           )}
         </div>
-      </div>
+      )}
 
       <div className="grid gap-2 sm:grid-cols-3">
         <input
@@ -431,7 +439,57 @@ function PendingQueuePage() {
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
+        {isCompletedGroup && (
+          <select
+            aria-label="Rows per page"
+            value={completedPageSize}
+            onChange={(e) => {
+              setCompletedPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+            className="min-h-11 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
+          >
+            {COMPLETED_PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n} per page
+              </option>
+            ))}
+          </select>
+        )}
       </div>
+
+      {isCompletedGroup && (
+        <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
+          <MalaysiaDateInput
+            label="Completed from"
+            value={completedRange.from}
+            onChange={(iso) => {
+              setCompletedRange((r) => ({ ...r, from: iso }));
+              setPage(1);
+            }}
+            className="sm:w-44"
+          />
+          <MalaysiaDateInput
+            label="Completed to"
+            value={completedRange.to}
+            onChange={(iso) => {
+              setCompletedRange((r) => ({ ...r, to: iso }));
+              setPage(1);
+            }}
+            className="sm:w-44"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setCompletedRange(defaultCompletedRange());
+              setPage(1);
+            }}
+            className="col-span-2 min-h-11 rounded-md border px-3 text-xs font-semibold hover:bg-accent sm:col-span-1"
+          >
+            Last 3 months
+          </button>
+        </div>
+      )}
 
       {err && (
         <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>
@@ -449,25 +507,23 @@ function PendingQueuePage() {
         reopenRows.length === 0 &&
         !err && (
           <div className="rounded-lg border border-dashed bg-background/60 px-4 py-6 text-center text-sm text-muted-foreground">
-            {(isCancellationTab
-              ? QUEUE_TABS.find((t) => t.key === CANCELLATION_QUEUE)?.emptyMsg
-              : QUEUE_TABS.find((t) => t.key === queueType)?.emptyMsg) ?? "No jobs."}
+            {EMPTY_MSG[emptyKey] ?? "No jobs."}
           </div>
         )}
 
-      {/* WP3A — Reopen Requests: enough context to decide, and a clear open
-          action to the Job where an Owner/Admin approves or rejects. */}
-      {reopenView && reopenRows.length > 0 && (
+      {/* Reopen requests: enough context to decide, and a clear open action
+          to the Job where an Owner/Admin approves or rejects. */}
+      {reopenRows.length > 0 && (
         <ul data-testid="reopen-queue" className="space-y-2">
           {reopenRows.map((r) => (
             <li key={r.request_id}>
               <button
                 type="button"
-                onClick={() => openReopen(r)}
+                onClick={() => openJob(r.service_job_id, r.job_number)}
                 className="block w-full min-w-0 rounded-lg border-2 border-amber-300 border-l-4 border-l-amber-500 bg-amber-50 p-3 text-left shadow-sm hover:bg-amber-100"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-mono text-xs font-semibold text-primary">
+                  <span className="font-mono text-xs font-semibold text-primary underline-offset-2 hover:underline">
                     {r.job_number}
                   </span>
                   <span className="text-[10px] uppercase text-muted-foreground">
@@ -479,6 +535,9 @@ function PendingQueuePage() {
                   {r.customer_name ?? r.customer_code}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                  <span className="rounded-full border border-amber-500 bg-amber-100 px-2 py-0.5 uppercase text-amber-900">
+                    Reopen Request
+                  </span>
                   <StatusBadge status={r.job_status} />
                   <PriorityBadge priority={r.priority} />
                   <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
@@ -504,28 +563,31 @@ function PendingQueuePage() {
         </ul>
       )}
 
-      {cancellationView && cancelRows.length > 0 && (
+      {cancelRows.length > 0 && (
         <ul className="space-y-2">
           {cancelRows.map((r) => (
             <li key={r.request_id}>
               <button
                 type="button"
-                onClick={() => openRequest(r)}
+                onClick={() => openJob(r.service_job_id, r.job_number)}
                 className="block w-full rounded-lg border-2 border-red-300 border-l-4 border-l-red-500 bg-red-50 p-3 text-left shadow-sm hover:bg-red-100"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-mono text-xs font-semibold text-primary">
+                  <span className="font-mono text-xs font-semibold text-primary underline-offset-2 hover:underline">
                     {r.job_number}
                   </span>
                   <span className="text-[10px] uppercase text-muted-foreground">
                     Requested {formatMYDateTime(r.requested_at)}
                   </span>
                 </div>
-                <div className="mt-1 truncate text-sm font-semibold">{r.subject}</div>
+                <div className="mt-1 break-words text-sm font-semibold">{r.subject}</div>
                 <div className="text-xs text-muted-foreground">
                   {r.customer_name ?? r.customer_code}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                  <span className="rounded-full border border-red-400 bg-red-100 px-2 py-0.5 uppercase text-red-900">
+                    Cancellation Request
+                  </span>
                   <StatusBadge status={r.job_status} />
                   <PriorityBadge priority={r.priority} />
                   <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
@@ -553,62 +615,75 @@ function PendingQueuePage() {
 
       {rows.length > 0 && (
         <ul className="space-y-2">
-          {rows.map((r) => (
-            <li key={r.id}>
-              <button
-                type="button"
-                onClick={() => open(r)}
-                className={`block w-full rounded-lg border p-3 text-left shadow-sm ${
-                  r.has_active_cancellation_request
-                    ? "border-red-300 border-l-4 border-l-red-500 bg-red-50 hover:bg-red-100"
-                    : "bg-background hover:bg-accent/40"
-                }`}
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-mono text-xs font-semibold text-primary">
-                    {r.job_number}
-                  </span>
-                  <span className="text-[10px] uppercase text-muted-foreground">
-                    {isCompletedTab && r.completed_at
-                      ? `Completed ${formatMYDateTime(r.completed_at)}`
-                      : formatMYDateTime(r.created_at)}
-                  </span>
-                </div>
-                <div className="mt-1 break-words text-sm font-semibold">{r.subject}</div>
-                <div className="text-xs text-muted-foreground">
-                  {r.customer_name_snapshot ?? r.customer_code_snapshot}
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
-                  <StatusBadge status={r.status} />
-                  <PriorityBadge priority={r.priority} />
-                  <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
-                    {r.assigned_user_name_snapshot ?? "Unassigned"}
-                  </span>
-                  {r.has_active_cancellation_request && (
-                    <span className="rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-red-900">
-                      Cancellation Requested
+          {rows.map((r) => {
+            const outcome = r.outcome ? OUTCOME_BADGE[r.outcome] : undefined;
+            return (
+              <li key={r.id}>
+                <button
+                  type="button"
+                  onClick={() => openJob(r.id, r.job_number)}
+                  className={`block w-full rounded-lg border p-3 text-left shadow-sm ${
+                    r.has_active_cancellation_request
+                      ? "border-red-300 border-l-4 border-l-red-500 bg-red-50 hover:bg-red-100"
+                      : "bg-background hover:bg-accent/40"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-mono text-xs font-semibold text-primary underline-offset-2 hover:underline">
+                      {r.job_number}
                     </span>
-                  )}
-                  {r.requires_approval && (
-                    <span className="rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 text-amber-900">
-                      Waiting for Approval{r.approval_reason ? ` · ${r.approval_reason}` : ""}
+                    <span className="text-[10px] uppercase text-muted-foreground">
+                      {isCompletedGroup && r.completed_at
+                        ? `Completed ${formatMYDateTime(r.completed_at)}`
+                        : formatMYDateTime(r.created_at)}
                     </span>
-                  )}
-                  {(r.subscription_category_snapshot || r.stock_code_snapshot) && (
-                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 normal-case text-sky-900">
-                      {r.subscription_category_snapshot ?? "Entitlement"}
-                      {r.stock_code_snapshot ? ` · ${r.stock_code_snapshot}` : ""}
-                      {r.entitlement_status_snapshot ? ` · ${r.entitlement_status_snapshot}` : ""}
+                  </div>
+                  <div className="mt-1 break-words text-sm font-semibold">{r.subject}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {r.customer_name_snapshot ?? r.customer_code_snapshot}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
+                    {approvalsAll && r.status === "Pending Approval" && (
+                      <span className="rounded-full border border-sky-400 bg-sky-50 px-2 py-0.5 uppercase text-sky-900">
+                        Job Approval
+                      </span>
+                    )}
+                    <StatusBadge status={r.status} />
+                    <PriorityBadge priority={r.priority} />
+                    {outcome && (
+                      <span className={`rounded-full border px-2 py-0.5 ${outcome.cls}`}>
+                        {outcome.label}
+                      </span>
+                    )}
+                    <span className="rounded-full border px-2 py-0.5 uppercase text-muted-foreground">
+                      {r.assigned_user_name_snapshot ?? "Unassigned"}
                     </span>
-                  )}
-                </div>
-              </button>
-            </li>
-          ))}
+                    {r.has_active_cancellation_request && (
+                      <span className="rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-red-900">
+                        Cancellation Requested
+                      </span>
+                    )}
+                    {r.requires_approval && r.status === "Pending Approval" && (
+                      <span className="rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 text-amber-900">
+                        Waiting for Approval{r.approval_reason ? ` · ${r.approval_reason}` : ""}
+                      </span>
+                    )}
+                    {(r.subscription_category_snapshot || r.stock_code_snapshot) && (
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 normal-case text-sky-900">
+                        {r.subscription_category_snapshot ?? "Entitlement"}
+                        {r.stock_code_snapshot ? ` · ${r.stock_code_snapshot}` : ""}
+                        {r.entitlement_status_snapshot ? ` · ${r.entitlement_status_snapshot}` : ""}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
-      {total > pageSize && (
+      {total > pageSize && !approvalsAll && (
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>
             Page {page} / {totalPages} · {total} jobs
@@ -618,7 +693,7 @@ function PendingQueuePage() {
               type="button"
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
-              className="min-h-9 rounded-md border bg-background px-3 disabled:opacity-40"
+              className="min-h-11 rounded-md border bg-background px-3 disabled:opacity-40 sm:min-h-9"
             >
               Prev
             </button>
@@ -626,7 +701,7 @@ function PendingQueuePage() {
               type="button"
               disabled={page >= totalPages}
               onClick={() => setPage(page + 1)}
-              className="min-h-9 rounded-md border bg-background px-3 disabled:opacity-40"
+              className="min-h-11 rounded-md border bg-background px-3 disabled:opacity-40 sm:min-h-9"
             >
               Next
             </button>
