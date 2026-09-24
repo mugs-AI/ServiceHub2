@@ -144,20 +144,18 @@ describe("Pending Queue categories", () => {
   });
 
   it("follow-up filtering runs through the current-cycle rule", () => {
-    expect(pendingRoute).toContain("followUpJobIds");
-    expect(pendingRoute).toContain("completion_cycle");
+    // WP3C-2: completed_followup is an alias of the outcome-derived
+    // Follow-up Open list (current cycle via loadCompletionOutcomes).
+    expect(pendingRoute).toContain('queueType === "completed_followup" ? "follow_up_open" : queueType');
+    expect(pendingRoute).toContain("loadCompletionOutcomes");
   });
 
   it("renders the three new tabs and resets paging on tab change", () => {
+    // WP3C-2: Reopen lives under Approvals; groups/sub-filters reset paging.
     expect(pendingUi).toContain("QUEUE_REOPEN_REQUESTS");
-    expect(pendingUi).toContain("QUEUE_COMPLETED_FOLLOWUP");
-    expect(pendingUi).toContain("QUEUE_COMPLETED");
-    expect(pendingUi).toContain('label: "Reopen Requests"');
-    expect(pendingUi).toContain('label: "Completed Follow-up"');
-    // Both the desktop tab bar and the mobile compact set select through the
-    // one handler, which resets paging.
-    expect(pendingUi).toMatch(/setQueueType\(key\);\s*\n\s*setPage\(1\)/);
-    expect(pendingUi).toContain("selectQueue(t.key)");
+    expect(pendingUi).toContain("selectGroup(g.key)");
+    expect(pendingUi).toContain("selectScope(f.key)");
+    expect(pendingUi).toMatch(/chip: null \}\);\s*\n(.*\n)?\s*setPage\(1\)|setPage\(1\);/);
   });
 
   it("keeps the existing queue tabs", () => {

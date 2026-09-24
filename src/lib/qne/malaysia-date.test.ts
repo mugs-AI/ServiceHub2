@@ -83,7 +83,8 @@ describe("route contracts — no raw month-first date inputs on UAT surfaces", (
   it("uses the shared Malaysian date field", () => {
     for (const f of surfaces) {
       const src = read(f);
-      expect(src).toContain("MalaysiaDateInput");
+      // WP3C-2: the calendar uses the shared in-app day picker popover.
+      expect(src.includes("MalaysiaDateInput") || src.includes("MalaysiaDatePopover")).toBe(true);
       expect(src).not.toContain('type="date"');
     }
   });
