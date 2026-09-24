@@ -35,7 +35,7 @@ describe("WP3C-2A Completed page outcomes", () => {
     const o = deriveOutcome({
       jobStatus: "Completed",
       isDeleted: false,
-      completion: { follow_up_required: true, completed_by_user_id: "u1" },
+      completion: { follow_up_required: true },
       followup: { state: "resolved" } as never,
       hasPendingReopen: false,
     });
