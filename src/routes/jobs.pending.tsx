@@ -79,104 +79,43 @@ interface ReopenRow {
   prior_status: string;
 }
 
-const QUEUE_TABS = [
-  {
-    key: "",
-    label: "All Pending",
-    emptyMsg: "No jobs currently require action.",
-    adminOnly: false,
+/** Empty-state copy per exact scope key. */
+const EMPTY_MSG: Record<string, string> = {
+  "": "No jobs currently require action.",
+  draft: "No Draft jobs.",
+  open_unassigned: "No Open unassigned jobs.",
+  assigned_not_started: "No Assigned jobs.",
+  in_progress: "No jobs in progress.",
+  active: "No active jobs.",
+  jobs_today: "No jobs created today.",
+  waiting: "No jobs waiting on customer or vendor.",
+  waiting_customer: "No jobs waiting on customer.",
+  waiting_vendor: "No jobs waiting on vendor.",
+  pending_approval: "No Job Approvals pending.",
+  [CANCELLATION_QUEUE]: "No jobs with a pending cancellation request.",
+  [QUEUE_REOPEN_REQUESTS]: "No pending reopen requests.",
+  approvals: "Nothing is waiting for approval.",
+  completed: "No completed jobs in this date range.",
+  resolved: "No resolved jobs in this date range.",
+  follow_up_open: "No open follow-ups.",
+  reopen_pending: "No reopen-pending jobs.",
+  legacy_completed: "No legacy completed jobs without modern evidence.",
+  resolved_today: "Nothing resolved today yet.",
+  completed_current_cycle: "No completed jobs in the current cycle.",
+  cancelled: "No cancelled jobs.",
+  all_jobs: "No jobs.",
+};
+
+const OUTCOME_BADGE: Record<string, { label: string; cls: string }> = {
+  resolved_at_completion: { label: "Resolved", cls: "border-emerald-300 bg-emerald-50 text-emerald-900" },
+  resolved_after_follow_up: {
+    label: "Resolved after Follow-up",
+    cls: "border-emerald-300 bg-emerald-50 text-emerald-900",
   },
-  { key: "draft", label: "Draft", emptyMsg: "No Draft jobs.", adminOnly: false },
-  {
-    key: "pending_approval",
-    label: "Job Approvals",
-    emptyMsg: "No Job Approvals pending.",
-    adminOnly: false,
-  },
-  {
-    key: CANCELLATION_QUEUE,
-    label: "Cancellation Requested",
-    emptyMsg: "No jobs with a pending cancellation request.",
-    adminOnly: false,
-  },
-  {
-    key: "open_unassigned",
-    label: "Open · Unassigned",
-    emptyMsg: "No Open unassigned jobs.",
-    adminOnly: false,
-  },
-  {
-    key: "assigned_not_started",
-    label: "Assigned",
-    emptyMsg: "No Assigned jobs.",
-    adminOnly: false,
-  },
-  {
-    key: "waiting_customer",
-    label: "Waiting Customer",
-    emptyMsg: "No jobs waiting on customer.",
-    adminOnly: false,
-  },
-  {
-    key: "waiting_vendor",
-    label: "Waiting Vendor",
-    emptyMsg: "No jobs waiting on vendor.",
-    adminOnly: false,
-  },
-  // WP3A categories. The keys are the stable URL values used by dashboard
-  // deep links, so a bookmarked link keeps working.
-  {
-    key: QUEUE_REOPEN_REQUESTS,
-    label: "Reopen Requests",
-    emptyMsg: "No pending reopen requests.",
-    adminOnly: false,
-  },
-  {
-    key: QUEUE_COMPLETED_FOLLOWUP,
-    label: "Completed Follow-up",
-    emptyMsg: "No completed jobs still need follow-up.",
-    adminOnly: false,
-  },
-  { key: QUEUE_COMPLETED, label: "Completed", emptyMsg: "No completed jobs.", adminOnly: false },
-  // WP3B outcome scopes — membership comes from the shared completion read
-  // model, the same derivation the dashboard cards count with.
-  {
-    key: "follow_up_open",
-    label: "Follow-up Open",
-    emptyMsg: "No open follow-ups.",
-    adminOnly: false,
-  },
-  {
-    key: "reopen_pending",
-    label: "Reopen Pending",
-    emptyMsg: "No reopen-pending jobs.",
-    adminOnly: false,
-  },
-  { key: "resolved", label: "Resolved", emptyMsg: "No resolved jobs.", adminOnly: false },
-  // WP3C Admin Dashboard destinations. Each key is the exact scope the
-  // matching Admin card counted.
-  { key: "jobs_today", label: "Jobs Today", emptyMsg: "No jobs created today.", adminOnly: false },
-  { key: "active", label: "Active Jobs", emptyMsg: "No active jobs.", adminOnly: false },
-  { key: "in_progress", label: "In Progress", emptyMsg: "No jobs in progress.", adminOnly: false },
-  {
-    key: "resolved_today",
-    label: "Resolved Today",
-    emptyMsg: "Nothing resolved today yet.",
-    adminOnly: false,
-  },
-  {
-    key: "completed_current_cycle",
-    label: "Completed (Current Cycle)",
-    emptyMsg: "No completed jobs in the current cycle.",
-    adminOnly: false,
-  },
-  {
-    key: "legacy_completed",
-    label: "Legacy Completed",
-    emptyMsg: "No legacy completed jobs without modern evidence.",
-    adminOnly: false,
-  },
-] as const;
+  follow_up_open: { label: "Follow-up Open", cls: "border-amber-300 bg-amber-50 text-amber-900" },
+  reopen_pending: { label: "Reopen Pending", cls: "border-orange-300 bg-orange-50 text-orange-900" },
+  legacy_unknown: { label: "Legacy · Data Alert", cls: "border-rose-300 bg-rose-50 text-rose-900" },
+};
 
 export const Route = createFileRoute("/jobs/pending")({
   validateSearch: (s: Record<string, unknown>) => ({
