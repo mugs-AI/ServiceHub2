@@ -272,6 +272,9 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           // CURRENT completion cycle counts, so an earlier cycle's follow-up
           // flag can never leak into a later cycle.
           let followUpOnly = false;
+          // Outcome indicator (Resolved / Follow-up Open / Reopen Pending /
+          // Legacy) for rows decided by the shared outcome read model.
+          let outcomeById = new Map<string, string>();
 
           // WP3B/WP3C — outcome lists. The SAME shared derivation the dashboard
           // cards count with decides membership here, so a card count and the
@@ -318,11 +321,14 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
                   }
                   const outcomeKey =
                     queueType === "completed_followup" ? "follow_up_open" : queueType;
-                  return (outcomesForQueue(outcomeKey) as string[]).includes(r.outcome);
+                  return (
+                    outcomesForQueue(outcomeKey as "follow_up_open" | "reopen_pending" | "resolved") as string[]
+                  ).includes(r.outcome);
                 })
                 .map((r) => r.id),
             );
             rows = rows.filter((r) => keep.has(r.id));
+            outcomeById = new Map(outcomeRows.map((r) => [r.id, r.outcome as string]));
           }
 
           // Shared cancellation-state awareness. Every authenticated
@@ -363,6 +369,7 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           const jobs = paged.map((r) => ({
             ...r,
             has_active_cancellation_request: flagged.has(r.id),
+            outcome: outcomeById.get(r.id) ?? null,
           }));
 
           return Response.json({
