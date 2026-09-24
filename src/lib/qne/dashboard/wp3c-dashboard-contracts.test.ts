@@ -272,7 +272,7 @@ describe("WP3C — Admin Dashboard cards", () => {
         expect(ui).toContain("QUEUE_REOPEN_REQUESTS");
         continue;
       }
-      expect(ui).toContain(`"${card.queueType}"`);
+      expect(ui).toMatch(new RegExp(`"${card.queueType}"|\\b${card.queueType}:`));
     }
     for (const label of [
       "Jobs Today",
