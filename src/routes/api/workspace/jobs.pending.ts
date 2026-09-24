@@ -234,8 +234,27 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
                     list.map((r) => r.id),
                   )
                 : new Set<string>();
+            // WP3C-2A — Completed page: derive the shared WP3B outcome for
+            // this page's Job IDs only (never the whole tenant). Cancelled
+            // and All Jobs rows are not decorated.
+            let pageOutcomes = new Map<string, string>();
+            if (queueType === "completed" && list.length > 0) {
+              const { loadCompletionOutcomes: loadPageOutcomes } =
+                await import("@/lib/qne/service-jobs/wp3b.server");
+              const pageIds = list.map((r) => r.id);
+              try {
+                const rows = await loadPageOutcomes(user.tenantCode, pageIds);
+                pageOutcomes = new Map(rows.map((r) => [r.id, r.outcome as string]));
+              } catch (e) {
+                console.warn("[jobs.pending] page outcome load failed", e);
+              }
+            }
             return Response.json({
-              jobs: list.map((r) => ({ ...r, has_active_cancellation_request: marks.has(r.id) })),
+              jobs: list.map((r) => ({
+                ...r,
+                has_active_cancellation_request: marks.has(r.id),
+                ...(queueType === "completed" ? { outcome: pageOutcomes.get(r.id) ?? null } : {}),
+              })),
               total: pageCount ?? list.length,
               page,
               pageSize,

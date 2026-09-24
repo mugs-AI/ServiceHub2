@@ -100,13 +100,21 @@ export interface OutcomeJob {
  * The single central derivation of EVERY completed cycle for a tenant, used by
  * dashboard counts and by the Pending Queue lists so they can never disagree.
  */
-export async function loadCompletionOutcomes(tenantCode: string): Promise<OutcomeJob[]> {
-  const { data: jobs, error: jobsErr } = await supabaseAdmin
+export async function loadCompletionOutcomes(
+  tenantCode: string,
+  jobIds?: readonly string[],
+): Promise<OutcomeJob[]> {
+  // WP3C-2A — optional bounded ID set (e.g. one Completed page). When omitted,
+  // behaviour is identical to before: every Completed Job in the tenant.
+  if (jobIds && jobIds.length === 0) return [];
+  let jobsQuery = supabaseAdmin
     .from("service_jobs")
     .select("id, job_number, status, is_deleted, assigned_user_id, completed_at, completion_cycle")
     .eq("tenant_code", tenantCode)
     .eq("is_deleted", false)
     .eq("status", "Completed");
+  if (jobIds) jobsQuery = jobsQuery.in("id", [...jobIds]);
+  const { data: jobs, error: jobsErr } = await jobsQuery;
   if (jobsErr) throw jobsErr;
   const rows = jobs ?? [];
   if (rows.length === 0) return [];
