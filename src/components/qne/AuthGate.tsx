@@ -12,14 +12,21 @@ interface NavItem {
   label: string;
 }
 
+/** WP3C-2 — persistent header navigation, same order on every width. */
+export const PRIMARY_NAV_LABELS = ["Dashboard", "Workspace", "Pending", "Calendar"] as const;
+
 const USER_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/support", label: "Workspace" },
+  { to: "/jobs/pending", label: "Pending" },
+  { to: "/calendar", label: "Calendar" },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard" },
   { to: "/support", label: "Workspace" },
+  { to: "/jobs/pending", label: "Pending" },
+  { to: "/calendar", label: "Calendar" },
 ];
 
 const ADMIN_TOOLS: NavItem[] = [
@@ -84,7 +91,7 @@ function AuthenticatedShell({
       },
       {
         key: "pin:pending",
-        label: "Pending Queue",
+        label: "Pending",
         href: "/jobs/pending",
         closable: false,
         kind: "pinned",
@@ -130,44 +137,48 @@ function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-1 px-2 sm:gap-3 sm:px-4">
         <Link
           to={isAdmin ? "/admin/dashboard" : "/support"}
-          className="flex items-center gap-2 text-base font-semibold text-foreground"
+          aria-label="ServiceHub2 home"
+          className="flex shrink-0 items-center gap-2 text-base font-semibold text-foreground"
         >
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs text-primary-foreground">
             S2
           </span>
-          <span className="hidden sm:inline">ServiceHub2</span>
+          <span className="hidden lg:inline">ServiceHub2</span>
         </Link>
 
-        <nav className="hidden flex-1 items-center gap-1 text-sm md:flex">
+        {/* Persistent navigation beside S2 — visible on phones too. */}
+        <nav
+          aria-label="Main"
+          data-testid="primary-nav"
+          className="flex min-w-0 flex-1 items-center gap-0.5 text-[12px] sm:gap-1 sm:text-sm"
+        >
           {nav.map((item) => (
             <NavLink key={item.to} item={item} />
           ))}
-          {isAdmin && <AdminToolsMenu />}
+          <div className="hidden md:block">
+            <ToolsMenu isAdmin={isAdmin} />
+          </div>
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <Link
             to="/jobs/new"
-            className="hidden min-h-9 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:inline-flex"
+            className="hidden min-h-9 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 md:inline-flex"
           >
             + New Service Job
           </Link>
-          <Link
-            to="/jobs/new"
-            aria-label="New Service Job"
-            className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground shadow-sm hover:bg-primary/90 sm:hidden"
-          >
-            +
-          </Link>
-          <UserMenu user={currentUser} />
+          <div className="hidden md:block">
+            <UserMenu user={currentUser} />
+          </div>
           <button
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
-            aria-label="Toggle menu"
-            className="rounded-md border p-2 md:hidden"
+            aria-label="Open menu"
+            aria-expanded={mobileOpen}
+            className="grid h-10 w-10 place-items-center rounded-md border md:hidden"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 6h18M3 12h18M3 18h18" />
@@ -186,9 +197,7 @@ function AppHeader() {
             >
               + New Service Job
             </Link>
-            {nav.map((item) => (
-              <NavLink key={item.to} item={item} onClick={() => setMobileOpen(false)} />
-            ))}
+            <MobileProfile onDone={() => setMobileOpen(false)} />
             {isAdmin && (
               <>
                 <div className="mt-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -213,14 +222,39 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
       onClick={onClick}
       activeOptions={{ exact: item.to === "/" }}
       activeProps={{ className: "active" }}
-      className="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
+      className="inline-flex min-h-10 items-center whitespace-nowrap rounded-md px-1.5 font-medium sm:px-3 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
     >
       {item.label}
     </Link>
   );
 }
 
-function AdminToolsMenu() {
+function MobileProfile({ onDone }: { onDone: () => void }) {
+  const { session, currentUser, signOut } = useSession();
+  const name = currentUser?.displayName || session?.email || "User";
+  return (
+    <div className="mb-1 rounded-md border px-3 py-2 text-xs">
+      <div className="font-semibold text-foreground">{name}</div>
+      <div className="text-muted-foreground">
+        {session?.companyName || "—"} · {session?.tenantCode || "—"}
+        {currentUser?.isAdministrator ? " · Administrator" : ""}
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          onDone();
+          signOut();
+        }}
+        className="mt-2 min-h-10 w-full rounded-md border px-3 text-left text-sm text-foreground hover:bg-accent"
+      >
+        Sign out
+      </button>
+    </div>
+  );
+}
+
+function ToolsMenu({ isAdmin }: { isAdmin: boolean }) {
+  const items: NavItem[] = isAdmin ? ADMIN_TOOLS : [{ to: "/jobs/new", label: "New Service Job" }];
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -239,14 +273,14 @@ function AdminToolsMenu() {
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
       >
-        Admin tools
+        Tools
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
       {open && (
         <div className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border bg-popover shadow-lg">
-          {ADMIN_TOOLS.map((item) => (
+          {items.map((item) => (
             <Link
               key={item.to}
               to={item.to}
