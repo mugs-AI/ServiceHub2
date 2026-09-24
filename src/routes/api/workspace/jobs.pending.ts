@@ -1,5 +1,5 @@
 // GET /api/workspace/jobs/pending — Pending Queue for the current tenant.
-// Includes: Pending Approval, Open+Unassigned, Assigned (not started),
+// Default (All Pending): Draft, Pending Approval, Open, Assigned, In Progress,
 // Waiting Customer, Waiting Vendor. Excludes soft-deleted jobs.
 // Sorted by: priority (High > Medium > Low), then oldest created_at.
 // Filters (all optional): queueType, customerCode, jobNumber, priority,
@@ -11,6 +11,11 @@ import {
   isAdminDashboardQueueKey,
   statusesForAdminQueue,
 } from "@/lib/qne/dashboard/admin-scope";
+import {
+  ALL_JOB_STATUSES,
+  ALL_PENDING_STATUSES,
+  malaysiaDayRangeToUtc,
+} from "@/lib/qne/dashboard/pending-queue-groups";
 
 type QueueType =
   | "draft"
@@ -33,7 +38,11 @@ type QueueType =
   | "in_progress"
   | "resolved_today"
   | "legacy_completed"
-  | "completed_current_cycle";
+  | "completed_current_cycle"
+  // WP3C-2 — consolidated groups.
+  | "waiting"
+  | "cancelled"
+  | "all_jobs";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
@@ -58,20 +67,29 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         try {
           const user = await requireAuthenticatedN3User(request);
           const sp = new URL(request.url).searchParams;
           const queueType = trim(sp.get("queueType"), 40) as QueueType | null;
           const validQueueTypes = new Set([
-            "draft", "pending_approval", "open_unassigned", "assigned_not_started",
-            "waiting_customer", "waiting_vendor", "cancellation_requested",
-            "completed_followup", "completed", "follow_up_open", "reopen_pending", "resolved",
+            "draft",
+            "pending_approval",
+            "open_unassigned",
+            "assigned_not_started",
+            "waiting_customer",
+            "waiting_vendor",
+            "cancellation_requested",
+            "completed_followup",
+            "completed",
+            "follow_up_open",
+            "reopen_pending",
+            "resolved",
+            "waiting",
+            "cancelled",
+            "all_jobs",
             ...ADMIN_DASHBOARD_QUEUE_KEYS,
           ]);
           if (queueType && !validQueueTypes.has(queueType)) {
@@ -84,14 +102,20 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           const from = trim(sp.get("from"), 40);
           const to = trim(sp.get("to"), 40);
           const q = trim(sp.get("q"), 100);
+          // WP3C-2 — server-backed Completed date range (Malaysia days).
+          const dayRe = /^\d{4}-\d{2}-\d{2}$/;
+          const completedFromDay = trim(sp.get("completedFrom"), 10);
+          const completedToDay = trim(sp.get("completedTo"), 10);
+          if (
+            (completedFromDay && !dayRe.test(completedFromDay)) ||
+            (completedToDay && !dayRe.test(completedToDay))
+          ) {
+            return Response.json({ error: "Invalid completed date range." }, { status: 400 });
+          }
           // Run 2 — "Pending from My Team": exclude jobs assigned to caller.
-          const excludeMe =
-            sp.get("excludeMe") === "1" || sp.get("excludeMe") === "true";
+          const excludeMe = sp.get("excludeMe") === "1" || sp.get("excludeMe") === "true";
           const page = Math.max(Number(sp.get("page") ?? 1) || 1, 1);
-          const pageSize = Math.min(
-            Math.max(Number(sp.get("pageSize") ?? 50) || 50, 1),
-            200,
-          );
+          const pageSize = Math.min(Math.max(Number(sp.get("pageSize") ?? 50) || 50, 1), 200);
 
           let query = supabaseAdmin
             .from("service_jobs")
@@ -115,6 +139,12 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             query = query.eq("status", "Waiting Customer");
           } else if (queueType === "waiting_vendor") {
             query = query.eq("status", "Waiting Vendor");
+          } else if (queueType === "waiting") {
+            query = query.in("status", ["Waiting Customer", "Waiting Vendor"]);
+          } else if (queueType === "cancelled") {
+            query = query.eq("status", "Cancelled");
+          } else if (queueType === "all_jobs") {
+            query = query.in("status", [...ALL_JOB_STATUSES]);
           } else if (queueType && isAdminDashboardQueueKey(queueType)) {
             const statuses = statusesForAdminQueue(queueType);
             if (statuses) query = query.in("status", [...statuses]);
@@ -133,15 +163,9 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             // above, so a soft-deleted Job can never appear here.
             query = query.eq("status", "Completed");
           } else {
-            // All pending statuses (non-terminal, non-In-Progress, non-deleted).
-            query = query.in("status", [
-              "Draft",
-              "Pending Approval",
-              "Open",
-              "Assigned",
-              "Waiting Customer",
-              "Waiting Vendor",
-            ]);
+            // WP3C-2 — All Pending: every non-terminal, non-deleted status,
+            // In Progress included. A pending cancellation is only an overlay.
+            query = query.in("status", [...ALL_PENDING_STATUSES]);
           }
 
           if (customerCode) query = query.eq("customer_code_snapshot", customerCode);
@@ -155,9 +179,7 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             const me = user.diagnostics.matchedN3UserId;
             if (me) {
               // Exclude jobs whose assignee is me. Unassigned rows remain.
-              query = query.or(
-                `assigned_user_id.is.null,assigned_user_id.neq.${me}`,
-              );
+              query = query.or(`assigned_user_id.is.null,assigned_user_id.neq.${me}`);
             }
           }
           if (from) query = query.gte("created_at", from);
@@ -167,6 +189,57 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             query = query.or(
               `job_number.ilike.${like},subject.ilike.${like},customer_name_snapshot.ilike.${like}`,
             );
+          }
+
+          const isCompletedStatusList =
+            queueType === "completed" ||
+            queueType === "completed_followup" ||
+            queueType === "follow_up_open" ||
+            queueType === "reopen_pending" ||
+            queueType === "resolved" ||
+            queueType === "resolved_today" ||
+            queueType === "legacy_completed" ||
+            queueType === "completed_current_cycle";
+          if (isCompletedStatusList && (completedFromDay || completedToDay)) {
+            const { fromIso: cf, toIso: ct } = malaysiaDayRangeToUtc(
+              completedFromDay,
+              completedToDay,
+            );
+            if (cf) query = query.gte("completed_at", cf);
+            if (ct) query = query.lt("completed_at", ct);
+          }
+
+          // WP3C-2 — plain status lists that can grow large are paginated in
+          // the database, never loaded whole.
+          const dbPaged =
+            queueType === "completed" || queueType === "cancelled" || queueType === "all_jobs";
+          if (dbPaged) {
+            const sortCol = queueType === "all_jobs" ? "created_at" : "completed_at";
+            const {
+              data: pageRows,
+              error: pageErr,
+              count: pageCount,
+            } = await query
+              .order(sortCol, { ascending: false, nullsFirst: false })
+              .order("created_at", { ascending: false })
+              .range((page - 1) * pageSize, page * pageSize - 1);
+            if (pageErr) throw pageErr;
+            const { pendingCancellationJobIds: flaggedIds } =
+              await import("@/lib/qne/service-jobs/cancellation.server");
+            const list = pageRows ?? [];
+            const marks =
+              list.length > 0
+                ? await flaggedIds(
+                    user.tenantCode,
+                    list.map((r) => r.id),
+                  )
+                : new Set<string>();
+            return Response.json({
+              jobs: list.map((r) => ({ ...r, has_active_cancellation_request: marks.has(r.id) })),
+              total: pageCount ?? list.length,
+              page,
+              pageSize,
+            });
           }
 
           const { data, error, count } = await query;
@@ -180,17 +253,9 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             return a.created_at.localeCompare(b.created_at);
           });
 
-          // WP3A/WP3C — Completed lists read newest completion first.
-          const isCompletedList =
-            queueType === "completed" ||
-            queueType === "completed_followup" ||
-            queueType === "follow_up_open" ||
-            queueType === "reopen_pending" ||
-            queueType === "resolved" ||
-            queueType === "resolved_today" ||
-            queueType === "legacy_completed" ||
-            queueType === "completed_current_cycle";
-          if (isCompletedList) {
+          // WP3A/WP3C — Completed outcome lists read newest completion first
+          // (plain "completed" is already DB-ordered and returned above).
+          if (isCompletedStatusList) {
             rows = rows
               .slice()
               .sort((a, b) =>
@@ -204,12 +269,19 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           // CURRENT completion cycle counts, so an earlier cycle's follow-up
           // flag can never leak into a later cycle.
           let followUpOnly = false;
+          // Outcome indicator (Resolved / Follow-up Open / Reopen Pending /
+          // Legacy) for rows decided by the shared outcome read model.
+          let outcomeById = new Map<string, string>();
 
           // WP3B/WP3C — outcome lists. The SAME shared derivation the dashboard
           // cards count with decides membership here, so a card count and the
           // list it opens always agree. Legacy Completed jobs without modern
           // evidence only ever appear in the explicit legacy scope.
+          // completed_followup is kept only as a stable alias of Follow-up
+          // Open: membership is outcome-derived, so a cleared follow-up
+          // (Resolved after Follow-up) can never appear as still needing one.
           if (
+            queueType === "completed_followup" ||
             queueType === "follow_up_open" ||
             queueType === "reopen_pending" ||
             queueType === "resolved" ||
@@ -219,9 +291,8 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           ) {
             followUpOnly = true;
             const { loadCompletionOutcomes } = await import("@/lib/qne/service-jobs/wp3b.server");
-            const { outcomesForQueue, matchesWp3bCard } = await import(
-              "@/lib/qne/dashboard/followup-scope"
-            );
+            const { outcomesForQueue, matchesWp3bCard } =
+              await import("@/lib/qne/dashboard/followup-scope");
             const outcomeRows = await loadCompletionOutcomes(user.tenantCode);
             const { fromIso, toIso } = malaysiaTodayUtcRange();
             const keep = new Set(
@@ -244,40 +315,26 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
                       { todayFromIso: fromIso, todayToIso: toIso },
                     );
                   }
-                  return (outcomesForQueue(queueType) as string[]).includes(r.outcome);
+                  const outcomeKey =
+                    queueType === "completed_followup" ? "follow_up_open" : queueType;
+                  return (
+                    outcomesForQueue(
+                      outcomeKey as "follow_up_open" | "reopen_pending" | "resolved",
+                    ) as string[]
+                  ).includes(r.outcome);
                 })
                 .map((r) => r.id),
             );
             rows = rows.filter((r) => keep.has(r.id));
-          }
-
-          if (queueType === "completed_followup") {
-            followUpOnly = true;
-            const ids = rows.map((r) => r.id);
-            if (ids.length === 0) {
-              rows = [];
-            } else {
-              const { data: evidence, error: evErr } = await supabaseAdmin
-                .from("service_job_completions")
-                .select("service_job_id, completion_cycle, follow_up_required")
-                .eq("tenant_code", user.tenantCode)
-                .in("service_job_id", ids);
-              if (evErr) throw evErr;
-              const { followUpJobIds } = await import(
-                "@/lib/qne/service-jobs/wp3a-queues"
-              );
-              const keep = followUpJobIds(rows, evidence ?? []);
-              rows = rows.filter((r) => keep.has(r.id));
-            }
+            outcomeById = new Map(outcomeRows.map((r) => [r.id, r.outcome as string]));
           }
 
           // Shared cancellation-state awareness. Every authenticated
           // same-tenant user may know that a Job they can already see carries
           // an active cancellation request; no request detail is ever exposed
           // here. One query per result set, never per row.
-          const { pendingCancellationJobIds } = await import(
-            "@/lib/qne/service-jobs/cancellation.server"
-          );
+          const { pendingCancellationJobIds } =
+            await import("@/lib/qne/service-jobs/cancellation.server");
           const cancellationOnly = queueType === "cancellation_requested";
           let flagged: Set<string>;
           let total: number;
@@ -309,6 +366,7 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           const jobs = paged.map((r) => ({
             ...r,
             has_active_cancellation_request: flagged.has(r.id),
+            outcome: outcomeById.get(r.id) ?? null,
           }));
 
           return Response.json({
@@ -318,11 +376,13 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             pageSize,
           });
         } catch (err) {
-
           const resp = guardResponse(err);
           if (resp) return resp;
           console.error("[workspace/jobs/pending] failed", err);
-          return Response.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
+          return Response.json(
+            { error: err instanceof Error ? err.message : "Failed" },
+            { status: 500 },
+          );
         }
       },
     },

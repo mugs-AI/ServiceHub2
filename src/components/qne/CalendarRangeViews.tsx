@@ -186,22 +186,31 @@ export function WeekSchedule({
 
 /* -------------------------------- Month ------------------------------- */
 
+/**
+ * Month view — one compact Monday-first seven-column grid on every width.
+ * Phones show a dot/count per appointment day and the selected day's agenda
+ * below the grid; desktop cells also list the first few appointments.
+ */
 export function MonthSchedule({
   anchor,
   items,
   loading,
   error,
   showTechnician = false,
+  onSelectDay,
 }: {
   anchor: string;
   items: Appointment[];
   loading: boolean;
   error: string | null;
   showTechnician?: boolean;
+  /** Tapping a day selects it (keeps the shared calendar anchor in sync). */
+  onSelectDay?: (dayKey: string) => void;
 }) {
   const grouped = useMemo(() => groupByDay(items), [items]);
   const grid = useMemo(() => monthGridDays(anchor), [anchor]);
   const { openJobTab } = useTabs();
+  const selected = anchor;
 
   if (loading) return <LoadingBlock />;
   if (error) return <ErrorBlock error={error} />;
@@ -209,15 +218,16 @@ export function MonthSchedule({
   const inMonthCount = grid
     .filter((d) => isSameMonth(d, anchor))
     .reduce((n, d) => n + (grouped.get(d)?.length ?? 0), 0);
+  const agenda = grouped.get(selected) ?? [];
 
   return (
     <div className="space-y-3">
-      {/* Desktop: Monday-first month grid */}
-      <div className="hidden overflow-hidden rounded-xl border bg-card shadow-sm md:block">
-        <div className="grid grid-cols-7 border-b bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div data-testid="month-grid" className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="grid grid-cols-7 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
           {WEEKDAY_SHORT.map((w) => (
-            <div key={w} className="px-2 py-1.5 text-center">
-              {w}
+            <div key={w} className="px-0.5 py-1.5 text-center">
+              <span className="md:hidden">{w.slice(0, 2)}</span>
+              <span className="hidden md:inline">{w}</span>
             </div>
           ))}
         </div>
@@ -225,20 +235,45 @@ export function MonthSchedule({
           {grid.map((d) => {
             const list = grouped.get(d) ?? [];
             const outside = !isSameMonth(d, anchor);
+            const isSel = d === selected;
             return (
               <div
                 key={d}
-                className={`min-h-24 border-b border-r p-1.5 align-top ${
+                role="button"
+                tabIndex={0}
+                aria-label={`${dayHeading(d)}${list.length ? `, ${list.length} appointment${list.length === 1 ? "" : "s"}` : ""}`}
+                aria-pressed={isSel}
+                onClick={() => onSelectDay?.(d)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectDay?.(d);
+                  }
+                }}
+                className={`min-h-12 min-w-0 cursor-pointer border-b border-r p-1 text-left align-top outline-none focus-visible:ring-2 focus-visible:ring-primary md:min-h-24 md:p-1.5 ${
                   outside ? "bg-muted/30 text-muted-foreground/70" : "bg-card"
-                }`}
+                } ${isSel ? "ring-2 ring-inset ring-primary" : ""}`}
               >
-                <div className="mb-1 text-[11px] font-semibold">{Number(d.slice(8, 10))}</div>
-                <ul className="space-y-1">
+                <div className="flex items-center justify-between gap-0.5">
+                  <span className="text-[11px] font-semibold">{Number(d.slice(8, 10))}</span>
+                  {list.length > 0 && (
+                    <span
+                      data-testid="day-count"
+                      className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground md:hidden"
+                    >
+                      {list.length}
+                    </span>
+                  )}
+                </div>
+                <ul className="mt-1 hidden space-y-1 md:block">
                   {list.slice(0, 3).map((a) => (
                     <li key={a.id}>
                       <button
                         type="button"
-                        onClick={() => openJobTab(a.id, a.job_number)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openJobTab(a.id, a.job_number);
+                        }}
                         title={`${a.job_number} · ${a.subject}`}
                         className="block w-full truncate rounded bg-primary/10 px-1.5 py-0.5 text-left text-[11px] font-medium text-primary hover:bg-primary/20"
                       >
@@ -258,33 +293,26 @@ export function MonthSchedule({
         </div>
       </div>
 
-      {/* Mobile: agenda by day — same data, compact presentation */}
-      <div className="space-y-3 md:hidden">
-        {grid
-          .filter((d) => isSameMonth(d, anchor) && (grouped.get(d)?.length ?? 0) > 0)
-          .map((d) => (
-            <section key={d} className="rounded-lg border bg-background/40 p-3">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {dayHeading(d)} · {grouped.get(d)!.length}
-              </h3>
-              <ul className="space-y-2">
-                {grouped.get(d)!.map((a) => (
-                  <li key={a.id}>
-                    <AppointmentRow a={a} showTechnician={showTechnician} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        {inMonthCount === 0 && (
-          <div className="rounded-lg border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
-            No appointments scheduled for this month.
-          </div>
+      {/* Selected day's agenda — same data; appointment rows open Jobs. */}
+      <section data-testid="month-day-agenda" className="rounded-lg border bg-background/40 p-3">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {dayHeading(selected)} · {agenda.length}
+        </h3>
+        {agenda.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No appointments scheduled.</p>
+        ) : (
+          <ul className="space-y-2">
+            {agenda.map((a) => (
+              <li key={a.id}>
+                <AppointmentRow a={a} showTechnician={showTechnician} />
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
+      </section>
 
       {inMonthCount === 0 && (
-        <p className="hidden rounded-lg border border-dashed bg-background/60 p-4 text-center text-sm text-muted-foreground md:block">
+        <p className="rounded-lg border border-dashed bg-background/60 p-4 text-center text-sm text-muted-foreground">
           No appointments scheduled for this month.
         </p>
       )}

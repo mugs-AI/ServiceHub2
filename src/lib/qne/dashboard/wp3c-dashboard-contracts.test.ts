@@ -261,7 +261,9 @@ describe("WP3C — Admin Dashboard cards", () => {
   });
 
   it("offers a Pending Queue tab for every queue destination", () => {
-    const ui = read("src/routes/jobs.pending.tsx");
+    // WP3C-2: deep-link keys resolve through the consolidated taxonomy.
+    const ui =
+      read("src/routes/jobs.pending.tsx") + read("src/lib/qne/dashboard/pending-queue-groups.ts");
     // `reopen_requests` is referenced through the shared WP3A constant.
     const viaConstant = new Set<string>(["reopen_requests"]);
     for (const card of ALL_ADMIN_CARDS) {
@@ -270,14 +272,14 @@ describe("WP3C — Admin Dashboard cards", () => {
         expect(ui).toContain("QUEUE_REOPEN_REQUESTS");
         continue;
       }
-      expect(ui).toContain(`"${card.queueType}"`);
+      expect(ui).toMatch(new RegExp(`"${card.queueType}"|\\b${card.queueType}:`));
     }
     for (const label of [
       "Jobs Today",
       "Active Jobs",
       "In Progress",
       "Resolved Today",
-      "Legacy Completed",
+      "Legacy/Data Alert",
     ]) {
       expect(ui).toContain(label);
     }

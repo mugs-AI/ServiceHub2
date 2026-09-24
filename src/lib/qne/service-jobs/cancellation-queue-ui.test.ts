@@ -41,19 +41,20 @@ describe("Admin Dashboard source contract", () => {
   });
 });
 
+const groups = readFileSync("src/lib/qne/dashboard/pending-queue-groups.ts", "utf8");
+
 describe("Pending Queue source contract", () => {
   it("shows one Cancellation Requested tab to every authenticated user", () => {
-    expect(pending).toContain('label: "Cancellation Requested"');
+    // WP3C-2: Cancellation is an Approvals type visible to every user.
+    expect(pending + groups).toContain('label: "Cancellation"');
     expect(pending).not.toContain("adminOnly: true");
     expect(pending).toContain("currentUser?.isAdministrator");
   });
 
   it("keeps the rich decision queue Admin-only and routes Normal Users to the safe Workspace filter", () => {
-    expect(pending).toContain("const cancellationView = isCancellationTab && isAdmin");
+    expect(pending).toContain("if (isAdmin) {");
     expect(pending).toContain('CANCELLATION_WORKSPACE_QUEUE = "cancellation_requested"');
-    expect(pending).toContain(
-      'if (isCancellationTab) sp.set("queueType", CANCELLATION_WORKSPACE_QUEUE);',
-    );
+    expect(pending).toContain('js.set("queueType", CANCELLATION_WORKSPACE_QUEUE);');
   });
 
   it("highlights the whole card for a Job with an active cancellation request", () => {
@@ -70,7 +71,7 @@ describe("Pending Queue source contract", () => {
   });
 
   it("opens Job Detail from a request row and offers no decision buttons", () => {
-    expect(pending).toContain("openJobTab(r.service_job_id, r.job_number)");
+    expect(pending).toContain("openJob(r.service_job_id, r.job_number)");
     expect(pending).not.toMatch(/>\s*(Approve|Reject)\s*</);
   });
 
