@@ -146,7 +146,9 @@ describe("Pending Queue categories", () => {
   it("follow-up filtering runs through the current-cycle rule", () => {
     // WP3C-2: completed_followup is an alias of the outcome-derived
     // Follow-up Open list (current cycle via loadCompletionOutcomes).
-    expect(pendingRoute).toContain('queueType === "completed_followup" ? "follow_up_open" : queueType');
+    expect(pendingRoute).toContain(
+      'queueType === "completed_followup" ? "follow_up_open" : queueType',
+    );
     expect(pendingRoute).toContain("loadCompletionOutcomes");
   });
 

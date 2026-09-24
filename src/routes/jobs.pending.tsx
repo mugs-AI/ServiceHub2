@@ -115,13 +115,19 @@ const EMPTY_MSG: Record<string, string> = {
 };
 
 const OUTCOME_BADGE: Record<string, { label: string; cls: string }> = {
-  resolved_at_completion: { label: "Resolved", cls: "border-emerald-300 bg-emerald-50 text-emerald-900" },
+  resolved_at_completion: {
+    label: "Resolved",
+    cls: "border-emerald-300 bg-emerald-50 text-emerald-900",
+  },
   resolved_after_follow_up: {
     label: "Resolved after Follow-up",
     cls: "border-emerald-300 bg-emerald-50 text-emerald-900",
   },
   follow_up_open: { label: "Follow-up Open", cls: "border-amber-300 bg-amber-50 text-amber-900" },
-  reopen_pending: { label: "Reopen Pending", cls: "border-orange-300 bg-orange-50 text-orange-900" },
+  reopen_pending: {
+    label: "Reopen Pending",
+    cls: "border-orange-300 bg-orange-50 text-orange-900",
+  },
   legacy_unknown: { label: "Legacy · Data Alert", cls: "border-rose-300 bg-rose-50 text-rose-900" },
 };
 
@@ -204,17 +210,27 @@ function PendingQueuePage() {
           });
           const body = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(body?.error ?? "Failed to load cancellation requests");
-          return { admin: (body.requests ?? []) as CancellationRow[], jobs: [] as QueueRow[], total: Number(body.total ?? 0) };
+          return {
+            admin: (body.requests ?? []) as CancellationRow[],
+            jobs: [] as QueueRow[],
+            total: Number(body.total ?? 0),
+          };
         }
         // Normal Users see the safe, Job-state-only view of the same scope.
         const js = new URLSearchParams(sp);
         js.set("queueType", CANCELLATION_WORKSPACE_QUEUE);
         if (technicianFilter) js.set("technician", technicianFilter);
         if (excludeMe) js.set("excludeMe", "1");
-        const res = await fetch(`/api/workspace/jobs/pending?${js.toString()}`, { headers: authHeaders() });
+        const res = await fetch(`/api/workspace/jobs/pending?${js.toString()}`, {
+          headers: authHeaders(),
+        });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body?.error ?? "Failed to load queue");
-        return { admin: [] as CancellationRow[], jobs: (body.jobs ?? []) as QueueRow[], total: Number(body.total ?? 0) };
+        return {
+          admin: [] as CancellationRow[],
+          jobs: (body.jobs ?? []) as QueueRow[],
+          total: Number(body.total ?? 0),
+        };
       };
       const loadReopens = async (sp: URLSearchParams) => {
         const res = await fetch(`/api/workspace/reopen-requests?${sp.toString()}`, {

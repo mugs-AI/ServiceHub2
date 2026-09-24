@@ -65,7 +65,14 @@ export function AppTabs() {
                 aria-label={`Close ${t.label}`}
                 className="mr-1 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
                   <path d="M6 6l12 12M6 18L18 6" />
                 </svg>
               </button>

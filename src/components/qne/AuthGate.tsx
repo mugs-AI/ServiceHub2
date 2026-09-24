@@ -38,7 +38,6 @@ const ADMIN_TOOLS: NavItem[] = [
   { to: "/users", label: "N3 Users" },
 ];
 
-
 export function AuthGate({ children }: { children?: ReactNode }) {
   const { ready, token, session, error } = useSession();
 
@@ -59,7 +58,11 @@ export function AuthGate({ children }: { children?: ReactNode }) {
     );
   }
 
-  return <AuthenticatedShell error={error} session={session}>{children}</AuthenticatedShell>;
+  return (
+    <AuthenticatedShell error={error} session={session}>
+      {children}
+    </AuthenticatedShell>
+  );
 }
 
 function AuthenticatedShell({
@@ -103,7 +106,6 @@ function AuthenticatedShell({
         closable: false,
         kind: "pinned",
       },
-
     ],
     [isAdmin],
   );
@@ -180,7 +182,14 @@ function AppHeader() {
             aria-expanded={mobileOpen}
             className="grid h-10 w-10 place-items-center rounded-md border md:hidden"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M3 6h18M3 12h18M3 18h18" />
             </svg>
           </button>
@@ -274,7 +283,14 @@ function ToolsMenu({ isAdmin }: { isAdmin: boolean }) {
         className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
       >
         Tools
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
@@ -310,12 +326,13 @@ function UserMenu({ user }: { user: CurrentUserInfo | null }) {
   }, [open]);
 
   const name = user?.displayName || session?.email || "User";
-  const initials = name
-    .split(/[\s@.]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase() ?? "")
-    .join("") || "U";
+  const initials =
+    name
+      .split(/[\s@.]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((s) => s[0]?.toUpperCase() ?? "")
+      .join("") || "U";
   const isAdmin = !!user?.isAdministrator;
 
   return (

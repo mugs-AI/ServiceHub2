@@ -222,10 +222,7 @@ export function MonthSchedule({
 
   return (
     <div className="space-y-3">
-      <div
-        data-testid="month-grid"
-        className="overflow-hidden rounded-xl border bg-card shadow-sm"
-      >
+      <div data-testid="month-grid" className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="grid grid-cols-7 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
           {WEEKDAY_SHORT.map((w) => (
             <div key={w} className="px-0.5 py-1.5 text-center">

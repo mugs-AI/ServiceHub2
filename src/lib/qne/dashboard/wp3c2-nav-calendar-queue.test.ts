@@ -17,11 +17,7 @@ import {
   viewForQueueKey,
 } from "./pending-queue-groups";
 import { matchesWp3bCard } from "./followup-scope";
-import {
-  isSameMonth,
-  monthGridDays,
-  rangeForView,
-} from "@/lib/qne/service-jobs/calendar-range";
+import { isSameMonth, monthGridDays, rangeForView } from "@/lib/qne/service-jobs/calendar-range";
 
 const read = (p: string) => readFileSync(p, "utf8");
 
@@ -122,7 +118,10 @@ describe("WP3C-2 — old dashboard deep-link mapping", () => {
 });
 
 describe("WP3C-2 — outcome membership", () => {
-  const range = { todayFromIso: "2026-09-23T16:00:00.000Z", todayToIso: "2026-09-24T16:00:00.000Z" };
+  const range = {
+    todayFromIso: "2026-09-23T16:00:00.000Z",
+    todayToIso: "2026-09-24T16:00:00.000Z",
+  };
   const cleared = {
     outcome: "resolved_after_follow_up" as const,
     assigned_user_id: "u1",
@@ -137,18 +136,32 @@ describe("WP3C-2 — outcome membership", () => {
   it("Resolved Today respects the Malaysia day boundary", () => {
     // 23:59 MYT on the 23rd is yesterday; 00:00 MYT on the 24th is today.
     expect(
-      matchesWp3bCard({ ...cleared, followup_resolved_at: "2026-09-23T15:59:59.000Z" }, "resolvedToday", range),
+      matchesWp3bCard(
+        { ...cleared, followup_resolved_at: "2026-09-23T15:59:59.000Z" },
+        "resolvedToday",
+        range,
+      ),
     ).toBe(false);
     expect(
-      matchesWp3bCard({ ...cleared, followup_resolved_at: "2026-09-23T16:00:00.000Z" }, "resolvedToday", range),
+      matchesWp3bCard(
+        { ...cleared, followup_resolved_at: "2026-09-23T16:00:00.000Z" },
+        "resolvedToday",
+        range,
+      ),
     ).toBe(true);
     expect(
-      matchesWp3bCard({ ...cleared, followup_resolved_at: "2026-09-24T16:00:00.000Z" }, "resolvedToday", range),
+      matchesWp3bCard(
+        { ...cleared, followup_resolved_at: "2026-09-24T16:00:00.000Z" },
+        "resolvedToday",
+        range,
+      ),
     ).toBe(false);
   });
   it("legacy vs current cycle stays available as a filter and indicator", () => {
     const api = read("src/routes/api/workspace/jobs.pending.ts");
-    expect(api).toContain('if (queueType === "legacy_completed") return r.outcome === "legacy_unknown";');
+    expect(api).toContain(
+      'if (queueType === "legacy_completed") return r.outcome === "legacy_unknown";',
+    );
     expect(api).toContain('return r.outcome !== "legacy_unknown";');
     expect(api).toContain("outcome: outcomeById.get(r.id) ?? null");
     expect(read("src/routes/jobs.pending.tsx")).toContain("Legacy · Data Alert");
@@ -202,7 +215,9 @@ describe("WP3C-2 — calendar", () => {
   it("mobile renders the grid (no hidden-on-mobile month) with day selection + agenda", () => {
     const src = read("src/components/qne/CalendarRangeViews.tsx");
     expect(src).toContain('data-testid="month-grid"');
-    expect(src).not.toContain("hidden overflow-hidden rounded-xl border bg-card shadow-sm md:block");
+    expect(src).not.toContain(
+      "hidden overflow-hidden rounded-xl border bg-card shadow-sm md:block",
+    );
     expect(src).toContain("onSelectDay?.(d)");
     expect(src).toContain('data-testid="day-count"');
     expect(src).toContain('data-testid="month-day-agenda"');
@@ -222,7 +237,9 @@ describe("WP3C-2 — calendar", () => {
     expect(src).toContain('data-testid="calendar-nav-row" className="flex flex-nowrap');
     expect(src).toContain("<InfoPopover");
     expect(src).toContain("Appointments shown in Malaysia time (Asia/Kuala_Lumpur).");
-    expect(src).not.toContain('<p className="mt-1 text-sm text-muted-foreground">\n            Appointments');
+    expect(src).not.toContain(
+      '<p className="mt-1 text-sm text-muted-foreground">\n            Appointments',
+    );
   });
 });
 
@@ -230,7 +247,9 @@ describe("WP3C-2 — navigation separation", () => {
   const gate = read("src/components/qne/AuthGate.tsx");
   const tabs = read("src/components/qne/AppTabs.tsx");
   it("header carries Dashboard | Workspace | Pending | Calendar on every width", () => {
-    expect(gate).toContain('export const PRIMARY_NAV_LABELS = ["Dashboard", "Workspace", "Pending", "Calendar"]');
+    expect(gate).toContain(
+      'export const PRIMARY_NAV_LABELS = ["Dashboard", "Workspace", "Pending", "Calendar"]',
+    );
     expect(gate).toContain('data-testid="primary-nav"');
     expect(gate).not.toContain('"Pending Queue"');
     expect(gate).toContain("Tools");
