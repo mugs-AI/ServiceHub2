@@ -248,17 +248,9 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
             return a.created_at.localeCompare(b.created_at);
           });
 
-          // WP3A/WP3C — Completed lists read newest completion first.
-          const isCompletedList =
-            queueType === "completed" ||
-            queueType === "completed_followup" ||
-            queueType === "follow_up_open" ||
-            queueType === "reopen_pending" ||
-            queueType === "resolved" ||
-            queueType === "resolved_today" ||
-            queueType === "legacy_completed" ||
-            queueType === "completed_current_cycle";
-          if (isCompletedList) {
+          // WP3A/WP3C — Completed outcome lists read newest completion first
+          // (plain "completed" is already DB-ordered and returned above).
+          if (isCompletedStatusList) {
             rows = rows
               .slice()
               .sort((a, b) =>
