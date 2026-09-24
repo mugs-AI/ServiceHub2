@@ -168,8 +168,8 @@ function PendingQueuePage() {
   const isAdmin = !!currentUser?.isAdministrator;
 
   const isCompletedGroup = view.group === "completed";
-  const pageSize = isCompletedGroup ? completedPageSize : approvalsAll ? 100 : 25;
   const approvalsAll = view.group === "approvals" && view.scope === "";
+  const pageSize = isCompletedGroup ? completedPageSize : approvalsAll ? 100 : 25;
   const isCancellationScope = view.group === "approvals" && view.scope === CANCELLATION_QUEUE;
   const reopenScope = view.group === "approvals" && view.scope === QUEUE_REOPEN_REQUESTS;
   const serverQueueType = serverQueueTypeFor(view);
