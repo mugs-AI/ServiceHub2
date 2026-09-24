@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { CalendarDays } from "lucide-react";
 
 import { DaySchedule, useDaySchedule } from "@/components/qne/DaySchedule";
-import { MalaysiaDateInput } from "@/components/qne/MalaysiaDateInput";
+import { InfoPopover } from "@/components/qne/InfoPopover";
+import { MalaysiaDatePopover } from "@/components/qne/MalaysiaDayPicker";
 import { MonthSchedule, WeekSchedule, useRangeSchedule } from "@/components/qne/CalendarRangeViews";
 import {
   type CalendarView,
@@ -83,12 +85,12 @@ function CalendarPage() {
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Scheduling</p>
-          <h1 className="mt-1 text-xl font-semibold text-foreground sm:text-2xl">
-            Service Calendar
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Appointments shown in Malaysia time (Asia/Kuala_Lumpur).
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-foreground sm:text-2xl">Service Calendar</h1>
+            <InfoPopover label="About calendar time zone" testId="calendar-tz-info" align="left">
+              Appointments shown in Malaysia time (Asia/Kuala_Lumpur).
+            </InfoPopover>
+          </div>
         </div>
         <button
           type="button"
@@ -136,35 +138,45 @@ function CalendarPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {/* WP3C-2 — Prev · period (date picker) · Next · Today on one row. */}
+        <div data-testid="calendar-nav-row" className="flex flex-nowrap items-center gap-1.5">
           <button
             type="button"
+            aria-label="Previous"
             onClick={() => setDate((d) => shiftForView(view, d, -1))}
-            className="min-h-11 rounded-md border px-3 text-sm font-semibold hover:bg-accent"
+            className="min-h-11 min-w-11 shrink-0 rounded-md border px-2 text-sm font-semibold hover:bg-accent"
           >
-            ← Prev
+            ←
           </button>
-          <MalaysiaDateInput
+          <MalaysiaDatePopover
             value={date}
-            onChange={(iso) => setDate(iso || myDayKey())}
-            aria-label="Calendar date (dd/mm/yyyy)"
-            className="w-[10.5rem]"
+            onSelect={(iso) => setDate(iso || myDayKey())}
+            trigger={
+              <button
+                type="button"
+                aria-label={`Choose date — ${rangeLabel}`}
+                className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border px-2 text-sm font-semibold text-foreground hover:bg-accent"
+              >
+                <CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span className="truncate">{rangeLabel}</span>
+              </button>
+            }
           />
           <button
             type="button"
+            aria-label="Next"
             onClick={() => setDate((d) => shiftForView(view, d, 1))}
-            className="min-h-11 rounded-md border px-3 text-sm font-semibold hover:bg-accent"
+            className="min-h-11 min-w-11 shrink-0 rounded-md border px-2 text-sm font-semibold hover:bg-accent"
           >
-            Next →
+            →
           </button>
           <button
             type="button"
             onClick={() => setDate(myDayKey())}
-            className="min-h-11 rounded-md border px-3 text-sm font-semibold hover:bg-accent"
+            className="min-h-11 shrink-0 rounded-md border px-3 text-sm font-semibold hover:bg-accent"
           >
             Today
           </button>
-          <span className="ml-auto text-sm font-semibold text-foreground">{rangeLabel}</span>
         </div>
       </div>
 
@@ -190,6 +202,7 @@ function CalendarPage() {
       {view === "month" && (
         <MonthSchedule
           anchor={date}
+          onSelectDay={setDate}
           items={rangeFeed.items}
           loading={rangeFeed.loading}
           error={rangeFeed.error}
