@@ -6,6 +6,12 @@ import { CancellationSettingsCard } from "@/components/qne/CancellationSettingsC
 import { EntitlementPolicyCard } from "@/components/qne/EntitlementPolicyCard";
 import { GoogleDriveCard } from "@/components/qne/GoogleDriveCard";
 import { RoleDiagnostics } from "@/components/qne/RoleDiagnostics";
+import {
+  AttachmentPolicyCard,
+  CompletionPolicyCard,
+  InquiryAccessCard,
+  TravelGpsCard,
+} from "@/components/qne/SystemOptionsCards";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 
@@ -92,6 +98,32 @@ function formatCycle(value: number | null, unit: string | null): string {
   return `${value} ${plural}`;
 }
 
+const SECTION_NAV = [
+  { id: "grp-renewal", label: "Renewals & Coverage" },
+  { id: "grp-field", label: "Field Work & Jobs" },
+  { id: "grp-storage", label: "Storage & Attachments" },
+  { id: "grp-access", label: "Access" },
+] as const;
+
+function SettingsGroup({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-32 space-y-4">
+      <h2 id={`${id}-title`} className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 function Settings() {
   const { session } = useSession();
   const tenant = session?.tenantCode ?? "—";
@@ -137,56 +169,33 @@ function Settings() {
   const activeCategories = categories.filter((c) => c.is_active);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Configure how N3 Stock Codes drive renewable services for this Client
-          (<span className="font-mono">{tenant}</span>). Renewal mappings assign
-          a Subscription Category (e.g. Maintenance, Hosting, N3 Subscription)
-          and a Renewal Cycle. Ad Hoc mappings mark service-only items. Changes
-          mark related snapshots stale — recalculate from the{" "}
-          <Link to="/admin/snapshots" className="underline">
-            Snapshot Console
-          </Link>
-          .
+    <div className="mx-auto max-w-5xl space-y-6">
+      <header className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Owner / Admin
         </p>
-      </div>
-
-      <SubscriptionCategoriesPanel
-        rows={categories}
-        onChanged={(msg) => {
-          notify("ok", msg);
-          bumpCategories();
-        }}
-        onError={(msg) => notify("err", msg)}
-      />
-
-      <EntitlementPolicyCard onNotify={notify} />
-
-      <GoogleDriveCard onNotify={notify} />
-
-      <CancellationSettingsCard onNotify={notify} />
-
-      <div className="flex gap-1 border-b">
-        {(["renewal", "adhoc", "diagnostics"] as TabKey[]).map((k) => (
-          <button
-            key={k}
-            onClick={() => setTab(k)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === k
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {TAB_LABEL[k]}
-          </button>
-        ))}
-      </div>
+        <h1 className="text-2xl font-semibold text-foreground">System Options</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Company settings for <span className="font-mono">{tenant}</span>. Changes are saved
+          per company and recorded in the audit log.
+        </p>
+        <nav aria-label="Settings sections" className="mt-3 flex flex-wrap gap-2">
+          {SECTION_NAV.map((s) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className="inline-flex min-h-9 items-center rounded-full border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted"
+            >
+              {s.label}
+            </a>
+          ))}
+        </nav>
+      </header>
 
       {toast && (
         <div
-          className={`rounded-md px-3 py-2 text-sm ${
+          role="status"
+          className={`sticky top-32 z-10 rounded-md px-3 py-2 text-sm shadow-sm ${
             toast.kind === "ok"
               ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
               : "bg-destructive/10 text-destructive"
@@ -196,56 +205,106 @@ function Settings() {
         </div>
       )}
 
-      {tab === "diagnostics" ? (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-foreground">Role Diagnostics</h2>
-          <p className="text-xs text-muted-foreground">
-            Read-only view of how this signed-in session resolved its N3 identity
-            and Administrator authority. Values come from the authenticated
-            session only.
-          </p>
-          <RoleDiagnostics />
+      <SettingsGroup id="grp-renewal" title="Renewals & Coverage">
+        <SubscriptionCategoriesPanel
+          rows={categories}
+          onChanged={(msg) => {
+            notify("ok", msg);
+            bumpCategories();
+          }}
+          onError={(msg) => notify("err", msg)}
+        />
+
+        <EntitlementPolicyCard onNotify={notify} />
+
+        <section id="opt-stock-mapping" className="scroll-mt-32 space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">Stock Mapping</h3>
+            <p className="text-xs text-muted-foreground">
+              Renewal mappings assign a Subscription Category and Renewal Cycle; Ad Hoc mappings
+              mark service-only items. Changes mark related snapshots stale.
+            </p>
+          </div>
+          <div className="flex gap-1 overflow-x-auto border-b">
+            {(["renewal", "adhoc", "diagnostics"] as TabKey[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className={`-mb-px min-h-11 shrink-0 border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  tab === k
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {TAB_LABEL[k]}
+              </button>
+            ))}
+          </div>
+
+          {tab === "diagnostics" ? (
+            <section className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Read-only view of how this signed-in session resolved its N3 identity and
+                Administrator authority.
+              </p>
+              <RoleDiagnostics />
+            </section>
+          ) : (
+            <>
+              <MappingTab
+                key={tab}
+                tab={tab}
+                categories={activeCategories}
+                reloadKey={reloadKey}
+                onSaved={(msg) => {
+                  notify("ok", msg);
+                  bumpReload();
+                }}
+                onError={(msg) => notify("err", msg)}
+              />
+
+              <ConfiguredMappings
+                tab={tab}
+                categories={activeCategories}
+                reloadKey={reloadKey}
+                onChange={(msg) => {
+                  notify("ok", msg);
+                  bumpReload();
+                }}
+                onError={(msg) => notify("err", msg)}
+              />
+            </>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+            <span className="text-muted-foreground">
+              After mapping changes, recalculate snapshots.
+            </span>
+            <Link
+              to="/admin/snapshots"
+              className="inline-flex min-h-11 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Open Snapshot Console
+            </Link>
+          </div>
         </section>
-      ) : (
-        <>
-          <MappingTab
-            key={tab}
-            tab={tab}
-            categories={activeCategories}
-            reloadKey={reloadKey}
-            onSaved={(msg) => {
-              notify("ok", msg);
-              bumpReload();
-            }}
-            onError={(msg) => notify("err", msg)}
-          />
+      </SettingsGroup>
 
-          <ConfiguredMappings
-            tab={tab}
-            categories={activeCategories}
-            reloadKey={reloadKey}
-            onChange={(msg) => {
-              notify("ok", msg);
-              bumpReload();
-            }}
-            onError={(msg) => notify("err", msg)}
-          />
-        </>
-      )}
+      <SettingsGroup id="grp-field" title="Field Work & Jobs">
+        <TravelGpsCard onNotify={notify} />
+        <CompletionPolicyCard />
+        <CancellationSettingsCard onNotify={notify} />
+      </SettingsGroup>
 
-      <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3 text-sm">
-        <span className="text-muted-foreground">
-          After mapping changes, recalculate snapshots from the Snapshot Console.
-        </span>
-        <Link
-          to="/admin/snapshots"
-          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Open Snapshot Console
-        </Link>
-      </div>
+      <SettingsGroup id="grp-storage" title="Storage & Attachments">
+        <GoogleDriveCard onNotify={notify} />
+        <AttachmentPolicyCard />
+      </SettingsGroup>
 
-      <AdminAllowlistPanel />
+      <SettingsGroup id="grp-access" title="Access">
+        <InquiryAccessCard onNotify={notify} />
+        <AdminAllowlistPanel />
+      </SettingsGroup>
     </div>
   );
 }
