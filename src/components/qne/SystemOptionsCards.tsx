@@ -134,7 +134,9 @@ export function TravelGpsCard({ onNotify }: { onNotify: Notify }) {
           <select
             className="mt-1 block h-11 w-full rounded-md border bg-background px-3 text-sm"
             value={value.mode}
-            onChange={(e) => setValue({ ...value, mode: e.target.value as TravelGpsSettings["mode"] })}
+            onChange={(e) =>
+              setValue({ ...value, mode: e.target.value as TravelGpsSettings["mode"] })
+            }
           >
             {GPS_MODES.map((m) => (
               <option key={m} value={m}>
@@ -206,9 +208,15 @@ export function CompletionPolicyCard() {
       title="Completion & Acknowledgement"
       description="Completion rules applied to every Job."
     >
-      <ul className="list-disc space-y-1 pl-5 text-sm text-foreground" data-testid="completion-policy">
+      <ul
+        className="list-disc space-y-1 pl-5 text-sm text-foreground"
+        data-testid="completion-policy"
+      >
         <li>Completion needs a resolution note and is saved in one step.</li>
-        <li>Ticking “Follow-up required” keeps the Job in Follow-up Open until it is cleared with a note.</li>
+        <li>
+          Ticking “Follow-up required” keeps the Job in Follow-up Open until it is cleared with a
+          note.
+        </li>
         <li>Completed work can only be reopened through an approved reopen request.</li>
         <li>Customer acknowledgement capture is not yet available.</li>
       </ul>
@@ -222,7 +230,10 @@ interface InquiryRow {
   normalUser: InquiryPermission;
 }
 
-const DIMENSIONS: { k: "can_view" | "can_export_excel" | "view_private_notes" | "view_gps"; label: string }[] = [
+const DIMENSIONS: {
+  k: "can_view" | "can_export_excel" | "view_private_notes" | "view_gps";
+  label: string;
+}[] = [
   { k: "can_view", label: "View" },
   { k: "can_export_excel", label: "Export to Excel" },
   { k: "view_private_notes", label: "Private notes" },
@@ -288,7 +299,9 @@ function InquiryEditor({ row, onNotify }: { row: InquiryRow; onNotify: Notify })
             className="mt-1 block h-11 w-full rounded-md border bg-background px-3 text-sm sm:w-64"
             value={value.scope}
             disabled={!value.can_view}
-            onChange={(e) => setValue({ ...value, scope: e.target.value as InquiryPermission["scope"] })}
+            onChange={(e) =>
+              setValue({ ...value, scope: e.target.value as InquiryPermission["scope"] })
+            }
           >
             <option value="own">{INQUIRY_SCOPE_LABEL.own}</option>
             <option value="all">{INQUIRY_SCOPE_LABEL.all}</option>
@@ -340,7 +353,9 @@ export function InquiryAccessCard({ onNotify }: { onNotify: Notify }) {
       {error && <p className="text-sm text-destructive">{error}</p>}
       {!rows && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
       <div className="space-y-3">
-        {rows?.map((r) => <InquiryEditor key={r.key} row={r} onNotify={onNotify} />)}
+        {rows?.map((r) => (
+          <InquiryEditor key={r.key} row={r} onNotify={onNotify} />
+        ))}
       </div>
     </OptionCard>
   );

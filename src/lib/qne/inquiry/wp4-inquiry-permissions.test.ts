@@ -127,7 +127,9 @@ describe("server boundaries", () => {
   it("tenant PUT validates Travel/GPS", () => {
     expect(read("src/routes/api/settings/tenant.ts")).toContain("validateTravelGpsPatch");
     expect(validateTravelGpsPatch(undefined)).toBeNull();
-    expect(validateTravelGpsPatch({ mode: "optional", events: { travel_started: true } })).toBeNull();
+    expect(
+      validateTravelGpsPatch({ mode: "optional", events: { travel_started: true } }),
+    ).toBeNull();
     expect(validateTravelGpsPatch({ mode: "always" })).not.toBeNull();
     expect(validateTravelGpsPatch({ mode: "off", events: { hack: true } })).not.toBeNull();
   });
@@ -137,12 +139,27 @@ describe("settings UI", () => {
   const ui = read("src/components/qne/SystemOptionsCards.tsx");
   const page = read("src/routes/settings.tsx");
   it("mounts the WP4 cards", () => {
-    for (const c of ["TravelGpsCard", "InquiryAccessCard", "AttachmentPolicyCard", "CompletionPolicyCard", "CancellationSettingsCard", "GoogleDriveCard", "EntitlementPolicyCard", "SubscriptionCategoriesPanel"]) {
+    for (const c of [
+      "TravelGpsCard",
+      "InquiryAccessCard",
+      "AttachmentPolicyCard",
+      "CompletionPolicyCard",
+      "CancellationSettingsCard",
+      "GoogleDriveCard",
+      "EntitlementPolicyCard",
+      "SubscriptionCategoriesPanel",
+    ]) {
       expect(page).toContain(`<${c}`);
     }
   });
   it("exposes no speculative roles or unsupported providers", () => {
-    for (const bad of ["coordinator", "support_pic", "reports_viewer", "S3", "Google Cloud Storage"]) {
+    for (const bad of [
+      "coordinator",
+      "support_pic",
+      "reports_viewer",
+      "S3",
+      "Google Cloud Storage",
+    ]) {
       expect(ui).not.toContain(bad);
       expect(page).not.toContain(bad);
     }

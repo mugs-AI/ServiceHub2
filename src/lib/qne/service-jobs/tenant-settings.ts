@@ -34,13 +34,7 @@ export interface TravelGpsSettings {
   viewGpsRoles: string[];
 }
 
-export const STORAGE_MODES = [
-  "disabled",
-  "supabase",
-  "google_drive",
-  "s3",
-  "gcs",
-] as const;
+export const STORAGE_MODES = ["disabled", "supabase", "google_drive", "s3", "gcs"] as const;
 export type StorageMode = (typeof STORAGE_MODES)[number];
 
 export const STORAGE_MODE_LABEL: Record<StorageMode, string> = {
@@ -121,7 +115,6 @@ export interface TenantSettings {
   cancellation: CancellationSettings;
 }
 
-
 export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
   travelGps: {
     mode: "optional",
@@ -152,14 +145,7 @@ export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
   completion: {
     ackMode: "required_onsite",
     requiredCategories: [],
-    allowedMethods: [
-      "signature",
-      "name_checkbox",
-      "whatsapp",
-      "email",
-      "phone",
-      "remote_session",
-    ],
+    allowedMethods: ["signature", "name_checkbox", "whatsapp", "email", "phone", "remote_session"],
     allowAdminWaiver: true,
   },
   cancellation: DEFAULT_CANCELLATION_SETTINGS,

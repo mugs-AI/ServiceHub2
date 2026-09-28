@@ -116,7 +116,10 @@ function SettingsGroup({
 }) {
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-32 space-y-4">
-      <h2 id={`${id}-title`} className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2
+        id={`${id}-title`}
+        className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+      >
         {title}
       </h2>
       {children}
@@ -140,14 +143,8 @@ function Settings() {
   }, [toast]);
 
   const bumpReload = useCallback(() => setReloadKey((k) => k + 1), []);
-  const bumpCategories = useCallback(
-    () => setCategoriesReloadKey((k) => k + 1),
-    [],
-  );
-  const notify = useCallback(
-    (kind: "ok" | "err", msg: string) => setToast({ kind, msg }),
-    [],
-  );
+  const bumpCategories = useCallback(() => setCategoriesReloadKey((k) => k + 1), []);
+  const notify = useCallback((kind: "ok" | "err", msg: string) => setToast({ kind, msg }), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,8 +173,8 @@ function Settings() {
         </p>
         <h1 className="text-2xl font-semibold text-foreground">System Options</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Company settings for <span className="font-mono">{tenant}</span>. Changes are saved
-          per company and recorded in the audit log.
+          Company settings for <span className="font-mono">{tenant}</span>. Changes are saved per
+          company and recorded in the audit log.
         </p>
         <nav aria-label="Settings sections" className="mt-3 flex flex-wrap gap-2">
           {SECTION_NAV.map((s) => (
@@ -217,7 +214,10 @@ function Settings() {
 
         <EntitlementPolicyCard onNotify={notify} />
 
-        <section id="opt-stock-mapping" className="scroll-mt-32 space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+        <section
+          id="opt-stock-mapping"
+          className="scroll-mt-32 space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5"
+        >
           <div>
             <h3 className="text-base font-semibold text-foreground">Stock Mapping</h3>
             <p className="text-xs text-muted-foreground">
@@ -380,8 +380,8 @@ function SubscriptionCategoriesPanel({
     <section className="rounded-lg border bg-card p-4">
       <h2 className="text-sm font-semibold text-foreground">Subscription Categories</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Categories group renewable services. Every Renewal mapping is assigned
-        to one category. System categories can be disabled but not deleted.
+        Categories group renewable services. Every Renewal mapping is assigned to one category.
+        System categories can be disabled but not deleted.
       </p>
 
       <form onSubmit={add} className="mt-3 flex flex-wrap items-center gap-2">
@@ -548,7 +548,7 @@ function MappingTab({
     return {
       category: m?.subscription_category ?? categories[0]?.name ?? "",
       cycleValue: m?.renewal_cycle_value ?? 1,
-      cycleUnit: ((m?.renewal_cycle_unit as CycleUnit) ?? "year"),
+      cycleUnit: (m?.renewal_cycle_unit as CycleUnit) ?? "year",
     };
   };
 
@@ -559,10 +559,7 @@ function MappingTab({
     }));
   };
 
-  const getPendingForCode = (
-    existing: PendingRenewal | undefined,
-    _code: string,
-  ): PendingRenewal =>
+  const getPendingForCode = (existing: PendingRenewal | undefined, _code: string): PendingRenewal =>
     existing ?? {
       category: categories[0]?.name ?? "",
       cycleValue: 1,
@@ -632,8 +629,7 @@ function MappingTab({
 
       {meta && !meta.tenantHasSnapshots && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Stock snapshots are empty for this Client. Run Stock Snapshot Sync
-          first from the{" "}
+          Stock snapshots are empty for this Client. Run Stock Snapshot Sync first from the{" "}
           <Link to="/admin/snapshots" className="underline">
             Snapshot Console
           </Link>
@@ -681,9 +677,7 @@ function MappingTab({
                   <tr key={r.stock_code} className="border-t align-top">
                     <td className="px-3 py-2 font-mono text-xs">{r.stock_code}</td>
                     <td className="px-3 py-2">
-                      <div>
-                        {r.stock_name ?? <span className="text-muted-foreground">—</span>}
-                      </div>
+                      <div>{r.stock_name ?? <span className="text-muted-foreground">—</span>}</div>
                       {r.description && r.description !== r.stock_name && (
                         <div className="text-xs text-muted-foreground">{r.description}</div>
                       )}
@@ -715,9 +709,7 @@ function MappingTab({
                             }
                             className="w-48 rounded-md border bg-background px-2 py-1 text-sm"
                           >
-                            {categories.length === 0 && (
-                              <option value="">No categories</option>
-                            )}
+                            {categories.length === 0 && <option value="">No categories</option>}
                             {categories.map((c) => (
                               <option key={c.id} value={c.name}>
                                 {c.name}
@@ -814,9 +806,7 @@ function ConfiguredMappings({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await authFetch(
-        `/api/settings/stock-mappings?mode=configured&type=${tab}`,
-      );
+      const res = await authFetch(`/api/settings/stock-mappings?mode=configured&type=${tab}`);
       const json = (await res.json()) as { rows?: ConfiguredRow[]; error?: string };
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       setRows(json.rows ?? []);
@@ -908,9 +898,7 @@ function ConfiguredMappings({
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">
           Configured {tab === "renewal" ? "Renewal" : "Ad Hoc"} Mappings
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            ({rows.length})
-          </span>
+          <span className="ml-2 text-xs font-normal text-muted-foreground">({rows.length})</span>
         </h2>
         {rows.length > 5 && (
           <input
@@ -977,9 +965,9 @@ function ConfiguredMappings({
                               ))}
                             </select>
                           ) : (
-                            r.subscription_category ?? (
+                            (r.subscription_category ?? (
                               <span className="text-muted-foreground">—</span>
-                            )
+                            ))
                           )}
                         </td>
                         <td className="px-3 py-2">
@@ -996,9 +984,7 @@ function ConfiguredMappings({
                               />
                               <select
                                 value={editCycleUnit}
-                                onChange={(e) =>
-                                  setEditCycleUnit(e.target.value as CycleUnit)
-                                }
+                                onChange={(e) => setEditCycleUnit(e.target.value as CycleUnit)}
                                 className="rounded-md border bg-background px-2 py-1 text-sm"
                               >
                                 <option value="day">Day</option>
@@ -1049,9 +1035,7 @@ function ConfiguredMappings({
                                   r.subscription_category ?? categories[0]?.name ?? "",
                                 );
                                 setEditCycleValue(r.renewal_cycle_value ?? 1);
-                                setEditCycleUnit(
-                                  ((r.renewal_cycle_unit as CycleUnit) ?? "year"),
-                                );
+                                setEditCycleUnit((r.renewal_cycle_unit as CycleUnit) ?? "year");
                               }}
                               className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
                             >
@@ -1149,10 +1133,9 @@ function AdminAllowlistPanel() {
 
   const remove = async (email: string) => {
     if (!confirm(`Remove administrator access for ${email}?`)) return;
-    const res = await call(
-      `/api/admin/allowlist?email=${encodeURIComponent(email)}`,
-      { method: "DELETE" },
-    );
+    const res = await call(`/api/admin/allowlist?email=${encodeURIComponent(email)}`, {
+      method: "DELETE",
+    });
     if (res.ok) await load();
     else {
       const j = (await res.json().catch(() => ({}))) as { error?: string };
@@ -1163,12 +1146,10 @@ function AdminAllowlistPanel() {
   return (
     <section className="rounded-lg border bg-card p-4">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">
-          Emergency Administrator Fallback
-        </h2>
+        <h2 className="text-sm font-semibold text-foreground">Emergency Administrator Fallback</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          ServiceHub administration is granted to the current N3 company Owner.
-          This allowlist is an emergency fallback, active only while{" "}
+          ServiceHub administration is granted to the current N3 company Owner. This allowlist is an
+          emergency fallback, active only while{" "}
           <code className="mx-1 rounded bg-muted px-1">SERVICEHUB_ALLOWLIST_FALLBACK=1</code>
           is set.
         </p>
@@ -1221,8 +1202,7 @@ function AdminAllowlistPanel() {
               </tr>
             ) : (
               rows.map((r) => {
-                const isSelf =
-                  r.email.toLowerCase() === (currentUser?.email ?? "").toLowerCase();
+                const isSelf = r.email.toLowerCase() === (currentUser?.email ?? "").toLowerCase();
                 return (
                   <tr key={r.id} className="border-t">
                     <td className="px-3 py-2 font-mono text-xs">
