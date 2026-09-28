@@ -7,12 +7,10 @@ export const Route = createFileRoute("/api/settings/tenant")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { loadTenantSettings } = await import(
-          "@/lib/qne/service-jobs/tenant-settings.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { loadTenantSettings } =
+          await import("@/lib/qne/service-jobs/tenant-settings.server");
         try {
           const user = await requireAuthenticatedN3User(request);
           const settings = await loadTenantSettings(user.tenantCode);
@@ -26,12 +24,10 @@ export const Route = createFileRoute("/api/settings/tenant")({
       },
 
       PUT: async ({ request }) => {
-        const { requireAuthenticatedN3User, guardResponse } = await import(
-          "@/lib/qne/session/current-user.server"
-        );
-        const { loadTenantSettings, saveTenantSettings } = await import(
-          "@/lib/qne/service-jobs/tenant-settings.server"
-        );
+        const { requireAuthenticatedN3User, guardResponse } =
+          await import("@/lib/qne/session/current-user.server");
+        const { loadTenantSettings, saveTenantSettings } =
+          await import("@/lib/qne/service-jobs/tenant-settings.server");
         const { mergeTenantSettings } = await import("@/lib/qne/service-jobs/tenant-settings");
         try {
           const user = await requireAuthenticatedN3User(request);
@@ -43,6 +39,11 @@ export const Route = createFileRoute("/api/settings/tenant")({
           }
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
           const area = String(body.area ?? "settings");
+          const { validateTravelGpsPatch } = await import("@/lib/qne/service-jobs/tenant-settings");
+          const gpsError = validateTravelGpsPatch(
+            (body.settings as { travelGps?: unknown } | undefined)?.travelGps,
+          );
+          if (gpsError) return Response.json({ error: gpsError }, { status: 400 });
           const current = await loadTenantSettings(user.tenantCode);
           const next = mergeTenantSettings({ ...current, ...(body.settings ?? {}) });
           const saved = await saveTenantSettings(
