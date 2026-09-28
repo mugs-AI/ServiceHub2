@@ -43,6 +43,11 @@ export const Route = createFileRoute("/api/settings/tenant")({
           }
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
           const area = String(body.area ?? "settings");
+          const { validateTravelGpsPatch } = await import("@/lib/qne/service-jobs/tenant-settings");
+          const gpsError = validateTravelGpsPatch(
+            (body.settings as { travelGps?: unknown } | undefined)?.travelGps,
+          );
+          if (gpsError) return Response.json({ error: gpsError }, { status: 400 });
           const current = await loadTenantSettings(user.tenantCode);
           const next = mergeTenantSettings({ ...current, ...(body.settings ?? {}) });
           const saved = await saveTenantSettings(

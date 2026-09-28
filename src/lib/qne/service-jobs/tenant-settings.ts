@@ -181,6 +181,22 @@ export function mergeTenantSettings(raw: unknown): TenantSettings {
   };
 }
 
+/** WP4 — validate an Owner-submitted Travel/GPS patch; null when valid or absent. */
+export function validateTravelGpsPatch(raw: unknown): string | null {
+  if (raw === undefined) return null;
+  if (!raw || typeof raw !== "object") return "Travel & GPS settings are invalid.";
+  const r = raw as { mode?: unknown; events?: unknown };
+  if (!(GPS_MODES as readonly unknown[]).includes(r.mode)) return "Unknown GPS mode.";
+  if (r.events !== undefined) {
+    if (!r.events || typeof r.events !== "object") return "GPS events are invalid.";
+    for (const [k, v] of Object.entries(r.events as Record<string, unknown>)) {
+      if (!(GPS_EVENTS as readonly string[]).includes(k)) return `Unknown GPS event: ${k}.`;
+      if (typeof v !== "boolean") return `GPS event ${k} must be true or false.`;
+    }
+  }
+  return null;
+}
+
 /** Should the browser ask for location for this event on this Job? */
 export function gpsRequestFor(
   settings: TravelGpsSettings,
