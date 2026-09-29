@@ -98,32 +98,104 @@ function formatCycle(value: number | null, unit: string | null): string {
   return `${value} ${plural}`;
 }
 
-const SECTION_NAV = [
+export const SECTION_NAV = [
   { id: "grp-renewal", label: "Renewals & Coverage" },
   { id: "grp-field", label: "Field Work & Jobs" },
   { id: "grp-storage", label: "Storage & Attachments" },
   { id: "grp-access", label: "Access" },
 ] as const;
 
+export type SectionId = (typeof SECTION_NAV)[number]["id"];
+
+/** Map a URL hash (legacy #grp-* anchors) to a tab; unknown → Renewals. */
+export function sectionFromHash(hash: string): SectionId {
+  const id = hash.replace(/^#/, "");
+  return (SECTION_NAV.find((s) => s.id === id)?.id ?? "grp-renewal") as SectionId;
+}
+
 function SettingsGroup({
   id,
   title,
+  active,
   children,
 }: {
-  id: string;
+  id: SectionId;
   title: string;
+  active: boolean;
   children: React.ReactNode;
 }) {
+  // Inactive panels stay mounted (hidden) so unsaved edits and loaded data
+  // survive switching tabs.
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-32 space-y-4">
-      <h2
-        id={`${id}-title`}
-        className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
-      >
-        {title}
-      </h2>
+    <section
+      id={id}
+      role="tabpanel"
+      aria-labelledby={`${id}-tab`}
+      hidden={!active}
+      tabIndex={0}
+      className="space-y-4 focus:outline-none"
+    >
+      <h2 className="sr-only">{title}</h2>
       {children}
     </section>
+  );
+}
+
+function SettingsTabs({
+  active,
+  onChange,
+}: {
+  active: SectionId;
+  onChange: (id: SectionId) => void;
+}) {
+  const refs = useRef(new Map<string, HTMLButtonElement>());
+  function onKey(e: React.KeyboardEvent, idx: number) {
+    let next = -1;
+    if (e.key === "ArrowRight") next = (idx + 1) % SECTION_NAV.length;
+    else if (e.key === "ArrowLeft") next = (idx - 1 + SECTION_NAV.length) % SECTION_NAV.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = SECTION_NAV.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    const id = SECTION_NAV[next].id;
+    onChange(id);
+    refs.current.get(id)?.focus();
+  }
+  return (
+    <div
+      role="tablist"
+      aria-label="System Options sections"
+      className="-mx-1 mt-3 flex gap-1 overflow-x-auto border-b px-1"
+      data-testid="settings-tabs"
+    >
+      {SECTION_NAV.map((s, i) => {
+        const on = s.id === active;
+        return (
+          <button
+            key={s.id}
+            ref={(el) => {
+              if (el) refs.current.set(s.id, el);
+              else refs.current.delete(s.id);
+            }}
+            id={`${s.id}-tab`}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            aria-controls={s.id}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onChange(s.id)}
+            onKeyDown={(e) => onKey(e, i)}
+            className={`-mb-px min-h-11 shrink-0 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors ${
+              on
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -131,6 +203,20 @@ function Settings() {
   const { session } = useSession();
   const tenant = session?.tenantCode ?? "—";
   const [tab, setTab] = useState<TabKey>("renewal");
+  const [section, setSection] = useState<SectionId>("grp-renewal");
+
+  // Honour legacy #grp-* deep links after hydration, and follow hash changes.
+  useEffect(() => {
+    const sync = () => setSection(sectionFromHash(window.location.hash));
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+
+  const changeSection = useCallback((id: SectionId) => {
+    setSection(id);
+    window.history.replaceState(null, "", `#${id}`);
+  }, []);
   const [reloadKey, setReloadKey] = useState(0);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
@@ -176,17 +262,7 @@ function Settings() {
           Company settings for <span className="font-mono">{tenant}</span>. Changes are saved per
           company and recorded in the audit log.
         </p>
-        <nav aria-label="Settings sections" className="mt-3 flex flex-wrap gap-2">
-          {SECTION_NAV.map((s) => (
-            <a
-              key={s.id}
-              href={`#${s.id}`}
-              className="inline-flex min-h-9 items-center rounded-full border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted"
-            >
-              {s.label}
-            </a>
-          ))}
-        </nav>
+        <SettingsTabs active={section} onChange={changeSection} />
       </header>
 
       {toast && (
@@ -202,7 +278,7 @@ function Settings() {
         </div>
       )}
 
-      <SettingsGroup id="grp-renewal" title="Renewals & Coverage">
+      <SettingsGroup id="grp-renewal" active={section === "grp-renewal"} title="Renewals & Coverage">
         <SubscriptionCategoriesPanel
           rows={categories}
           onChanged={(msg) => {
@@ -290,18 +366,18 @@ function Settings() {
         </section>
       </SettingsGroup>
 
-      <SettingsGroup id="grp-field" title="Field Work & Jobs">
+      <SettingsGroup id="grp-field" active={section === "grp-field"} title="Field Work & Jobs">
         <TravelGpsCard onNotify={notify} />
         <CompletionPolicyCard />
         <CancellationSettingsCard onNotify={notify} />
       </SettingsGroup>
 
-      <SettingsGroup id="grp-storage" title="Storage & Attachments">
+      <SettingsGroup id="grp-storage" active={section === "grp-storage"} title="Storage & Attachments">
         <GoogleDriveCard onNotify={notify} />
-        <AttachmentPolicyCard />
+        <AttachmentPolicyCard onNotify={notify} />
       </SettingsGroup>
 
-      <SettingsGroup id="grp-access" title="Access">
+      <SettingsGroup id="grp-access" active={section === "grp-access"} title="Access">
         <InquiryAccessCard onNotify={notify} />
         <AdminAllowlistPanel />
       </SettingsGroup>
