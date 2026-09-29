@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AdminOnly } from "@/components/qne/AdminOnly";
 import { CancellationSettingsCard } from "@/components/qne/CancellationSettingsCard";
@@ -13,6 +13,7 @@ import {
   TravelGpsCard,
 } from "@/components/qne/SystemOptionsCards";
 import { useSession } from "@/lib/qne/session-context";
+import { SECTION_NAV, sectionFromHash, type SectionId } from "@/lib/qne/settings-sections";
 import { getStoredToken } from "@/lib/qne/tokens";
 
 export const Route = createFileRoute("/settings")({
@@ -98,20 +99,6 @@ function formatCycle(value: number | null, unit: string | null): string {
   return `${value} ${plural}`;
 }
 
-export const SECTION_NAV = [
-  { id: "grp-renewal", label: "Renewals & Coverage" },
-  { id: "grp-field", label: "Field Work & Jobs" },
-  { id: "grp-storage", label: "Storage & Attachments" },
-  { id: "grp-access", label: "Access" },
-] as const;
-
-export type SectionId = (typeof SECTION_NAV)[number]["id"];
-
-/** Map a URL hash (legacy #grp-* anchors) to a tab; unknown → Renewals. */
-export function sectionFromHash(hash: string): SectionId {
-  const id = hash.replace(/^#/, "");
-  return (SECTION_NAV.find((s) => s.id === id)?.id ?? "grp-renewal") as SectionId;
-}
 
 function SettingsGroup({
   id,
