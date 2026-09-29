@@ -8,7 +8,12 @@ import {
   type CancellationSettings,
 } from "./cancellation";
 
-export type { CancellationSettings };
+import {
+  DEFAULT_JOB_ATTACHMENT_LIMITS,
+  type JobAttachmentLimits,
+} from "@/lib/qne/storage/attachment-policy";
+
+export type { CancellationSettings, JobAttachmentLimits };
 
 export const GPS_MODES = ["off", "optional", "required_onsite"] as const;
 export type GpsMode = (typeof GPS_MODES)[number];
@@ -113,6 +118,12 @@ export interface TenantSettings {
   completion: CompletionSettings;
   /** WP0E-R — tenant-configurable Service Job cancellation policy. */
   cancellation: CancellationSettings;
+  /**
+   * WP4 correction — Owner-adjustable Job attachment limits for the Google
+   * Drive upload path. Resolved server-side through resolveEffectivePolicy,
+   * which never exceeds the hard caps in attachment-policy.ts.
+   */
+  jobAttachments: JobAttachmentLimits;
 }
 
 export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
@@ -149,6 +160,10 @@ export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
     allowAdminWaiver: true,
   },
   cancellation: DEFAULT_CANCELLATION_SETTINGS,
+  jobAttachments: {
+    ...DEFAULT_JOB_ATTACHMENT_LIMITS,
+    allowedExtensions: [...DEFAULT_JOB_ATTACHMENT_LIMITS.allowedExtensions],
+  },
 };
 
 /** Merge stored partials over defaults so old tenants keep working. */
@@ -164,6 +179,7 @@ export function mergeTenantSettings(raw: unknown): TenantSettings {
     attachments: { ...d.attachments, ...(src.attachments ?? {}) },
     completion: { ...d.completion, ...(src.completion ?? {}) },
     cancellation: mergeCancellationSettings(src.cancellation),
+    jobAttachments: { ...d.jobAttachments, ...(src.jobAttachments ?? {}) },
   };
 }
 

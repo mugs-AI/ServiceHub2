@@ -20,6 +20,14 @@ import { createFileRoute } from "@tanstack/react-router";
 const LEGACY_BUCKET = "job-attachments";
 const SIGNED_URL_TTL = 300; // seconds
 
+/** Tenant-effective attachment policy (never above the hard caps). */
+async function effectivePolicyFor(tenantCode: string) {
+  const { loadTenantSettings } = await import("@/lib/qne/service-jobs/tenant-settings.server");
+  const { resolveEffectivePolicy } = await import("@/lib/qne/storage/attachment-policy");
+  const settings = await loadTenantSettings(tenantCode);
+  return resolveEffectivePolicy(settings.jobAttachments);
+}
+
 export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
   server: {
     handlers: {
@@ -35,6 +43,9 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           if (!job) return Response.json({ error: "Job not found." }, { status: 404 });
 
           const rows = await svc.loadActiveAttachments(user.tenantCode, params.jobId);
+          // Effective limits come from the server-verified tenant only. They
+          // govern NEW uploads; existing rows are always listed and readable.
+          const effective = await effectivePolicyFor(user.tenantCode);
 
           // Legacy Supabase-backed rows stay readable via a short-lived signed
           // URL. Drive-backed rows are served only through the authorised
@@ -69,9 +80,10 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const quota = {
             activeCount: rows.length,
             activeBytes: rows.reduce((n, r) => n + (Number(r.file_size) || 0), 0),
-            maxFiles: policy.MAX_ACTIVE_FILES,
-            maxTotalBytes: policy.MAX_TOTAL_BYTES,
-            maxFileBytes: policy.MAX_FILE_BYTES,
+            maxFiles: effective.maxActiveFiles,
+            maxTotalBytes: effective.maxTotalBytes,
+            maxFileBytes: effective.maxFileBytes,
+            allowedExtensions: effective.allowedExtensions,
           };
 
           return Response.json({
@@ -148,7 +160,8 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           const candidate = { name: displayName, type: file.type, size: file.size };
           const mime = policy.effectiveMime(candidate);
 
-          const verdict = policy.validateCandidate(candidate);
+          const effective = await effectivePolicyFor(user.tenantCode);
+          const verdict = policy.validateCandidate(candidate, effective);
           if (!verdict.ok) {
             return Response.json({ error: verdict.error }, { status: 400 });
           }
@@ -156,7 +169,11 @@ export const Route = createFileRoute("/api/workspace/jobs/$jobId/attachments")({
           // Server-side quota, re-read inside the request so a stale browser
           // count cannot be used to exceed the limits.
           const { activeCount, activeBytes } = await svc.quotaFor(user.tenantCode, params.jobId);
-          const quotaVerdict = policy.validateQuota({ activeCount, activeBytes }, file.size);
+          const quotaVerdict = policy.validateQuota(
+            { activeCount, activeBytes },
+            file.size,
+            effective,
+          );
           if (!quotaVerdict.ok) {
             return Response.json({ error: quotaVerdict.error }, { status: 409 });
           }
