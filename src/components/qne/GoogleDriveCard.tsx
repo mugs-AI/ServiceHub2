@@ -15,7 +15,7 @@ import {
 } from "@/lib/qne/storage/drive-picker";
 
 import {
-  ATTACHMENTS_NOT_IMPLEMENTED_NOTICE,
+  ATTACHMENTS_STORAGE_NOTICE,
   DEFAULT_ROOT_FOLDER_NAME,
   NOT_CONNECTED,
   PUBLIC_SHARING_CONFIRMATION,
@@ -232,8 +232,8 @@ export function GoogleDriveCard({
         </span>
       </div>
 
-      <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-        {ATTACHMENTS_NOT_IMPLEMENTED_NOTICE}
+      <p className="mt-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+        {ATTACHMENTS_STORAGE_NOTICE}
       </p>
 
       {loadError && (

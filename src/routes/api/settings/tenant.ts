@@ -44,8 +44,16 @@ export const Route = createFileRoute("/api/settings/tenant")({
             (body.settings as { travelGps?: unknown } | undefined)?.travelGps,
           );
           if (gpsError) return Response.json({ error: gpsError }, { status: 400 });
+          const patch = { ...((body.settings ?? {}) as Record<string, unknown>) };
+          if (patch.jobAttachments !== undefined) {
+            const { validateJobAttachmentLimits } =
+              await import("@/lib/qne/storage/attachment-policy");
+            const limits = validateJobAttachmentLimits(patch.jobAttachments);
+            if (!limits.ok) return Response.json({ error: limits.error }, { status: 400 });
+            patch.jobAttachments = limits.value;
+          }
           const current = await loadTenantSettings(user.tenantCode);
-          const next = mergeTenantSettings({ ...current, ...(body.settings ?? {}) });
+          const next = mergeTenantSettings({ ...current, ...patch });
           const saved = await saveTenantSettings(
             user.tenantCode,
             next,

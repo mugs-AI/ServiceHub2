@@ -11,10 +11,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-  ACCEPT_ATTRIBUTE,
-  MAX_ACTIVE_FILES,
-  MAX_FILE_BYTES,
-  MAX_TOTAL_BYTES,
+  HARD_POLICY,
+  acceptAttributeFor,
+  type EffectiveAttachmentPolicy,
   effectiveMime,
   formatBytes,
   sanitizeDisplayName,
@@ -44,6 +43,18 @@ interface Quota {
   maxFiles: number;
   maxTotalBytes: number;
   maxFileBytes: number;
+  allowedExtensions?: string[];
+}
+
+/** Server-supplied effective policy; hard caps until the list has loaded. */
+function policyFromQuota(q: Quota | null): EffectiveAttachmentPolicy {
+  if (!q) return HARD_POLICY;
+  return {
+    maxFileBytes: q.maxFileBytes,
+    maxActiveFiles: q.maxFiles,
+    maxTotalBytes: q.maxTotalBytes,
+    allowedExtensions: q.allowedExtensions ?? HARD_POLICY.allowedExtensions,
+  };
 }
 
 type QueueState = "queued" | "uploading" | "success" | "failed";
@@ -196,11 +207,14 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
       const rejected: QueueItem[] = [];
       for (const file of Array.from(fileList)) {
         const displayName = sanitizeDisplayName(file.name);
-        const verdict = validateCandidate({
-          name: displayName,
-          type: effectiveMime({ name: displayName, type: file.type, size: file.size }),
-          size: file.size,
-        });
+        const verdict = validateCandidate(
+          {
+            name: displayName,
+            type: effectiveMime({ name: displayName, type: file.type, size: file.size }),
+            size: file.size,
+          },
+          policyFromQuota(quota),
+        );
         const base: QueueItem = {
           key: `${displayName}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           file,
@@ -217,7 +231,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
       if (inputRef.current) inputRef.current.value = "";
       if (picked.length) void runQueue(picked);
     },
-    [runQueue],
+    [quota, runQueue],
   );
 
   const retry = useCallback(
@@ -356,21 +370,22 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
     });
   }, [releaseUrl]);
 
-  const atFileLimit = (quota?.activeCount ?? 0) >= (quota?.maxFiles ?? MAX_ACTIVE_FILES);
+  const effective = policyFromQuota(quota);
+  const atFileLimit = (quota?.activeCount ?? 0) >= effective.maxActiveFiles;
 
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">Job Attachments</h2>
         <span className="text-xs text-muted-foreground">
-          Internal only · {quota?.activeCount ?? items.length}/{quota?.maxFiles ?? MAX_ACTIVE_FILES}{" "}
-          files · {formatBytes(quota?.activeBytes ?? 0)} of{" "}
-          {formatBytes(quota?.maxTotalBytes ?? MAX_TOTAL_BYTES)}
+          Internal only · {quota?.activeCount ?? items.length}/{effective.maxActiveFiles} files ·{" "}
+          {formatBytes(quota?.activeBytes ?? 0)} of {formatBytes(effective.maxTotalBytes)}
         </span>
       </div>
 
       <p className="mt-1 text-xs text-muted-foreground">
-        Up to {formatBytes(MAX_FILE_BYTES)} per file. Photos, PDF, text, Office documents and ZIP.
+        Up to {formatBytes(effective.maxFileBytes)} per file. Allowed:{" "}
+        {effective.allowedExtensions.map((e) => `.${e}`).join(", ")}.
       </p>
 
       {err && (
@@ -384,7 +399,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
           ref={inputRef}
           type="file"
           multiple
-          accept={ACCEPT_ATTRIBUTE}
+          accept={acceptAttributeFor(effective)}
           className="hidden"
           onChange={(e) => onPick(e.target.files)}
         />
@@ -398,7 +413,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
         </button>
         {atFileLimit && (
           <span className="ml-2 text-xs text-muted-foreground">
-            This Job has reached the {quota?.maxFiles ?? MAX_ACTIVE_FILES} file limit.
+            This Job has reached the {effective.maxActiveFiles} file limit.
           </span>
         )}
       </div>

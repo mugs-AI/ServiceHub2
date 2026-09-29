@@ -193,8 +193,131 @@ export interface CandidateFile {
 
 export type PolicyResult = { ok: true; displayName: string } | { ok: false; error: string };
 
+/* ------------------------- tenant-configurable limits -------------------- */
+//
+// WP4 correction — an Owner/Admin may LOWER the limits above for their
+// company. The constants above stay the immutable hard caps: an effective
+// policy can never exceed them, and the blocklist is never weakened.
+
+/** Allowed extensions an Owner may choose from (closed allowlist). */
+export const ALLOWED_EXTENSION_KEYS: readonly string[] = Object.keys(ALLOWED_BY_EXTENSION);
+
+/** Server-validated editable ranges (whole MiB / file counts). */
+export const POLICY_BOUNDS = {
+  maxFileMB: { min: 1, max: MAX_FILE_BYTES / (1024 * 1024) },
+  maxFiles: { min: 1, max: MAX_ACTIVE_FILES },
+  maxTotalMB: { min: 1, max: MAX_TOTAL_BYTES / (1024 * 1024) },
+} as const;
+
+/** Stored shape in general_settings.extra.run7.jobAttachments. */
+export interface JobAttachmentLimits {
+  maxFileMB: number;
+  maxFiles: number;
+  maxTotalMB: number;
+  allowedExtensions: string[];
+}
+
+export const DEFAULT_JOB_ATTACHMENT_LIMITS: Readonly<JobAttachmentLimits> = Object.freeze({
+  maxFileMB: POLICY_BOUNDS.maxFileMB.max,
+  maxFiles: POLICY_BOUNDS.maxFiles.max,
+  maxTotalMB: POLICY_BOUNDS.maxTotalMB.max,
+  allowedExtensions: [...ALLOWED_EXTENSION_KEYS],
+});
+
+/** Effective policy used by upload, quota and help text. */
+export interface EffectiveAttachmentPolicy {
+  maxFileBytes: number;
+  maxActiveFiles: number;
+  maxTotalBytes: number;
+  allowedExtensions: readonly string[];
+}
+
+export const HARD_POLICY: Readonly<EffectiveAttachmentPolicy> = Object.freeze({
+  maxFileBytes: MAX_FILE_BYTES,
+  maxActiveFiles: MAX_ACTIVE_FILES,
+  maxTotalBytes: MAX_TOTAL_BYTES,
+  allowedExtensions: ALLOWED_EXTENSION_KEYS,
+});
+
+function inRange(n: unknown, b: { min: number; max: number }): n is number {
+  return typeof n === "number" && Number.isInteger(n) && n >= b.min && n <= b.max;
+}
+
+/**
+ * Strict validation of an Owner-submitted limits patch. Returns the
+ * normalised value or an error; contradictions are rejected, not corrected.
+ */
+export function validateJobAttachmentLimits(
+  raw: unknown,
+): { ok: true; value: JobAttachmentLimits } | { ok: false; error: string } {
+  if (!raw || typeof raw !== "object")
+    return { ok: false, error: "Attachment limits are invalid." };
+  const r = raw as Record<string, unknown>;
+  const B = POLICY_BOUNDS;
+  if (!inRange(r.maxFileMB, B.maxFileMB))
+    return {
+      ok: false,
+      error: `Per-file limit must be a whole number from ${B.maxFileMB.min} to ${B.maxFileMB.max} MB.`,
+    };
+  if (!inRange(r.maxFiles, B.maxFiles))
+    return {
+      ok: false,
+      error: `Files per Job must be a whole number from ${B.maxFiles.min} to ${B.maxFiles.max}.`,
+    };
+  if (!inRange(r.maxTotalMB, B.maxTotalMB))
+    return {
+      ok: false,
+      error: `Total per Job must be a whole number from ${B.maxTotalMB.min} to ${B.maxTotalMB.max} MB.`,
+    };
+  if (r.maxTotalMB < r.maxFileMB)
+    return { ok: false, error: "Total per Job cannot be smaller than the per-file limit." };
+  if (!Array.isArray(r.allowedExtensions) || r.allowedExtensions.length === 0)
+    return { ok: false, error: "Choose at least one allowed file type." };
+  const exts: string[] = [];
+  for (const e of r.allowedExtensions) {
+    const k = typeof e === "string" ? e.trim().toLowerCase() : "";
+    if (!ALLOWED_EXTENSION_KEYS.includes(k) || BLOCKED_EXTENSIONS.has(k))
+      return { ok: false, error: `".${String(e)}" is not a file type that can be allowed.` };
+    if (!exts.includes(k)) exts.push(k);
+  }
+  return {
+    ok: true,
+    value: {
+      maxFileMB: r.maxFileMB,
+      maxFiles: r.maxFiles,
+      maxTotalMB: r.maxTotalMB,
+      allowedExtensions: ALLOWED_EXTENSION_KEYS.filter((k) => exts.includes(k)),
+    },
+  };
+}
+
+/**
+ * Stored limits → effective policy. Missing or invalid stored data falls
+ * back to the hard caps (today's behaviour); the result never exceeds them.
+ */
+export function resolveEffectivePolicy(stored: unknown): EffectiveAttachmentPolicy {
+  if (stored === undefined || stored === null) return HARD_POLICY;
+  const v = validateJobAttachmentLimits(stored);
+  if (!v.ok) return HARD_POLICY;
+  const MB = 1024 * 1024;
+  return {
+    maxFileBytes: Math.min(v.value.maxFileMB * MB, MAX_FILE_BYTES),
+    maxActiveFiles: Math.min(v.value.maxFiles, MAX_ACTIVE_FILES),
+    maxTotalBytes: Math.min(v.value.maxTotalMB * MB, MAX_TOTAL_BYTES),
+    allowedExtensions: v.value.allowedExtensions,
+  };
+}
+
+/** Accept attribute for an effective policy (convenience only). */
+export function acceptAttributeFor(policy: EffectiveAttachmentPolicy): string {
+  return policy.allowedExtensions.map((e) => `.${e}`).join(",");
+}
+
 /** Per-file validation: extension, MIME, blocklist and size. */
-export function validateCandidate(file: CandidateFile): PolicyResult {
+export function validateCandidate(
+  file: CandidateFile,
+  policy: EffectiveAttachmentPolicy = HARD_POLICY,
+): PolicyResult {
   const displayName = sanitizeDisplayName(file.name);
   if (!displayName || displayName === "attachment") {
     if (!String(file.name ?? "").trim()) return { ok: false, error: "A file name is required." };
@@ -216,7 +339,7 @@ export function validateCandidate(file: CandidateFile): PolicyResult {
 
   const ext = segs[segs.length - 1];
   const accepted = ALLOWED_BY_EXTENSION[ext];
-  if (!accepted) {
+  if (!accepted || !policy.allowedExtensions.includes(ext)) {
     return { ok: false, error: `".${ext}" files are not an allowed attachment type.` };
   }
 
@@ -247,10 +370,11 @@ export function validateCandidate(file: CandidateFile): PolicyResult {
   if (!Number.isFinite(file.size) || file.size <= 0) {
     return { ok: false, error: `"${displayName}" is empty.` };
   }
-  if (file.size > MAX_FILE_BYTES) {
+  const maxFile = Math.min(policy.maxFileBytes, MAX_FILE_BYTES);
+  if (file.size > maxFile) {
     return {
       ok: false,
-      error: `"${displayName}" is larger than the ${MAX_FILE_BYTES / (1024 * 1024)} MB limit for a single attachment.`,
+      error: `"${displayName}" is larger than the ${maxFile / (1024 * 1024)} MB limit for a single attachment.`,
     };
   }
   return { ok: true, displayName };
@@ -270,17 +394,23 @@ export interface QuotaState {
 }
 
 /** Job-level count and total enforcement. Always evaluated on the server. */
-export function validateQuota(state: QuotaState, incomingBytes: number): PolicyResult {
-  if (state.activeCount >= MAX_ACTIVE_FILES) {
+export function validateQuota(
+  state: QuotaState,
+  incomingBytes: number,
+  policy: EffectiveAttachmentPolicy = HARD_POLICY,
+): PolicyResult {
+  const maxFiles = Math.min(policy.maxActiveFiles, MAX_ACTIVE_FILES);
+  const maxTotal = Math.min(policy.maxTotalBytes, MAX_TOTAL_BYTES);
+  if (state.activeCount >= maxFiles) {
     return {
       ok: false,
-      error: `This Job already has the maximum of ${MAX_ACTIVE_FILES} attachments. Delete one before uploading another.`,
+      error: `This Job already has the maximum of ${maxFiles} attachments. Delete one before uploading another.`,
     };
   }
-  if (state.activeBytes + incomingBytes > MAX_TOTAL_BYTES) {
+  if (state.activeBytes + incomingBytes > maxTotal) {
     return {
       ok: false,
-      error: `This upload would exceed the ${MAX_TOTAL_BYTES / (1024 * 1024)} MB total attachment limit for this Job.`,
+      error: `This upload would exceed the ${maxTotal / (1024 * 1024)} MB total attachment limit for this Job.`,
     };
   }
   return { ok: true, displayName: "" };
