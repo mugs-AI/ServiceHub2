@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
         const {
           toPublicConnection,
           NOT_CONNECTED,
-          ATTACHMENTS_NOT_IMPLEMENTED_NOTICE,
+          ATTACHMENTS_STORAGE_NOTICE,
           PUBLIC_SHARING_WARNING,
           PUBLIC_SHARING_CONFIRMATION,
           SHARING_READ_ONLY_NOTICE,
@@ -60,7 +60,7 @@ export const Route = createFileRoute("/api/integrations/google-drive/connection"
               process.env["GOOGLE_DRIVE_REDIRECT_URI"] ??
               redirectUriFor(new URL(request.url).origin),
             pickerApiKeyConfigured: Boolean(gd.pickerApiKey()),
-            attachmentsNotice: ATTACHMENTS_NOT_IMPLEMENTED_NOTICE,
+            attachmentsNotice: ATTACHMENTS_STORAGE_NOTICE,
             sharingWarning: PUBLIC_SHARING_WARNING,
             sharingConfirmationText: PUBLIC_SHARING_CONFIRMATION,
             sharingReadOnlyNotice: SHARING_READ_ONLY_NOTICE,

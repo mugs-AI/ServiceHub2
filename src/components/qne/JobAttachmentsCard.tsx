@@ -228,7 +228,7 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
       if (inputRef.current) inputRef.current.value = "";
       if (picked.length) void runQueue(picked);
     },
-    [runQueue],
+    [quota, runQueue],
   );
 
   const retry = useCallback(

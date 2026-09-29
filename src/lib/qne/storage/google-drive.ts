@@ -285,8 +285,8 @@ export const PUBLIC_SHARING_CONFIRMATION =
 export const SHARING_READ_ONLY_NOTICE =
   "ServiceHub only reads sharing from Google — it never changes your Drive sharing. Change sharing in Google Drive, then check it again here.";
 
-export const ATTACHMENTS_NOT_IMPLEMENTED_NOTICE =
-  "Job attachments are not yet implemented. This screen only connects your company's Google Drive; uploading, previewing, downloading and deleting Job files arrive in a later work package.";
+export const ATTACHMENTS_STORAGE_NOTICE =
+  "Job attachments are stored in this Google Drive. Files uploaded on a Service Job are saved in the chosen folder and can be previewed, downloaded and deleted from the Job. Limits and allowed file types are set under Attachment policy.";
 
 /** The exact redirect URI Google Cloud must whitelist for a deployment origin. */
 export function redirectUriFor(origin: string): string {
