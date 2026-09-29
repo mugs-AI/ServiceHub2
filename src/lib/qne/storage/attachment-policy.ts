@@ -250,15 +250,25 @@ function inRange(n: unknown, b: { min: number; max: number }): n is number {
 export function validateJobAttachmentLimits(
   raw: unknown,
 ): { ok: true; value: JobAttachmentLimits } | { ok: false; error: string } {
-  if (!raw || typeof raw !== "object") return { ok: false, error: "Attachment limits are invalid." };
+  if (!raw || typeof raw !== "object")
+    return { ok: false, error: "Attachment limits are invalid." };
   const r = raw as Record<string, unknown>;
   const B = POLICY_BOUNDS;
   if (!inRange(r.maxFileMB, B.maxFileMB))
-    return { ok: false, error: `Per-file limit must be a whole number from ${B.maxFileMB.min} to ${B.maxFileMB.max} MB.` };
+    return {
+      ok: false,
+      error: `Per-file limit must be a whole number from ${B.maxFileMB.min} to ${B.maxFileMB.max} MB.`,
+    };
   if (!inRange(r.maxFiles, B.maxFiles))
-    return { ok: false, error: `Files per Job must be a whole number from ${B.maxFiles.min} to ${B.maxFiles.max}.` };
+    return {
+      ok: false,
+      error: `Files per Job must be a whole number from ${B.maxFiles.min} to ${B.maxFiles.max}.`,
+    };
   if (!inRange(r.maxTotalMB, B.maxTotalMB))
-    return { ok: false, error: `Total per Job must be a whole number from ${B.maxTotalMB.min} to ${B.maxTotalMB.max} MB.` };
+    return {
+      ok: false,
+      error: `Total per Job must be a whole number from ${B.maxTotalMB.min} to ${B.maxTotalMB.max} MB.`,
+    };
   if (r.maxTotalMB < r.maxFileMB)
     return { ok: false, error: "Total per Job cannot be smaller than the per-file limit." };
   if (!Array.isArray(r.allowedExtensions) || r.allowedExtensions.length === 0)
@@ -364,7 +374,7 @@ export function validateCandidate(
   if (file.size > maxFile) {
     return {
       ok: false,
-      error: `"${displayName}" is larger than the ${formatBytes(maxFile)} limit for a single attachment.`,
+      error: `"${displayName}" is larger than the ${maxFile / (1024 * 1024)} MB limit for a single attachment.`,
     };
   }
   return { ok: true, displayName };
@@ -400,7 +410,7 @@ export function validateQuota(
   if (state.activeBytes + incomingBytes > maxTotal) {
     return {
       ok: false,
-      error: `This upload would exceed the ${formatBytes(maxTotal)} total attachment limit for this Job.`,
+      error: `This upload would exceed the ${maxTotal / (1024 * 1024)} MB total attachment limit for this Job.`,
     };
   }
   return { ok: true, displayName: "" };

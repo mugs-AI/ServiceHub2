@@ -226,7 +226,10 @@ export function AttachmentPolicyCard({ onNotify }: { onNotify: Notify }) {
       const res = await fetch("/api/settings/tenant", {
         method: "PUT",
         headers: authHeaders(true),
-        body: JSON.stringify({ area: "attachment_policy", settings: { jobAttachments: check.value } }),
+        body: JSON.stringify({
+          area: "attachment_policy",
+          settings: { jobAttachments: check.value },
+        }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         settings?: { jobAttachments?: JobAttachmentLimits };
@@ -261,7 +264,9 @@ export function AttachmentPolicyCard({ onNotify }: { onNotify: Notify }) {
           step={1}
           className="h-11 w-24 rounded-md border bg-background px-3 text-sm"
           value={Number.isFinite(value[k]) ? value[k] : ""}
-          onChange={(e) => setValue({ ...value, [k]: e.target.value === "" ? NaN : Number(e.target.value) })}
+          onChange={(e) =>
+            setValue({ ...value, [k]: e.target.value === "" ? NaN : Number(e.target.value) })
+          }
           aria-describedby={`att-${k}-range`}
         />
         <span className="text-xs text-muted-foreground">{unit}</span>
@@ -311,7 +316,9 @@ export function AttachmentPolicyCard({ onNotify }: { onNotify: Notify }) {
         </div>
         {!check.ok && <p className="text-xs text-destructive">{check.error}</p>}
         {!isAdmin && !loading && (
-          <p className="text-xs text-muted-foreground">Only an Owner or Administrator can change this.</p>
+          <p className="text-xs text-muted-foreground">
+            Only an Owner or Administrator can change this.
+          </p>
         )}
         <button
           type="button"
@@ -449,8 +456,8 @@ function InquiryEditor({
         </div>
         {!value.can_view && (
           <p id={hintId} className="text-xs text-muted-foreground" data-testid="inquiry-view-hint">
-            Tick View first — Export, Private notes, GPS locations and All company Jobs unlock
-            once View is on.
+            Tick View first — Export, Private notes, GPS locations and All company Jobs unlock once
+            View is on.
           </p>
         )}
         <label className="block text-sm">

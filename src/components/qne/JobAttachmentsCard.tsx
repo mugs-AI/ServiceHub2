@@ -207,11 +207,14 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
       const rejected: QueueItem[] = [];
       for (const file of Array.from(fileList)) {
         const displayName = sanitizeDisplayName(file.name);
-        const verdict = validateCandidate({
-          name: displayName,
-          type: effectiveMime({ name: displayName, type: file.type, size: file.size }),
-          size: file.size,
-        }, policyFromQuota(quota));
+        const verdict = validateCandidate(
+          {
+            name: displayName,
+            type: effectiveMime({ name: displayName, type: file.type, size: file.size }),
+            size: file.size,
+          },
+          policyFromQuota(quota),
+        );
         const base: QueueItem = {
           key: `${displayName}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           file,
@@ -375,9 +378,8 @@ export function JobAttachmentsCard({ jobId }: { jobId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">Job Attachments</h2>
         <span className="text-xs text-muted-foreground">
-          Internal only · {quota?.activeCount ?? items.length}/{effective.maxActiveFiles}{" "}
-          files · {formatBytes(quota?.activeBytes ?? 0)} of{" "}
-          {formatBytes(effective.maxTotalBytes)}
+          Internal only · {quota?.activeCount ?? items.length}/{effective.maxActiveFiles} files ·{" "}
+          {formatBytes(quota?.activeBytes ?? 0)} of {formatBytes(effective.maxTotalBytes)}
         </span>
       </div>
 

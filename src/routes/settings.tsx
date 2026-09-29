@@ -99,7 +99,6 @@ function formatCycle(value: number | null, unit: string | null): string {
   return `${value} ${plural}`;
 }
 
-
 function SettingsGroup({
   id,
   title,
@@ -265,7 +264,11 @@ function Settings() {
         </div>
       )}
 
-      <SettingsGroup id="grp-renewal" active={section === "grp-renewal"} title="Renewals & Coverage">
+      <SettingsGroup
+        id="grp-renewal"
+        active={section === "grp-renewal"}
+        title="Renewals & Coverage"
+      >
         <SubscriptionCategoriesPanel
           rows={categories}
           onChanged={(msg) => {
@@ -359,7 +362,11 @@ function Settings() {
         <CancellationSettingsCard onNotify={notify} />
       </SettingsGroup>
 
-      <SettingsGroup id="grp-storage" active={section === "grp-storage"} title="Storage & Attachments">
+      <SettingsGroup
+        id="grp-storage"
+        active={section === "grp-storage"}
+        title="Storage & Attachments"
+      >
         <GoogleDriveCard onNotify={notify} />
         <AttachmentPolicyCard onNotify={notify} />
       </SettingsGroup>
