@@ -13,12 +13,15 @@ import { Route as UsersRouteImport } from './routes/users'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReportsIndexRouteImport } from './routes/reports/index'
 import { Route as CustomersIndexRouteImport } from './routes/customers.index'
+import { Route as ReportsJobDetailsRouteImport } from './routes/reports/job-details'
 import { Route as JobsPendingRouteImport } from './routes/jobs.pending'
 import { Route as JobsNewRouteImport } from './routes/jobs.new'
 import { Route as JobsJobIdRouteImport } from './routes/jobs.$jobId'
@@ -48,6 +51,8 @@ import { Route as ApiSettingsStockMappingsRouteImport } from './routes/api/setti
 import { Route as ApiSettingsReportsRouteImport } from './routes/api/settings/reports'
 import { Route as ApiSettingsEntitlementPolicyRouteImport } from './routes/api/settings/entitlement-policy'
 import { Route as ApiSessionMeRouteImport } from './routes/api/session/me'
+import { Route as ApiInquiriesJobDetailsRouteImport } from './routes/api/inquiries/job-details'
+import { Route as ApiInquiriesAccessRouteImport } from './routes/api/inquiries/access'
 import { Route as ApiDiagnosticsVerifyDocumentRouteImport } from './routes/api/diagnostics/verify-document'
 import { Route as ApiDiagnosticsSubscriptionRunRouteImport } from './routes/api/diagnostics/subscription-run'
 import { Route as ApiDiagnosticsSubscriptionPreviewRouteImport } from './routes/api/diagnostics/subscription-preview'
@@ -68,6 +73,7 @@ import { Route as ApiWorkspaceJobsJobIdRouteImport } from './routes/api/workspac
 import { Route as ApiIntegrationsGoogleDriveConnectionRouteImport } from './routes/api/integrations/google-drive/connection'
 import { Route as ApiIntegrationsGoogleDriveConnectRouteImport } from './routes/api/integrations/google-drive/connect'
 import { Route as ApiIntegrationsGoogleDriveCallbackRouteImport } from './routes/api/integrations/google-drive/callback'
+import { Route as ApiInquiriesJobDetailsExportRouteImport } from './routes/api/inquiries/job-details/export'
 import { Route as ApiWorkspaceJobsJobIdWorkNotesRouteImport } from './routes/api/workspace/jobs.$jobId.work-notes'
 import { Route as ApiWorkspaceJobsJobIdWaitingRouteImport } from './routes/api/workspace/jobs.$jobId.waiting'
 import { Route as ApiWorkspaceJobsJobIdTimelineRouteImport } from './routes/api/workspace/jobs.$jobId.timeline'
@@ -114,6 +120,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InvoicesRoute = InvoicesRouteImport.update({
   id: '/invoices',
   path: '/invoices',
@@ -139,10 +150,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ReportsRoute,
+} as any)
 const CustomersIndexRoute = CustomersIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => CustomersRoute,
+} as any)
+const ReportsJobDetailsRoute = ReportsJobDetailsRouteImport.update({
+  id: '/job-details',
+  path: '/job-details',
+  getParentRoute: () => ReportsRoute,
 } as any)
 const JobsPendingRoute = JobsPendingRouteImport.update({
   id: '/jobs/pending',
@@ -296,6 +317,16 @@ const ApiSessionMeRoute = ApiSessionMeRouteImport.update({
   path: '/api/session/me',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInquiriesJobDetailsRoute = ApiInquiriesJobDetailsRouteImport.update({
+  id: '/api/inquiries/job-details',
+  path: '/api/inquiries/job-details',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInquiriesAccessRoute = ApiInquiriesAccessRouteImport.update({
+  id: '/api/inquiries/access',
+  path: '/api/inquiries/access',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDiagnosticsVerifyDocumentRoute =
   ApiDiagnosticsVerifyDocumentRouteImport.update({
     id: '/api/diagnostics/verify-document',
@@ -404,6 +435,12 @@ const ApiIntegrationsGoogleDriveCallbackRoute =
     id: '/api/integrations/google-drive/callback',
     path: '/api/integrations/google-drive/callback',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInquiriesJobDetailsExportRoute =
+  ApiInquiriesJobDetailsExportRouteImport.update({
+    id: '/export',
+    path: '/export',
+    getParentRoute: () => ApiInquiriesJobDetailsRoute,
   } as any)
 const ApiWorkspaceJobsJobIdWorkNotesRoute =
   ApiWorkspaceJobsJobIdWorkNotesRouteImport.update({
@@ -562,6 +599,7 @@ export interface FileRoutesByFullPath {
   '/customers': typeof CustomersRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/invoices': typeof InvoicesRoute
+  '/reports': typeof ReportsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
   '/support': typeof SupportRoute
@@ -574,7 +612,9 @@ export interface FileRoutesByFullPath {
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
+  '/reports/job-details': typeof ReportsJobDetailsRoute
   '/customers/': typeof CustomersIndexRoute
+  '/reports/': typeof ReportsIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/admin/cancellation-requests': typeof ApiAdminCancellationRequestsRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
@@ -589,6 +629,8 @@ export interface FileRoutesByFullPath {
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
+  '/api/inquiries/access': typeof ApiInquiriesAccessRoute
+  '/api/inquiries/job-details': typeof ApiInquiriesJobDetailsRouteWithChildren
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/entitlement-policy': typeof ApiSettingsEntitlementPolicyRoute
   '/api/settings/reports': typeof ApiSettingsReportsRoute
@@ -610,6 +652,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/reopen-requests': typeof ApiWorkspaceReopenRequestsRoute
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
+  '/api/inquiries/job-details/export': typeof ApiInquiriesJobDetailsExportRoute
   '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
   '/api/integrations/google-drive/connection': typeof ApiIntegrationsGoogleDriveConnectionRoute
@@ -659,7 +702,9 @@ export interface FileRoutesByTo {
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
+  '/reports/job-details': typeof ReportsJobDetailsRoute
   '/customers': typeof CustomersIndexRoute
+  '/reports': typeof ReportsIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/admin/cancellation-requests': typeof ApiAdminCancellationRequestsRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
@@ -674,6 +719,8 @@ export interface FileRoutesByTo {
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
+  '/api/inquiries/access': typeof ApiInquiriesAccessRoute
+  '/api/inquiries/job-details': typeof ApiInquiriesJobDetailsRouteWithChildren
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/entitlement-policy': typeof ApiSettingsEntitlementPolicyRoute
   '/api/settings/reports': typeof ApiSettingsReportsRoute
@@ -695,6 +742,7 @@ export interface FileRoutesByTo {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/reopen-requests': typeof ApiWorkspaceReopenRequestsRoute
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
+  '/api/inquiries/job-details/export': typeof ApiInquiriesJobDetailsExportRoute
   '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
   '/api/integrations/google-drive/connection': typeof ApiIntegrationsGoogleDriveConnectionRoute
@@ -734,6 +782,7 @@ export interface FileRoutesById {
   '/customers': typeof CustomersRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/invoices': typeof InvoicesRoute
+  '/reports': typeof ReportsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/stock': typeof StockRoute
   '/support': typeof SupportRoute
@@ -746,7 +795,9 @@ export interface FileRoutesById {
   '/jobs/$jobId': typeof JobsJobIdRoute
   '/jobs/new': typeof JobsNewRoute
   '/jobs/pending': typeof JobsPendingRoute
+  '/reports/job-details': typeof ReportsJobDetailsRoute
   '/customers/': typeof CustomersIndexRoute
+  '/reports/': typeof ReportsIndexRoute
   '/api/admin/allowlist': typeof ApiAdminAllowlistRoute
   '/api/admin/cancellation-requests': typeof ApiAdminCancellationRequestsRoute
   '/api/admin/dashboard': typeof ApiAdminDashboardRoute
@@ -761,6 +812,8 @@ export interface FileRoutesById {
   '/api/diagnostics/subscription-preview': typeof ApiDiagnosticsSubscriptionPreviewRoute
   '/api/diagnostics/subscription-run': typeof ApiDiagnosticsSubscriptionRunRoute
   '/api/diagnostics/verify-document': typeof ApiDiagnosticsVerifyDocumentRoute
+  '/api/inquiries/access': typeof ApiInquiriesAccessRoute
+  '/api/inquiries/job-details': typeof ApiInquiriesJobDetailsRouteWithChildren
   '/api/session/me': typeof ApiSessionMeRoute
   '/api/settings/entitlement-policy': typeof ApiSettingsEntitlementPolicyRoute
   '/api/settings/reports': typeof ApiSettingsReportsRoute
@@ -782,6 +835,7 @@ export interface FileRoutesById {
   '/api/workspace/jobs': typeof ApiWorkspaceJobsRouteWithChildren
   '/api/workspace/reopen-requests': typeof ApiWorkspaceReopenRequestsRoute
   '/api/workspace/technicians': typeof ApiWorkspaceTechniciansRoute
+  '/api/inquiries/job-details/export': typeof ApiInquiriesJobDetailsExportRoute
   '/api/integrations/google-drive/callback': typeof ApiIntegrationsGoogleDriveCallbackRoute
   '/api/integrations/google-drive/connect': typeof ApiIntegrationsGoogleDriveConnectRoute
   '/api/integrations/google-drive/connection': typeof ApiIntegrationsGoogleDriveConnectionRoute
@@ -822,6 +876,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/invoices'
+    | '/reports'
     | '/settings'
     | '/stock'
     | '/support'
@@ -834,7 +889,9 @@ export interface FileRouteTypes {
     | '/jobs/$jobId'
     | '/jobs/new'
     | '/jobs/pending'
+    | '/reports/job-details'
     | '/customers/'
+    | '/reports/'
     | '/api/admin/allowlist'
     | '/api/admin/cancellation-requests'
     | '/api/admin/dashboard'
@@ -849,6 +906,8 @@ export interface FileRouteTypes {
     | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
     | '/api/diagnostics/verify-document'
+    | '/api/inquiries/access'
+    | '/api/inquiries/job-details'
     | '/api/session/me'
     | '/api/settings/entitlement-policy'
     | '/api/settings/reports'
@@ -870,6 +929,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/reopen-requests'
     | '/api/workspace/technicians'
+    | '/api/inquiries/job-details/export'
     | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
     | '/api/integrations/google-drive/connection'
@@ -919,7 +979,9 @@ export interface FileRouteTypes {
     | '/jobs/$jobId'
     | '/jobs/new'
     | '/jobs/pending'
+    | '/reports/job-details'
     | '/customers'
+    | '/reports'
     | '/api/admin/allowlist'
     | '/api/admin/cancellation-requests'
     | '/api/admin/dashboard'
@@ -934,6 +996,8 @@ export interface FileRouteTypes {
     | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
     | '/api/diagnostics/verify-document'
+    | '/api/inquiries/access'
+    | '/api/inquiries/job-details'
     | '/api/session/me'
     | '/api/settings/entitlement-policy'
     | '/api/settings/reports'
@@ -955,6 +1019,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/reopen-requests'
     | '/api/workspace/technicians'
+    | '/api/inquiries/job-details/export'
     | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
     | '/api/integrations/google-drive/connection'
@@ -993,6 +1058,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/invoices'
+    | '/reports'
     | '/settings'
     | '/stock'
     | '/support'
@@ -1005,7 +1071,9 @@ export interface FileRouteTypes {
     | '/jobs/$jobId'
     | '/jobs/new'
     | '/jobs/pending'
+    | '/reports/job-details'
     | '/customers/'
+    | '/reports/'
     | '/api/admin/allowlist'
     | '/api/admin/cancellation-requests'
     | '/api/admin/dashboard'
@@ -1020,6 +1088,8 @@ export interface FileRouteTypes {
     | '/api/diagnostics/subscription-preview'
     | '/api/diagnostics/subscription-run'
     | '/api/diagnostics/verify-document'
+    | '/api/inquiries/access'
+    | '/api/inquiries/job-details'
     | '/api/session/me'
     | '/api/settings/entitlement-policy'
     | '/api/settings/reports'
@@ -1041,6 +1111,7 @@ export interface FileRouteTypes {
     | '/api/workspace/jobs'
     | '/api/workspace/reopen-requests'
     | '/api/workspace/technicians'
+    | '/api/inquiries/job-details/export'
     | '/api/integrations/google-drive/callback'
     | '/api/integrations/google-drive/connect'
     | '/api/integrations/google-drive/connection'
@@ -1080,6 +1151,7 @@ export interface RootRouteChildren {
   CustomersRoute: typeof CustomersRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   InvoicesRoute: typeof InvoicesRoute
+  ReportsRoute: typeof ReportsRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   StockRoute: typeof StockRoute
   SupportRoute: typeof SupportRoute
@@ -1104,6 +1176,8 @@ export interface RootRouteChildren {
   ApiDiagnosticsSubscriptionPreviewRoute: typeof ApiDiagnosticsSubscriptionPreviewRoute
   ApiDiagnosticsSubscriptionRunRoute: typeof ApiDiagnosticsSubscriptionRunRoute
   ApiDiagnosticsVerifyDocumentRoute: typeof ApiDiagnosticsVerifyDocumentRoute
+  ApiInquiriesAccessRoute: typeof ApiInquiriesAccessRoute
+  ApiInquiriesJobDetailsRoute: typeof ApiInquiriesJobDetailsRouteWithChildren
   ApiSessionMeRoute: typeof ApiSessionMeRoute
   ApiSettingsEntitlementPolicyRoute: typeof ApiSettingsEntitlementPolicyRoute
   ApiSettingsReportsRoute: typeof ApiSettingsReportsRoute
@@ -1160,6 +1234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/invoices': {
       id: '/invoices'
       path: '/invoices'
@@ -1195,12 +1276,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/': {
+      id: '/reports/'
+      path: '/'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof ReportsIndexRouteImport
+      parentRoute: typeof ReportsRoute
+    }
     '/customers/': {
       id: '/customers/'
       path: '/'
       fullPath: '/customers/'
       preLoaderRoute: typeof CustomersIndexRouteImport
       parentRoute: typeof CustomersRoute
+    }
+    '/reports/job-details': {
+      id: '/reports/job-details'
+      path: '/job-details'
+      fullPath: '/reports/job-details'
+      preLoaderRoute: typeof ReportsJobDetailsRouteImport
+      parentRoute: typeof ReportsRoute
     }
     '/jobs/pending': {
       id: '/jobs/pending'
@@ -1405,6 +1500,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionMeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/inquiries/job-details': {
+      id: '/api/inquiries/job-details'
+      path: '/api/inquiries/job-details'
+      fullPath: '/api/inquiries/job-details'
+      preLoaderRoute: typeof ApiInquiriesJobDetailsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/inquiries/access': {
+      id: '/api/inquiries/access'
+      path: '/api/inquiries/access'
+      fullPath: '/api/inquiries/access'
+      preLoaderRoute: typeof ApiInquiriesAccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/diagnostics/verify-document': {
       id: '/api/diagnostics/verify-document'
       path: '/api/diagnostics/verify-document'
@@ -1544,6 +1653,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/integrations/google-drive/callback'
       preLoaderRoute: typeof ApiIntegrationsGoogleDriveCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/inquiries/job-details/export': {
+      id: '/api/inquiries/job-details/export'
+      path: '/export'
+      fullPath: '/api/inquiries/job-details/export'
+      preLoaderRoute: typeof ApiInquiriesJobDetailsExportRouteImport
+      parentRoute: typeof ApiInquiriesJobDetailsRoute
     }
     '/api/workspace/jobs/$jobId/work-notes': {
       id: '/api/workspace/jobs/$jobId/work-notes'
@@ -1739,6 +1855,33 @@ const CustomersRouteWithChildren = CustomersRoute._addFileChildren(
   CustomersRouteChildren,
 )
 
+interface ReportsRouteChildren {
+  ReportsJobDetailsRoute: typeof ReportsJobDetailsRoute
+  ReportsIndexRoute: typeof ReportsIndexRoute
+}
+
+const ReportsRouteChildren: ReportsRouteChildren = {
+  ReportsJobDetailsRoute: ReportsJobDetailsRoute,
+  ReportsIndexRoute: ReportsIndexRoute,
+}
+
+const ReportsRouteWithChildren =
+  ReportsRoute._addFileChildren(ReportsRouteChildren)
+
+interface ApiInquiriesJobDetailsRouteChildren {
+  ApiInquiriesJobDetailsExportRoute: typeof ApiInquiriesJobDetailsExportRoute
+}
+
+const ApiInquiriesJobDetailsRouteChildren: ApiInquiriesJobDetailsRouteChildren =
+  {
+    ApiInquiriesJobDetailsExportRoute: ApiInquiriesJobDetailsExportRoute,
+  }
+
+const ApiInquiriesJobDetailsRouteWithChildren =
+  ApiInquiriesJobDetailsRoute._addFileChildren(
+    ApiInquiriesJobDetailsRouteChildren,
+  )
+
 interface ApiWorkspaceJobsJobIdAttachmentsRouteChildren {
   ApiWorkspaceJobsJobIdAttachmentsAttachmentIdContentRoute: typeof ApiWorkspaceJobsJobIdAttachmentsAttachmentIdContentRoute
 }
@@ -1865,6 +2008,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersRoute: CustomersRouteWithChildren,
   DashboardRoute: DashboardRoute,
   InvoicesRoute: InvoicesRoute,
+  ReportsRoute: ReportsRouteWithChildren,
   SettingsRoute: SettingsRoute,
   StockRoute: StockRoute,
   SupportRoute: SupportRoute,
@@ -1890,6 +2034,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiDiagnosticsSubscriptionPreviewRoute,
   ApiDiagnosticsSubscriptionRunRoute: ApiDiagnosticsSubscriptionRunRoute,
   ApiDiagnosticsVerifyDocumentRoute: ApiDiagnosticsVerifyDocumentRoute,
+  ApiInquiriesAccessRoute: ApiInquiriesAccessRoute,
+  ApiInquiriesJobDetailsRoute: ApiInquiriesJobDetailsRouteWithChildren,
   ApiSessionMeRoute: ApiSessionMeRoute,
   ApiSettingsEntitlementPolicyRoute: ApiSettingsEntitlementPolicyRoute,
   ApiSettingsReportsRoute: ApiSettingsReportsRoute,

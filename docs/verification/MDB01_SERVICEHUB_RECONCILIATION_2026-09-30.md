@@ -1,0 +1,9 @@
+# ServiceHub MDB-01 reconciliation — 30/09/2026
+
+Owner approval: WP5A Job Details Inquiry direct repository build on an isolated review branch. Starting GitHub and Lovable code checkpoint: `67f6c4cf279bc60117c780e629892f2820bd51e6`; repository `mugs-AI/ServiceHub2`, synced branch `main`, Lovable project `9265adcd-acf6-4fdb-a766-3fc21310ee8f`, workspace `tJObptvCa2MGSCihecnu`.
+
+The supplied `00-MUGS_DIRECTBUILD_PROTOCOL.md` and `MDB-01_SERVICEHUB_ADOPTION.md` govern delivery alongside the existing product rules. For WP5A, the older `11-BUILDER_GOVERNANCE` requirement to execute an approved Lovable AI prompt is amended by the Owner-approved direct review branch route. Product target lock, N3 identity, tenant security, approved behavior, bounded work-package approval and separate merge/backend/publish gates remain authoritative. This does not approve future packages.
+
+The older WP2A baseline SHA in Project Sources is historical. Lovable reports Supabase enabled, ready, published, latest Git commit matching the starting checkpoint. The commit actually serving the public site is not exposed. Latest applied migration observed `20260920111137`, also in repository. Repository backend reference `yhzsrbwwhflelpxqbisu` could not be independently confirmed from database metadata. Read-only information_schema inspection confirmed the selected service job, attendance and audit columns, the attendance foreign key, and RLS on the policy/Job/audit tables. It does not prove authenticated PostgREST behavior.
+
+WP5A includes the Job grid, server filters and pagination, column chooser, Job links, and permission-controlled XLSX export with metadata audit using the existing table. Own Jobs means current Primary PIC. Timeline History Inquiry remains WP5B. This review candidate has no package, migration, generated Supabase type, credential, N3, backend deployment, merge or public publish change.
