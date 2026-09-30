@@ -25,7 +25,9 @@ const assert = require("node:assert/strict"),
       view_private_notes: false,
       view_gps: false,
     },
-    failList = 0;
+    failList = 0,
+    accessDelay = 0,
+    administrator = false;
   const rows = Array.from({ length: 20 }, (_, i) => ({
     id: `job-${i}`,
     job_number: `SJ${String(i + 1).padStart(4, "0")}`,
@@ -47,26 +49,37 @@ const assert = require("node:assert/strict"),
     if (!url.pathname.startsWith("/api/")) return route.continue();
     const json = (body) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    if (url.pathname === "/api/admin/dashboard")
+      return json({ summary: {}, userWorkload: [], generatedAt: "2026-09-30T14:00:00Z" });
+    if (url.pathname === "/api/diagnostics/health")
+      return json({
+        tenantCode: "fixture-A-very-long-unbroken-tenant-identifier-012345678901234567890123456789",
+        snapshots: [],
+      });
     if (url.pathname === "/api/proxy")
       return json({
         code: "0000",
         data: {
-          companyName: "Fixture Company",
-          tenantCode: "fixture-A",
+          companyName: "Fixture Malaysia Service Operations Company",
+          tenantCode:
+            "fixture-A-very-long-unbroken-tenant-identifier-012345678901234567890123456789",
           email: "fixture@example.invalid",
         },
       });
     if (url.pathname === "/api/session/me")
       return json({
-        tenantCode: "fixture-A",
-        companyName: "Fixture Company",
+        tenantCode: "fixture-A-very-long-unbroken-tenant-identifier-012345678901234567890123456789",
+        companyName: "Fixture Malaysia Service Operations Company",
         email: "fixture@example.invalid",
         displayName: "Fixture PIC",
-        isAdministrator: false,
+        isAdministrator: administrator,
         isOwner: false,
         diagnostics: { matchedN3UserId: "fixture-user-A", reason: "matched_not_owner" },
       });
-    if (url.pathname === "/api/inquiries/access") return json({ access });
+    if (url.pathname === "/api/inquiries/access") {
+      if (accessDelay) await new Promise((resolve) => setTimeout(resolve, accessDelay));
+      return json({ access });
+    }
     if (url.pathname === "/api/inquiries/job-details/export") {
       exports.push({ query: Object.fromEntries(url.searchParams), body: request.postDataJSON() });
       return route.fulfill({
@@ -121,7 +134,13 @@ const assert = require("node:assert/strict"),
   await page.getByRole("button", { name: "Tools", exact: true }).click();
   assert.equal(await page.getByRole("link", { name: "Inquiries", exact: true }).count(), 0);
   await page.getByRole("button", { name: "Tools", exact: true }).click();
+  await page.getByText("Apply filters to load Jobs.", { exact: true }).waitFor();
+  assert.equal(reads.length, 0, "Opening Inquiry must not fetch records");
+  assert(await page.getByRole("button", { name: "Export Excel", exact: true }).isDisabled());
+  await page.getByLabel("Search", { exact: true }).fill("first-filter");
+  await page.getByRole("button", { name: "Apply filters", exact: true }).click();
   await page.getByRole("button", { name: "SJ0001", exact: true }).waitFor();
+  assert.equal(reads.at(-1).q, "first-filter");
   assert.match(await page.locator("body").innerText(), /30\/09\/2026, 12:30 AM/);
   await page.getByRole("button", { name: "SJ0001", exact: true }).click();
   await page.waitForURL("**/jobs/job-0");
@@ -131,6 +150,8 @@ const assert = require("node:assert/strict"),
     ),
   );
   await page.goto("http://127.0.0.1:5173/reports/job-details");
+  await page.getByText("Apply filters to load Jobs.", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Apply filters", exact: true }).click();
   await page.getByRole("button", { name: "SJ0001", exact: true }).waitFor();
   await page.getByText("Columns (9)", { exact: true }).click();
   assert.equal(await page.getByLabel("Internal Note", { exact: true }).count(), 0);
@@ -144,6 +165,17 @@ const assert = require("node:assert/strict"),
   await page.getByRole("button", { name: "Apply filters", exact: true }).click();
   await page.getByRole("button", { name: "SJ0001", exact: true }).waitFor();
   await page.getByLabel("Search", { exact: true }).fill("unapplied");
+  const readsBeforeFocus = reads.length;
+  accessDelay = 1200;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForTimeout(200);
+  assert(await page.getByRole("button", { name: "SJ0001", exact: true }).isVisible());
+  assert.equal(await page.getByText("Checking inquiry access…", { exact: true }).count(), 0);
+  assert.equal(await page.getByLabel("Search", { exact: true }).inputValue(), "unapplied");
+  await page.waitForTimeout(1400);
+  assert.equal(reads.length, readsBeforeFocus, "Unchanged access must not reload records on focus");
+  accessDelay = 0;
+
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Excel", exact: true }).click();
   await (await download).saveAs("/tmp/wp5a-ui-download.xlsx");
@@ -221,6 +253,47 @@ const assert = require("node:assert/strict"),
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await page.getByText("You do not have access to this inquiry.", { exact: true }).waitFor();
   assert.equal(await page.getByRole("button", { name: "Inquiry", exact: true }).count(), 0);
+  administrator = true;
+  access = { ...access, can_view: true };
+  await page.goto("http://127.0.0.1:5173/admin/dashboard");
+  const hero = page.getByTestId("compact-dashboard-header");
+  await hero.waitFor();
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.equal(
+      await hero.getByRole("link").count(),
+      0,
+      "Dashboard header has no shortcut buttons",
+    );
+    assert.equal(
+      await page
+        .getByText(
+          "Tenant fixture-A-very-long-unbroken-tenant-identifier-012345678901234567890123456789",
+          { exact: false },
+        )
+        .count(),
+      0,
+    );
+    await hero.getByRole("button", { name: "Dashboard information" }).click();
+    const info = page.getByRole("dialog");
+    await info.waitFor();
+    assert.match(
+      await info.innerText(),
+      /Tenant fixture-A-very-long-unbroken-tenant-identifier-012345678901234567890123456789/,
+    );
+    assert.match(await info.innerText(), /Fixture PIC/);
+    assert.match(await info.innerText(), /Approvals, live job flow/);
+    assert(await info.getByRole("button", { name: "Refresh", exact: true }).isVisible());
+    const box = await info.boundingBox();
+    assert(box.x >= 0 && box.x + box.width <= width);
+    assert(await info.evaluate((node) => node.scrollWidth <= node.clientWidth));
+    await page.keyboard.press("Escape");
+    await info.waitFor({ state: "hidden" });
+    const heading = await hero.boundingBox();
+    assert(heading.height < 200, "Dashboard header stays compact");
+    assert((await page.evaluate(() => document.documentElement.scrollWidth)) <= width);
+    await page.screenshot({ path: `/tmp/dashboard-compact-${width}.png`, fullPage: false });
+  }
   assert.deepEqual(errors, []);
   assert.deepEqual(unexpected, []);
   console.log(

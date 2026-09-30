@@ -32,7 +32,7 @@ function initialQuery(): JobDetailsQuery {
 }
 
 export function JobDetailsInquiry() {
-  const { access, error: accessError, reload, token } = useInquiryAccess(),
+  const { access, error: accessError, reload, token, identity } = useInquiryAccess(),
     { openJobTab } = useTabs();
   const [draft, setDraft] = useState(initialQuery),
     [query, setQuery] = useState(initialQuery),
@@ -42,6 +42,10 @@ export function JobDetailsInquiry() {
     [error, setError] = useState(""),
     [exportError, setExportError] = useState(""),
     [exporting, setExporting] = useState(false);
+  const contextKey = `${token ?? ""}:${identity}`;
+  const [appliedContext, setAppliedContext] = useState<string | null>(null);
+  const [refreshRevision, setRefreshRevision] = useState(0);
+  const hasApplied = appliedContext === contextKey;
   const exportController = useRef<AbortController | null>(null);
   const permitted = access ? availableJobColumns(access) : [],
     columns = permitted.filter((c) => selected.includes(c.key));
@@ -49,7 +53,7 @@ export function JobDetailsInquiry() {
     exportController.current?.abort();
     setExporting(false);
     setData(null);
-    if (!access?.can_view) {
+    if (!access?.can_view || !hasApplied) {
       setLoading(false);
       return;
     }
@@ -74,7 +78,7 @@ export function JobDetailsInquiry() {
       controller.abort();
       exportController.current?.abort();
     };
-  }, [access, query, token]);
+  }, [access, query, token, hasApplied, refreshRevision]);
   useEffect(() => {
     if (!access) return;
     const allowed = availableJobColumns(access);
@@ -104,12 +108,14 @@ export function JobDetailsInquiry() {
     if (!access) return;
     try {
       setQuery(parseJobDetailsQuery(jobDetailsParams({ ...draft, page: 1 }), access));
+      setAppliedContext(contextKey);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Check your filters.");
     }
   };
   const exportExcel = async () => {
+    if (!hasApplied || !access?.can_view || !data || loading) return;
     exportController.current?.abort();
     const controller = new AbortController();
     exportController.current = controller;
@@ -176,7 +182,13 @@ export function JobDetailsInquiry() {
             Malaysia time
           </p>
         </div>
-        <button onClick={reload} className={control}>
+        <button
+          onClick={() => {
+            reload();
+            if (hasApplied) setRefreshRevision((v) => v + 1);
+          }}
+          className={control}
+        >
           Refresh
         </button>
       </header>
@@ -235,7 +247,6 @@ export function JobDetailsInquiry() {
             onClick={() => {
               const next = { ...initialQuery(), from: "", to: "" };
               setDraft(next);
-              setQuery(next);
             }}
           >
             Clear filters
@@ -246,7 +257,6 @@ export function JobDetailsInquiry() {
             onClick={() => {
               const next = initialQuery();
               setDraft(next);
-              setQuery(next);
             }}
           >
             Reset · 3 months
@@ -303,7 +313,9 @@ export function JobDetailsInquiry() {
           ? "Loading Jobs…"
           : data
             ? `${data.total.toLocaleString()} Jobs · Page ${query.page} of ${pageCount}`
-            : ""}
+            : !hasApplied
+              ? "Apply filters to load Jobs."
+              : ""}
       </p>
       <div className="w-full min-w-0 overflow-x-auto rounded-lg border" data-testid="inquiry-grid">
         <table className="w-full text-left text-sm">
