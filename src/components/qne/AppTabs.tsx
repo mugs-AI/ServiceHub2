@@ -2,11 +2,8 @@ import { useEffect, useRef } from "react";
 
 import { useTabs } from "@/lib/tabs";
 
-/** Header height (h-14 + 1px border) — the strip sticks right below it. */
-export const APP_HEADER_OFFSET_CLASS = "top-[57px]";
-
 /**
- * WP3C-2 — second sticky strip: opened Job tabs only. Pinned sections live in
+ * WP3C-2 — second strip inside the shared sticky navigation: opened Job tabs only. Pinned sections live in
  * the header navigation. The strip scrolls horizontally and keeps the active
  * Job tab in view automatically.
  */
@@ -24,10 +21,7 @@ export function AppTabs() {
   if (jobTabs.length === 0) return null;
 
   return (
-    <div
-      data-testid="job-tabs-strip"
-      className={`sticky ${APP_HEADER_OFFSET_CLASS} z-30 border-b bg-card/95 backdrop-blur`}
-    >
+    <div data-testid="job-tabs-strip" className="relative z-30 border-b bg-card/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-2 py-1.5">
         {jobTabs.map((t) => {
           const active = t.key === activeKey;

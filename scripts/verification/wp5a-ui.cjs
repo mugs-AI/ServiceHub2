@@ -107,6 +107,20 @@ const assert = require("node:assert/strict"),
     return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
   });
   await page.goto("http://127.0.0.1:5173/reports/job-details");
+  const inquiryMenu = page.getByRole("button", { name: "Inquiry", exact: true });
+  await inquiryMenu.waitFor({ timeout: 15000 }).catch(async (error) => {
+    console.error({ body: await page.locator("body").innerText(), errors, unexpected });
+    throw error;
+  });
+  const inquiryBox = await inquiryMenu.boundingBox();
+  const toolsBox = await page.getByRole("button", { name: "Tools", exact: true }).boundingBox();
+  assert(inquiryBox.x < toolsBox.x && Math.abs(inquiryBox.y - toolsBox.y) < 2);
+  await inquiryMenu.click();
+  await page.getByRole("link", { name: "Job Details Inquiry", exact: true }).waitFor();
+  assert(await page.getByRole("button", { name: /Timeline History Inquiry/ }).isDisabled());
+  await page.getByRole("button", { name: "Tools", exact: true }).click();
+  assert.equal(await page.getByRole("link", { name: "Inquiries", exact: true }).count(), 0);
+  await page.getByRole("button", { name: "Tools", exact: true }).click();
   await page.getByRole("button", { name: "SJ0001", exact: true }).waitFor();
   assert.match(await page.locator("body").innerText(), /30\/09\/2026, 12:30 AM/);
   await page.getByRole("button", { name: "SJ0001", exact: true }).click();
@@ -144,9 +158,46 @@ const assert = require("node:assert/strict"),
     scroll: document.documentElement.scrollWidth,
   }));
   assert(dims.scroll <= dims.width, JSON.stringify(dims));
-  await page.getByRole("button", { name: "Open menu", exact: true }).click();
-  await page.getByRole("link", { name: "Inquiries", exact: true }).waitFor();
-  await page.getByRole("button", { name: "Open menu", exact: true }).click();
+  for (const width of [320, 375, 390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    const newJob = page
+      .locator("header")
+      .getByRole("link", { name: "New Service Job", exact: true });
+    assert(await newJob.isVisible());
+    const box = await newJob.boundingBox();
+    assert(box.x >= 0 && box.x + box.width <= width && box.y < 60);
+    assert.equal(await newJob.getAttribute("href"), "/jobs/new");
+    const layout = await page.evaluate(() => ({
+      width: innerWidth,
+      scroll: document.documentElement.scrollWidth,
+    }));
+    assert(layout.scroll <= layout.width, JSON.stringify(layout));
+    await inquiryMenu.click();
+    assert(await page.getByRole("link", { name: "Job Details Inquiry", exact: true }).isVisible());
+    const popup = await page
+      .getByRole("link", { name: "Job Details Inquiry", exact: true })
+      .boundingBox();
+    assert(popup.x >= 0 && popup.x + popup.width <= width);
+    await inquiryMenu.click();
+    await page.evaluate(() => window.scrollTo(0, 400));
+    await page.waitForTimeout(200);
+    const headerBox = await page.getByRole("banner").boundingBox();
+    const tabBox = await page.getByTestId("job-tabs-strip").boundingBox();
+    assert(
+      tabBox.y >= headerBox.y + headerBox.height - 1,
+      "Job tabs must stay below header while scrolling",
+    );
+    if (width < 768) {
+      await page.getByRole("button", { name: "Open menu" }).click();
+      const expandedHeader = await page.getByRole("banner").boundingBox();
+      const expandedTabs = await page.getByTestId("job-tabs-strip").boundingBox();
+      assert(expandedTabs.y >= expandedHeader.y + expandedHeader.height - 1);
+      await page.getByRole("button", { name: "Open menu" }).click();
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "/tmp/servicehub-header-phone.png", fullPage: true });
   await page.getByLabel("Search", { exact: true }).fill("slow");
   await page.getByRole("button", { name: "Apply filters", exact: true }).click();
   await page.getByLabel("Search", { exact: true }).fill("fast");
@@ -169,8 +220,7 @@ const assert = require("node:assert/strict"),
   access = { ...access, can_view: false };
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await page.getByText("You do not have access to this inquiry.", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Open menu", exact: true }).click();
-  assert.equal(await page.getByRole("link", { name: "Inquiries", exact: true }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Inquiry", exact: true }).count(), 0);
   assert.deepEqual(errors, []);
   assert.deepEqual(unexpected, []);
   console.log(
