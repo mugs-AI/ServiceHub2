@@ -68,6 +68,13 @@ export class ForbiddenError extends Error {
   }
 }
 
+export class SessionUnavailableError extends Error {
+  constructor() {
+    super("Unable to verify access right now. Please retry.");
+    this.name = "SessionUnavailableError";
+  }
+}
+
 function allowlistFallbackEnabled(): boolean {
   const v = (process.env.SERVICEHUB_ALLOWLIST_FALLBACK ?? "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes";
@@ -188,7 +195,19 @@ async function fetchN3Users(token: string): Promise<UsersLoad & {
     };
   }
 
-  const text = await res.text();
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (err) {
+    return {
+      users: null,
+      status: res.status === 401 ? "unauthorized" : res.status === 403 ? "forbidden" : "failed",
+      httpStatus: res.status,
+      shape: "body_error",
+      count: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
   if (!res.ok) {
     const status: UsersEndpointStatus =
       res.status === 401 ? "unauthorized" : res.status === 403 ? "forbidden" : "failed";
@@ -291,19 +310,13 @@ interface CachedSession {
 const SESSION_TTL_MS = 60_000;
 const SESSION_CACHE = new Map<string, CachedSession>();
 const SESSION_CACHE_MAX = 500;
-
-function cacheKey(token: string): string {
-  // Bearer token is opaque to us; a short suffix keeps the map compact
-  // without weakening security (tokens never leave the server).
-  return token.length > 96 ? token.slice(-96) : token;
-}
+const SESSION_PENDING = new Map<string, Promise<CurrentUserContext>>();
 
 function readCache(token: string): CurrentUserContext | null {
-  const key = cacheKey(token);
-  const hit = SESSION_CACHE.get(key);
+  const hit = SESSION_CACHE.get(token);
   if (!hit) return null;
   if (hit.expiresAt < Date.now()) {
-    SESSION_CACHE.delete(key);
+    SESSION_CACHE.delete(token);
     return null;
   }
   return hit.ctx;
@@ -315,7 +328,7 @@ function writeCache(token: string, ctx: CurrentUserContext): void {
     const first = SESSION_CACHE.keys().next().value;
     if (first) SESSION_CACHE.delete(first);
   }
-  SESSION_CACHE.set(cacheKey(token), {
+  SESSION_CACHE.set(token, {
     ctx,
     expiresAt: Date.now() + SESSION_TTL_MS,
   });
@@ -332,6 +345,21 @@ export async function requireAuthenticatedN3User(
   const cached = readCache(token);
   if (cached) return cached;
 
+  // Share cold lookups within this runtime. Otherwise parallel Settings
+  // requests can resolve different roles and overwrite each other's cache.
+  const pending = SESSION_PENDING.get(token);
+  if (pending) return pending;
+  if (SESSION_PENDING.size >= SESSION_CACHE_MAX) throw new SessionUnavailableError();
+  const resolution = resolveCurrentUser(token);
+  SESSION_PENDING.set(token, resolution);
+  try {
+    return await resolution;
+  } finally {
+    SESSION_PENDING.delete(token);
+  }
+}
+
+async function resolveCurrentUser(token: string): Promise<CurrentUserContext> {
   const claims = decodeJwtPayload(token);
   const jwtIdentity = identityFromJwt(claims);
 
@@ -380,6 +408,13 @@ export async function requireAuthenticatedN3User(
     },
   );
 
+  // A failed upstream lookup does not establish a role denial. Keep the
+  // existing explicit emergency fallback, but fail closed with a retryable
+  // availability response when no administrator identity was verified.
+  if (load.status === "failed" && !decision.isAdministrator) {
+    throw new SessionUnavailableError();
+  }
+
   const displayName =
     decision.matchedDisplayName ||
     displayNameFromJwt ||
@@ -417,7 +452,9 @@ export async function requireAuthenticatedN3User(
       },
     },
   };
-  writeCache(token, ctx);
+  // Never latch an upstream failure/403/401 for the next 60 seconds.
+  // A verified non-owner decision still receives the normal bounded cache.
+  if (load.status === "ok") writeCache(token, ctx);
   return ctx;
 }
 
@@ -432,6 +469,12 @@ export async function requireAdministrator(request: Request): Promise<CurrentUse
 }
 
 export function guardResponse(err: unknown): Response | null {
+  if (err instanceof SessionUnavailableError) {
+    return Response.json(
+      { error: err.message, retryable: true },
+      { status: 503, headers: { "Retry-After": "1" } },
+    );
+  }
   if (err instanceof UnauthorizedError) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 401,
