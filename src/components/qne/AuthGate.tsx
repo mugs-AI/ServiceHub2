@@ -6,6 +6,7 @@ import { TabsProvider, type AppTab } from "@/lib/tabs";
 import { AppTabs } from "./AppTabs";
 import { DevLoginScreen } from "./DevLoginScreen";
 import { RelaunchNotice } from "./RelaunchNotice";
+import { useInquiryAccess } from "@/lib/qne/inquiry/use-inquiry-access";
 
 interface NavItem {
   to: string;
@@ -133,6 +134,8 @@ function AuthenticatedShell({
 
 function AppHeader() {
   const { currentUser } = useSession();
+  const { access: inquiryAccess } = useInquiryAccess();
+  const canViewInquiry = inquiryAccess?.can_view === true;
   const isAdmin = !!currentUser?.isAdministrator;
   const nav = isAdmin ? ADMIN_NAV : USER_NAV;
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -161,7 +164,7 @@ function AppHeader() {
             <NavLink key={item.to} item={item} />
           ))}
           <div className="hidden md:block">
-            <ToolsMenu isAdmin={isAdmin} />
+            <ToolsMenu isAdmin={isAdmin} canViewInquiry={canViewInquiry} />
           </div>
         </nav>
 
@@ -207,6 +210,12 @@ function AppHeader() {
               + New Service Job
             </Link>
             <MobileProfile onDone={() => setMobileOpen(false)} />
+            {canViewInquiry && (
+              <NavLink
+                item={{ to: "/reports", label: "Inquiries" }}
+                onClick={() => setMobileOpen(false)}
+              />
+            )}
             {isAdmin && (
               <>
                 <div className="mt-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -262,8 +271,11 @@ function MobileProfile({ onDone }: { onDone: () => void }) {
   );
 }
 
-function ToolsMenu({ isAdmin }: { isAdmin: boolean }) {
-  const items: NavItem[] = isAdmin ? ADMIN_TOOLS : [{ to: "/jobs/new", label: "New Service Job" }];
+function ToolsMenu({ isAdmin, canViewInquiry }: { isAdmin: boolean; canViewInquiry: boolean }) {
+  const items: NavItem[] = [
+    ...(isAdmin ? ADMIN_TOOLS : [{ to: "/jobs/new", label: "New Service Job" }]),
+    ...(canViewInquiry ? [{ to: "/reports", label: "Inquiries" }] : []),
+  ];
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
