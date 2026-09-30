@@ -35,6 +35,53 @@ function database(rows: Record<string, unknown>[] = [rawJob], count = rows.lengt
   return { db, requests };
 }
 describe("Job Details database boundary", () => {
+  it("walks export pages with invariant scope and rejects duplicate, changed-count or empty pages", async () => {
+    let failure: "none" | "duplicate" | "count" | "empty" = "none";
+    const offsets: number[] = [];
+    const db = createClient<Database>("https://test.invalid", "key", {
+      global: {
+        fetch: async (input) => {
+          const p = new URL(String(input)).searchParams;
+          expect(p.get("tenant_code")).toBe("eq.tenant-A");
+          expect(p.get("is_deleted")).toBe("eq.false");
+          expect(p.get("assigned_user_id")).toBe("eq.user-A");
+          expect(p.get("status")).toBe("eq.Completed");
+          expect(p.get("order")).toBeTruthy();
+          const offset = Number(p.get("offset"));
+          offsets.push(offset);
+          const rows =
+            offset && failure === "empty"
+              ? []
+              : [0, 1].map((i) => ({
+                  ...rawJob,
+                  id: String(offset && failure === "duplicate" ? i : offset + i),
+                }));
+          return new Response(JSON.stringify(rows), {
+            headers: {
+              "Content-Type": "application/json",
+              "Content-Range": `${offset}-${offset + Math.max(rows.length - 1, 0)}/${offset && failure === "count" ? 5 : 4}`,
+            },
+          });
+        },
+      },
+    });
+    const granted = { ...access, can_export_excel: true };
+    const input = parseJobDetailsQuery(
+      new URLSearchParams({ page: "3", filters: '{"status":"Completed"}' }),
+      granted,
+    );
+    expect((await queryJobDetails(db, actor, granted, input, true)).rows.map((r) => r.id)).toEqual([
+      "0",
+      "1",
+      "2",
+      "3",
+    ]);
+    expect(offsets).toEqual([0, 2]);
+    for (const mode of ["duplicate", "count", "empty"] as const) {
+      failure = mode;
+      await expect(queryJobDetails(db, actor, granted, input, true)).rejects.toThrow(/changed/);
+    }
+  });
   it("constrains tenant, soft deletion, immutable current assignee and Malaysia date at the database", async () => {
     const { db, requests } = database([rawJob], 30);
     const result = await queryJobDetails(
