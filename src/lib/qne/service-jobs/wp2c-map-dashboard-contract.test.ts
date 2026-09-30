@@ -69,7 +69,9 @@ describe("administrator dashboard mobile header contract", () => {
     expect(DASHBOARD).toContain("<DashboardHero");
     expect(DASHBOARD).toContain('className="min-w-0 space-y-6"');
     expect(HERO).toContain("grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_auto]");
-    expect(HERO).toContain('className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end"');
+    expect(HERO).toContain(
+      'className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end"',
+    );
   });
 
   it("keeps company and identity text readable on narrow screens", () => {
@@ -79,19 +81,19 @@ describe("administrator dashboard mobile header contract", () => {
     expect(DASHBOARD).toContain("flex flex-wrap items-center gap-x-3 gap-y-1");
   });
 
-  it("keeps exactly the four existing actions and their destinations", () => {
-    expect(DASHBOARD).toContain('label="Workspace"');
-    expect(DASHBOARD).toContain('to="/support"');
-    expect(DASHBOARD).toContain('label="Snapshot Console"');
-    expect(DASHBOARD).toContain('to="/admin/snapshots"');
-    expect(DASHBOARD).toContain('label="Settings"');
-    expect(DASHBOARD).toContain('to="/settings"');
-    expect(DASHBOARD).toContain('{opsLoading ? "Refreshing…" : "Refresh"}');
+  it("keeps Refresh in information and removes redundant administrator shortcuts", () => {
+    const hero = DASHBOARD.slice(DASHBOARD.indexOf("<DashboardHero"), DASHBOARD.indexOf("{opsErr"));
+    expect(hero).toContain("compact");
+    expect(hero).not.toContain("DashboardAction");
+    expect(hero).not.toContain("actions=");
+    expect(hero).toContain('{opsLoading ? "Refreshing…" : "Refresh"}');
   });
 
   it("shows workload as stacked cards on mobile and a table only on desktop", () => {
     expect(DASHBOARD).toContain('className="space-y-2 md:hidden"');
-    expect(DASHBOARD).toContain("hidden max-w-full overflow-hidden rounded-lg border bg-card shadow-sm md:block");
+    expect(DASHBOARD).toContain(
+      "hidden max-w-full overflow-hidden rounded-lg border bg-card shadow-sm md:block",
+    );
     expect(DASHBOARD).not.toContain("min-w-[36rem]");
   });
 });

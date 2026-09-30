@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export type DashboardTone =
   | "blue"
@@ -61,13 +62,50 @@ export function DashboardHero({
   subtitle,
   meta,
   actions,
+  compact = false,
 }: {
   eyebrow: string;
   title: string;
   subtitle: string;
   meta: ReactNode;
-  actions: ReactNode;
+  actions?: ReactNode;
+  compact?: boolean;
 }) {
+  if (compact)
+    return (
+      <header
+        data-testid="compact-dashboard-header"
+        className="dashboard-enter rounded-lg border border-dashboard-blue/20 bg-dashboard-hero p-4 shadow-sm sm:p-6"
+      >
+        <p className="text-xs font-bold uppercase tracking-wide text-dashboard-blue">{eyebrow}</p>
+        <div className="mt-2 flex min-w-0 items-start gap-2">
+          <h1 className="min-w-0 break-words text-xl font-bold text-dashboard-ink sm:text-3xl">
+            {title}
+          </h1>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Dashboard information"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-dashboard-blue hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span
+                  aria-hidden="true"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold"
+                >
+                  i
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="max-w-[calc(100vw-2rem)] space-y-3 text-sm">
+              <p className="font-semibold">Dashboard information</p>
+              <p className="text-muted-foreground">{subtitle}</p>
+              <div className="text-xs">{meta}</div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </header>
+    );
   return (
     <header className="dashboard-enter relative overflow-hidden rounded-lg border border-dashboard-blue/20 bg-dashboard-hero p-4 shadow-sm sm:p-6">
       <div className="relative grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">

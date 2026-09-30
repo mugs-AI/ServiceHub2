@@ -19,11 +19,29 @@ export function useInquiryAccess() {
       controller?.abort();
       controller = new AbortController();
       const signal = controller.signal;
-      setState({ token, identity, access: null, error: "" });
+      // Revalidate in the background without removing a same-session view.
+      setState((previous) => ({
+        token,
+        identity,
+        access: previous.token === token && previous.identity === identity ? previous.access : null,
+        error: "",
+      }));
       void inquiryRequest("/api/inquiries/access", token, { signal })
         .then((r) => r.json())
         .then((body) => {
-          if (!signal.aborted) setState({ token, identity, access: body.access, error: "" });
+          if (!signal.aborted)
+            setState((previous) => ({
+              token,
+              identity,
+              // Stable grants must not trigger a Job query again on window focus.
+              access:
+                previous.token === token &&
+                previous.identity === identity &&
+                JSON.stringify(previous.access) === JSON.stringify(body.access)
+                  ? previous.access
+                  : body.access,
+              error: "",
+            }));
         })
         .catch((error) => {
           if (!signal.aborted)
@@ -48,5 +66,6 @@ export function useInquiryAccess() {
     error: current ? state.error : "",
     reload: () => setRevision((v) => v + 1),
     token,
+    identity,
   };
 }

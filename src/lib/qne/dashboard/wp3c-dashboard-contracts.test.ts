@@ -330,7 +330,7 @@ describe("WP3C — Admin Dashboard cards", () => {
     const src = read("src/routes/admin.dashboard.tsx");
     expect(src).toContain("technicianName: w.name");
     expect(src).toContain("Integration health");
-    expect(src).toContain("Snapshot Console");
+    expect(src).not.toContain("DashboardAction");
     expect(src).not.toContain("arrive with Phase 1");
     expect(src).toContain("DashboardProgress");
   });

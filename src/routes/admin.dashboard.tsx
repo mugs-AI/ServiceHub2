@@ -10,11 +10,9 @@ import {
   Clock,
   Database,
   Flag,
-  LayoutList,
   PlayCircle,
   RefreshCw,
   RotateCcw,
-  Settings,
   ShieldAlert,
   Truck,
   UserX,
@@ -33,7 +31,6 @@ import {
   type AdminSummaryKey,
 } from "@/lib/qne/dashboard/admin-cards";
 import {
-  DashboardAction,
   DashboardHero,
   DashboardProgress,
   DashboardSection,
@@ -256,12 +253,13 @@ function AdminDashboard() {
   return (
     <div className="min-w-0 space-y-6">
       <DashboardHero
+        compact
         eyebrow="Administrator command centre"
         title={session?.companyName || "—"}
         subtitle="Approvals, live job flow, customer coverage and completion integrity for your whole tenant."
         meta={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>
+            <span className="min-w-0 max-w-full break-words">
               Tenant {session?.tenantCode || "—"} ·{" "}
               {currentUser?.displayName || currentUser?.email || "administrator"}
             </span>
@@ -280,18 +278,6 @@ function AdminDashboard() {
               {opsLoading ? "Refreshing…" : "Refresh"}
             </button>
           </span>
-        }
-        actions={
-          <>
-            <DashboardAction
-              to="/admin/snapshots"
-              label="Snapshot Console"
-              icon={Database}
-              primary
-            />
-            <DashboardAction to="/support" label="Workspace" icon={LayoutList} />
-            <DashboardAction to="/settings" label="Settings" icon={Settings} />
-          </>
         }
       />
 
