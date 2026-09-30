@@ -114,8 +114,10 @@ function AuthenticatedShell({
   return (
     <TabsProvider pinned={pinned}>
       <div className="min-h-screen bg-background">
-        <AppHeader />
-        <AppTabs />
+        <div data-testid="sticky-navigation" className="sticky top-0 z-40">
+          <AppHeader />
+          <AppTabs />
+        </div>
         {error && (
           <div className="border-b bg-destructive/10 px-4 py-2 text-xs text-destructive">
             Session error: {error}
@@ -141,8 +143,8 @@ function AppHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-1 px-2 sm:gap-3 sm:px-4">
+    <header className="relative z-40 border-b bg-card/95 backdrop-blur">
+      <div className="mx-auto flex min-h-14 max-w-7xl flex-wrap items-center gap-x-1 px-2 py-2 md:flex-nowrap md:gap-2 md:px-4 md:py-0">
         <Link
           to={isAdmin ? "/admin/dashboard" : "/support"}
           aria-label="ServiceHub2 home"
@@ -158,22 +160,25 @@ function AppHeader() {
         <nav
           aria-label="Main"
           data-testid="primary-nav"
-          className="flex min-w-0 flex-1 items-center gap-0.5 text-[12px] sm:gap-1 sm:text-sm"
+          className="order-last flex w-full min-w-0 flex-wrap items-center gap-0.5 text-[12px] md:order-none md:w-auto md:flex-1 md:flex-nowrap lg:gap-1 lg:text-sm"
         >
           {nav.map((item) => (
             <NavLink key={item.to} item={item} />
           ))}
-          <div className="hidden md:block">
-            <ToolsMenu isAdmin={isAdmin} canViewInquiry={canViewInquiry} />
+          <div className="ml-auto flex shrink-0 items-center gap-0.5">
+            {canViewInquiry && <InquiryMenu />}
+            <ToolsMenu isAdmin={isAdmin} />
           </div>
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <Link
             to="/jobs/new"
-            className="hidden min-h-9 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 md:inline-flex"
+            aria-label="New Service Job"
+            className="inline-flex min-h-9 items-center whitespace-nowrap rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
           >
-            + New Service Job
+            <span className="lg:hidden">+ New Job</span>
+            <span className="hidden lg:inline">+ New Service Job</span>
           </Link>
           <div className="hidden md:block">
             <UserMenu user={currentUser} />
@@ -210,12 +215,6 @@ function AppHeader() {
               + New Service Job
             </Link>
             <MobileProfile onDone={() => setMobileOpen(false)} />
-            {canViewInquiry && (
-              <NavLink
-                item={{ to: "/reports", label: "Inquiries" }}
-                onClick={() => setMobileOpen(false)}
-              />
-            )}
             {isAdmin && (
               <>
                 <div className="mt-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -240,7 +239,7 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
       onClick={onClick}
       activeOptions={{ exact: item.to === "/" }}
       activeProps={{ className: "active" }}
-      className="inline-flex min-h-10 items-center whitespace-nowrap rounded-md px-1.5 font-medium sm:px-3 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
+      className="inline-flex min-h-10 items-center whitespace-nowrap rounded-md px-1.5 font-medium lg:px-3 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
     >
       {item.label}
     </Link>
@@ -271,30 +270,88 @@ function MobileProfile({ onDone }: { onDone: () => void }) {
   );
 }
 
-function ToolsMenu({ isAdmin, canViewInquiry }: { isAdmin: boolean; canViewInquiry: boolean }) {
-  const items: NavItem[] = [
-    ...(isAdmin ? ADMIN_TOOLS : [{ to: "/jobs/new", label: "New Service Job" }]),
-    ...(canViewInquiry ? [{ to: "/reports", label: "Inquiries" }] : []),
-  ];
+function InquiryMenu() {
+  return (
+    <HeaderMenu label="Inquiry">
+      {(close) => (
+        <>
+          <Link
+            to="/reports/job-details"
+            onClick={close}
+            className="block px-3 py-2 text-sm text-foreground hover:bg-accent"
+          >
+            Job Details Inquiry
+          </Link>
+          <button
+            type="button"
+            disabled
+            className="block w-full px-3 py-2 text-left text-sm text-muted-foreground"
+          >
+            Timeline History Inquiry <span className="block text-xs">Coming soon</span>
+          </button>
+        </>
+      )}
+    </HeaderMenu>
+  );
+}
+
+function ToolsMenu({ isAdmin }: { isAdmin: boolean }) {
+  const items = isAdmin ? ADMIN_TOOLS : [{ to: "/jobs/new", label: "New Service Job" }];
+  return (
+    <HeaderMenu label="Tools">
+      {(close) =>
+        items.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            onClick={close}
+            className="block px-3 py-2 text-sm text-foreground hover:bg-accent"
+          >
+            {item.label}
+          </Link>
+        ))
+      }
+    </HeaderMenu>
+  );
+}
+
+function HeaderMenu({
+  label,
+  children,
+}: {
+  label: string;
+  children: (close: () => void) => ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
-    const onClick = (e: MouseEvent) => {
+    const onClick = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        ref.current?.querySelector("button")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+        className="inline-flex items-center gap-1 rounded-md min-h-10 px-1.5 py-1.5 text-inherit lg:px-3 font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
       >
-        Tools
+        {label}
         <svg
           width="12"
           height="12"
@@ -307,17 +364,8 @@ function ToolsMenu({ isAdmin, canViewInquiry }: { isAdmin: boolean; canViewInqui
         </svg>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border bg-popover shadow-lg">
-          {items.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={() => setOpen(false)}
-              className="block px-3 py-2 text-sm text-foreground hover:bg-accent"
-            >
-              {item.label}
-            </Link>
-          ))}
+        <div className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border bg-popover shadow-lg">
+          {children(() => setOpen(false))}
         </div>
       )}
     </div>

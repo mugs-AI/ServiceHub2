@@ -259,7 +259,8 @@ describe("WP3C-2 — navigation separation", () => {
     expect(tabs).toContain('tabs.filter((t) => t.kind === "job")');
     expect(tabs).toContain("scrollIntoView");
     expect(tabs).toContain("overflow-x-auto");
-    expect(tabs).toContain('APP_HEADER_OFFSET_CLASS = "top-[57px]"');
+    expect(gate).toContain('data-testid="sticky-navigation" className="sticky top-0 z-40"');
+    expect(tabs).not.toContain("top-[57px]");
     expect(gate).toContain("h-14");
   });
 });
