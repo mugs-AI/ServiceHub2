@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import { MalaysiaDateInput } from "./MalaysiaDateInput";
 import { useTabs } from "@/lib/tabs";
 import {
   availableJobColumns,
-  defaultJobRange,
-  JOB_COLUMNS,
   JOB_PAGE_SIZES,
   jobCellValue,
   jobDetailsParams,
@@ -12,110 +10,131 @@ import {
   type JobColumn,
   type JobDetailsQuery,
 } from "@/lib/qne/inquiry/job-details";
-import type { JobDetailsPage } from "@/lib/qne/inquiry/job-details.server";
-import { useInquiryAccess } from "@/lib/qne/inquiry/use-inquiry-access";
+import { useInquiryView } from "@/lib/qne/inquiry/InquiryViewProvider";
+import { normalizeInquiryPreferences, orderedJobColumns } from "@/lib/qne/inquiry/preferences";
 import { inquiryRequest } from "@/lib/qne/inquiry/client";
 import { malaysiaTodayIso } from "@/lib/qne/malaysia-date";
 
 const control = "min-h-11 rounded-md border bg-background px-3 text-sm";
-function initialQuery(): JobDetailsQuery {
-  return {
-    ...defaultJobRange(),
-    q: "",
-    dateField: "created_at",
-    filters: {},
-    page: 1,
-    pageSize: 20,
-    sort: "created_at",
-    direction: "desc",
-  };
-}
-
 export function JobDetailsInquiry() {
-  const { access, error: accessError, reload, token, identity } = useInquiryAccess(),
-    { openJobTab } = useTabs();
-  const [draft, setDraft] = useState(initialQuery),
-    [query, setQuery] = useState(initialQuery),
-    [selected, setSelected] = useState(JOB_COLUMNS.filter((c) => c.default).map((c) => c.key));
-  const [data, setData] = useState<JobDetailsPage | null>(null),
-    [loading, setLoading] = useState(false),
-    [error, setError] = useState(""),
+  const view = useInquiryView(),
+    {
+      access,
+      accessError,
+      reloadAccess: reload,
+      token,
+      identityKey,
+      snapshot,
+      update,
+      loading,
+      apply: applyQuery,
+      clear,
+    } = view;
+  const { openJobTab } = useTabs();
+  const {
+    draft,
+    query,
+    selectedColumns: selected,
+    columnOrder,
+    data,
+    hasApplied,
+    stale,
+  } = snapshot;
+  const [validationError, setError] = useState(""),
     [exportError, setExportError] = useState(""),
     [exporting, setExporting] = useState(false);
-  const contextKey = `${token ?? ""}:${identity}`;
-  const [appliedContext, setAppliedContext] = useState<string | null>(null);
-  const [refreshRevision, setRefreshRevision] = useState(0);
-  const hasApplied = appliedContext === contextKey;
+  const error = validationError || view.error;
   const exportController = useRef<AbortController | null>(null);
   const permitted = access ? availableJobColumns(access) : [],
-    columns = permitted.filter((c) => selected.includes(c.key));
+    columns = access ? orderedJobColumns(access, selected, columnOrder) : [];
+  const setDraft = (next: JobDetailsQuery | ((d: JobDetailsQuery) => JobDetailsQuery)) =>
+    update({ draft: typeof next === "function" ? next(draft) : next });
+  const setQuery = (next: JobDetailsQuery | ((q: JobDetailsQuery) => JobDetailsQuery)) =>
+    update({ query: typeof next === "function" ? next(query) : next });
+  const setSelected = (next: string[] | ((keys: string[]) => string[])) =>
+    update({ selectedColumns: typeof next === "function" ? next(selected) : next });
   useEffect(() => {
     exportController.current?.abort();
     setExporting(false);
-    setData(null);
-    if (!access?.can_view || !hasApplied) {
-      setLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    setLoading(true);
+    setExportError("");
     setError("");
-    void inquiryRequest(`/api/inquiries/job-details?${jobDetailsParams(query)}`, token, {
-      signal: controller.signal,
-    })
-      .then((r) => r.json())
-      .then((body) => {
-        if (!controller.signal.aborted) setData(body);
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted)
-          setError(e instanceof Error ? e.message : "Unable to load Jobs.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
     return () => {
-      controller.abort();
       exportController.current?.abort();
     };
-  }, [access, query, token, hasApplied, refreshRevision]);
-  useEffect(() => {
-    if (!access) return;
-    const allowed = availableJobColumns(access);
-    const clean = (value: JobDetailsQuery): JobDetailsQuery => {
-      const filters = Object.fromEntries(
-        Object.entries(value.filters).filter(([key]) =>
-          allowed.some((c) => c.key === key.replace(/__(from|to)$/, "")),
-        ),
-      );
-      const sort = allowed.some((c) => c.key === value.sort && !c.noFilter)
-        ? value.sort
-        : "created_at";
-      return Object.keys(filters).length === Object.keys(value.filters).length &&
-        sort === value.sort
-        ? value
-        : { ...value, filters, sort, page: 1 };
+  }, [identityKey, access]);
+  const mountedScroll = useRef(snapshot.scrollY);
+  const scrollIdentity = useRef(identityKey);
+  if (scrollIdentity.current !== identityKey) {
+    scrollIdentity.current = identityKey;
+    mountedScroll.current = 0;
+  }
+  useLayoutEffect(() => {
+    const restoreY = mountedScroll.current;
+    let y = restoreY;
+    let departureScroll: number | null = null;
+    const departing = (event: MouseEvent) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("a[href], button[title^='/jobs/'], [data-inquiry-job-link]")
+      )
+        departureScroll = window.scrollY;
     };
-    setDraft(clean);
-    setQuery(clean);
-    setSelected((keys) => keys.filter((k) => allowed.some((c) => c.key === k)));
-  }, [access]);
+    document.addEventListener("click", departing, true);
+    const frame = requestAnimationFrame(() => window.scrollTo(0, restoreY));
+    const track = () => {
+      y = window.scrollY;
+    };
+    window.addEventListener("scroll", track, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", track);
+      document.removeEventListener("click", departing, true);
+      update({ scrollY: departureScroll ?? y });
+    };
+  }, [identityKey, update]);
   const change = (patch: Partial<JobDetailsQuery>) =>
-    setDraft((value) => ({ ...value, ...patch, page: 1 }));
+    setDraft((d) => ({ ...d, ...patch, page: 1 }));
   const filter = (key: string, value: string) =>
     setDraft((d) => ({ ...d, filters: { ...d.filters, [key]: value }, page: 1 }));
   const apply = () => {
     if (!access) return;
     try {
-      setQuery(parseJobDetailsQuery(jobDetailsParams({ ...draft, page: 1 }), access));
-      setAppliedContext(contextKey);
+      applyQuery(parseJobDetailsQuery(jobDetailsParams({ ...draft, page: 1 }), access));
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Check your filters.");
     }
   };
+  const reset = (all: boolean) => {
+    if (!access) return;
+    const defaults = normalizeInquiryPreferences(null, access);
+    clear();
+    const next = all ? defaults.draft : { ...defaults.draft, from: "", to: "" };
+    update({
+      draft: next,
+      query: next,
+      ...(all
+        ? { selectedColumns: defaults.selectedColumns, columnOrder: defaults.columnOrder }
+        : {}),
+    });
+    setError("");
+    setExportError("");
+  };
+  const moveColumn = (key: string, direction: number) => {
+    const order = orderedJobColumns(
+        access!,
+        permitted.map((c) => c.key),
+        columnOrder,
+      ).map((c) => c.key),
+      index = order.indexOf(key),
+      target = index + direction;
+    if (index < 0 || target < 0 || target >= order.length) return;
+    [order[index], order[target]] = [order[target], order[index]];
+    update({ columnOrder: order });
+  };
   const exportExcel = async () => {
-    if (!hasApplied || !access?.can_view || !data || loading) return;
+    if (!hasApplied || !access?.can_export_excel || !data || loading || columns.length === 0)
+      return;
     exportController.current?.abort();
     const controller = new AbortController();
     exportController.current = controller;
@@ -185,13 +204,18 @@ export function JobDetailsInquiry() {
         <button
           onClick={() => {
             reload();
-            if (hasApplied) setRefreshRevision((v) => v + 1);
+            if (hasApplied) applyQuery(query);
           }}
           className={control}
         >
           Refresh
         </button>
       </header>
+      {stale && (
+        <p role="status" className="rounded-md border bg-amber-50 p-3 text-sm">
+          Job changes are available. Use Refresh to update these results.
+        </p>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -241,24 +265,10 @@ export function JobDetailsInquiry() {
           <button type="submit" className={`${control} bg-primary text-primary-foreground`}>
             Apply filters
           </button>
-          <button
-            type="button"
-            className={control}
-            onClick={() => {
-              const next = { ...initialQuery(), from: "", to: "" };
-              setDraft(next);
-            }}
-          >
+          <button type="button" className={control} onClick={() => reset(false)}>
             Clear filters
           </button>
-          <button
-            type="button"
-            className={control}
-            onClick={() => {
-              const next = initialQuery();
-              setDraft(next);
-            }}
-          >
+          <button type="button" className={control} onClick={() => reset(true)}>
             Reset · 3 months
           </button>
         </div>
@@ -273,27 +283,55 @@ export function JobDetailsInquiry() {
             Columns ({safeColumns.length})
           </summary>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {permitted.map((c) => (
-              <label key={c.key} className="flex min-h-9 items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selected.includes(c.key)}
-                  disabled={c.key === "job_number"}
-                  onChange={(e) =>
-                    setSelected((keys) =>
-                      e.target.checked ? [...keys, c.key] : keys.filter((k) => k !== c.key),
-                    )
-                  }
-                />
-                {c.label}
-              </label>
+            {(access
+              ? orderedJobColumns(
+                  access,
+                  permitted.map((c) => c.key),
+                  columnOrder,
+                )
+              : []
+            ).map((c, index) => (
+              <div key={c.key} className="flex min-w-0 items-center gap-1">
+                <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(c.key)}
+                    onChange={(e) =>
+                      setSelected((keys) =>
+                        e.target.checked ? [...keys, c.key] : keys.filter((k) => k !== c.key),
+                      )
+                    }
+                  />
+                  {c.label}
+                </label>
+                <button
+                  type="button"
+                  aria-label={`Move ${c.label} up`}
+                  className="min-h-11 min-w-11 rounded border disabled:opacity-40"
+                  disabled={index === 0}
+                  onClick={() => moveColumn(c.key, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Move ${c.label} down`}
+                  className="min-h-11 min-w-11 rounded border disabled:opacity-40"
+                  disabled={index === permitted.length - 1}
+                  onClick={() => moveColumn(c.key, 1)}
+                >
+                  ↓
+                </button>
+              </div>
             ))}
           </div>
         </details>
         {access.can_export_excel && effective.can_export_excel && (
           <button
             className={control}
-            disabled={exporting || loading || !data || !!error}
+            disabled={
+              exporting || loading || !data || !!error || !hasApplied || safeColumns.length === 0
+            }
             onClick={() => void exportExcel()}
           >
             {exporting ? "Preparing Excel…" : "Export Excel"}
@@ -317,6 +355,9 @@ export function JobDetailsInquiry() {
               ? "Apply filters to load Jobs."
               : ""}
       </p>
+      {safeColumns.length === 0 && (
+        <p role="status">Choose at least one column to display Jobs and export Excel.</p>
+      )}
       <div className="w-full min-w-0 overflow-x-auto rounded-lg border" data-testid="inquiry-grid">
         <table className="w-full text-left text-sm">
           <thead className="bg-muted">
@@ -337,7 +378,7 @@ export function JobDetailsInquiry() {
                   <button
                     type="button"
                     disabled={c.noFilter}
-                    className="min-h-9 text-left font-semibold"
+                    className="min-h-11 text-left font-semibold"
                     onClick={() => {
                       const next: JobDetailsQuery = {
                         ...query,
@@ -361,6 +402,7 @@ export function JobDetailsInquiry() {
           <tbody>
             {data &&
               !loading &&
+              safeColumns.length > 0 &&
               data.rows.map((row) => (
                 <tr key={row.id} className="border-t hover:bg-accent/40">
                   {safeColumns.map((c) => (
@@ -370,7 +412,8 @@ export function JobDetailsInquiry() {
                     >
                       {c.key === "job_number" ? (
                         <button
-                          className="min-h-9 font-semibold text-primary underline"
+                          data-inquiry-job-link
+                          className="min-h-11 font-semibold text-primary underline"
                           onClick={() => openJobTab(row.id, String(row.job_number ?? "Job"))}
                         >
                           {row.job_number}
@@ -414,7 +457,7 @@ export function JobDetailsInquiry() {
         <div className="flex gap-2">
           <button
             className={control}
-            disabled={loading || query.page <= 1}
+            disabled={loading || !hasApplied || query.page <= 1}
             onClick={() => setQuery((q) => ({ ...q, page: q.page - 1 }))}
           >
             Previous

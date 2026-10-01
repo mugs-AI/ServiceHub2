@@ -21,10 +21,12 @@ import {
   usesDefaultCompletedRange,
   viewForQueueKey,
 } from "@/lib/qne/dashboard/pending-queue-groups";
+import { JobReferences } from "@/components/qne/JobReferences";
+import type { ReferenceFields } from "@/lib/qne/service-jobs/pending-reference-search";
 import { MalaysiaDateInput } from "@/components/qne/MalaysiaDateInput";
 
 /** Owner/Admin decision queue row (GET /api/admin/cancellation-requests). */
-interface CancellationRow {
+interface CancellationRow extends ReferenceFields {
   request_id: string;
   service_job_id: string;
   job_number: string;
@@ -45,7 +47,7 @@ const CANCELLATION_QUEUE = "cancellation_requests";
 /** Safe Workspace queue key used by Normal Users for the same visible tab. */
 const CANCELLATION_WORKSPACE_QUEUE = "cancellation_requested";
 
-interface QueueRow {
+interface QueueRow extends ReferenceFields {
   id: string;
   job_number: string;
   customer_code_snapshot: string;
@@ -71,7 +73,7 @@ interface QueueRow {
 }
 
 /** WP3A — pending reopen request row (GET /api/workspace/reopen-requests). */
-interface ReopenRow {
+interface ReopenRow extends ReferenceFields {
   request_id: string;
   service_job_id: string;
   job_number: string;
@@ -439,7 +441,7 @@ function PendingQueuePage() {
             setQ(e.target.value);
             setPage(1);
           }}
-          placeholder="Search job, subject or customer"
+          placeholder="Search job, subject, customer or reference"
           className="min-h-11 rounded-lg border-[1.5px] border-gray-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:bg-blue-50"
         />
         <select
@@ -550,6 +552,7 @@ function PendingQueuePage() {
                 <div className="break-words text-xs text-muted-foreground">
                   {r.customer_name ?? r.customer_code}
                 </div>
+                <JobReferences job={r} />
                 <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
                   <span className="rounded-full border border-amber-500 bg-amber-100 px-2 py-0.5 uppercase text-amber-900">
                     Reopen Request
@@ -600,6 +603,7 @@ function PendingQueuePage() {
                 <div className="text-xs text-muted-foreground">
                   {r.customer_name ?? r.customer_code}
                 </div>
+                <JobReferences job={r} />
                 <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
                   <span className="rounded-full border border-red-400 bg-red-100 px-2 py-0.5 uppercase text-red-900">
                     Cancellation Request
@@ -658,6 +662,7 @@ function PendingQueuePage() {
                   <div className="text-xs text-muted-foreground">
                     {r.customer_name_snapshot ?? r.customer_code_snapshot}
                   </div>
+                  <JobReferences job={r} />
                   <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold">
                     {approvalsAll && r.status === "Pending Approval" && (
                       <span className="rounded-full border border-sky-400 bg-sky-50 px-2 py-0.5 uppercase text-sky-900">

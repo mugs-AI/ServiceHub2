@@ -220,6 +220,8 @@ export async function decideCancellationAtomic(input: {
 // tenant and is not soft-deleted.
 
 export interface PendingCancellationQueueRow {
+  latest_customer_ref_no: string | null;
+  latest_vendor_ref_no: string | null;
   request_id: string;
   service_job_id: string;
   job_number: string;
@@ -260,6 +262,8 @@ async function loadPendingRequests(tenantCode: string): Promise<RawPendingReques
 }
 
 interface QueueJobRow {
+  latest_customer_ref_no: string | null;
+  latest_vendor_ref_no: string | null;
   id: string;
   job_number: string;
   subject: string;
@@ -280,7 +284,7 @@ async function loadJobsForRequests(
   const { data, error } = await supabaseAdmin
     .from("service_jobs")
     .select(
-      "id, job_number, subject, customer_code_snapshot, customer_name_snapshot, status, priority, assigned_user_id, assigned_user_name_snapshot",
+      "id, job_number, subject, customer_code_snapshot, customer_name_snapshot, status, priority, assigned_user_id, assigned_user_name_snapshot, latest_customer_ref_no, latest_vendor_ref_no",
     )
     .eq("tenant_code", tenantCode)
     .eq("is_deleted", false)
@@ -308,6 +312,8 @@ export async function loadPendingCancellationQueue(
       service_job_id: job.id,
       job_number: job.job_number,
       subject: job.subject,
+      latest_customer_ref_no: job.latest_customer_ref_no,
+      latest_vendor_ref_no: job.latest_vendor_ref_no,
       customer_code: job.customer_code_snapshot,
       customer_name: job.customer_name_snapshot,
       job_status: job.status,

@@ -8,6 +8,7 @@
 // endpoint; this route is read-only.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { matchesPendingReference } from "@/lib/qne/service-jobs/pending-reference-search";
 
 function trim(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
@@ -50,7 +51,7 @@ export const Route = createFileRoute("/api/workspace/reopen-requests")({
           const { data: jobs, error: jobErr } = await supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, job_number, subject, status, priority, customer_code_snapshot, customer_name_snapshot, assigned_user_name_snapshot, is_deleted",
+              "id, job_number, subject, status, priority, customer_code_snapshot, customer_name_snapshot, assigned_user_name_snapshot, is_deleted, latest_customer_ref_no, latest_vendor_ref_no",
             )
             .eq("tenant_code", user.tenantCode)
             .in(
@@ -70,6 +71,8 @@ export const Route = createFileRoute("/api/workspace/reopen-requests")({
                 service_job_id: r.service_job_id,
                 job_number: j.job_number,
                 subject: j.subject,
+                latest_customer_ref_no: j.latest_customer_ref_no,
+                latest_vendor_ref_no: j.latest_vendor_ref_no,
                 customer_code: j.customer_code_snapshot,
                 customer_name: j.customer_name_snapshot,
                 job_status: j.status,
@@ -84,15 +87,7 @@ export const Route = createFileRoute("/api/workspace/reopen-requests")({
             .filter((r): r is NonNullable<typeof r> => r !== null);
 
           if (priority) merged = merged.filter((r) => r.priority === priority);
-          if (q) {
-            const needle = q.toLowerCase();
-            merged = merged.filter((r) =>
-              [r.job_number, r.subject, r.customer_name ?? "", r.customer_code]
-                .join(" ")
-                .toLowerCase()
-                .includes(needle),
-            );
-          }
+          if (q) merged = merged.filter((row) => matchesPendingReference(row, q));
 
           const total = merged.length;
           const paged = merged.slice((page - 1) * pageSize, page * pageSize);

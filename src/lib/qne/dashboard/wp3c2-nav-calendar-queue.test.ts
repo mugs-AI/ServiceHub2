@@ -255,9 +255,9 @@ describe("WP3C-2 — navigation separation", () => {
     expect(gate).toContain("Tools");
     expect(gate).toContain("<MobileProfile");
   });
-  it("the second strip shows Job tabs only and auto-scrolls the active one", () => {
-    expect(tabs).toContain('tabs.filter((t) => t.kind === "job")');
-    expect(tabs).toContain("scrollIntoView");
+  it("the second strip shows dynamic tabs and auto-scrolls the active one", () => {
+    expect(tabs).toContain('tabs.filter((t) => t.kind !== "pinned")');
+    expect(tabs).toContain("strip.scrollTo");
     expect(tabs).toContain("overflow-x-auto");
     expect(gate).toContain('data-testid="sticky-navigation" className="sticky top-0 z-40"');
     expect(tabs).not.toContain("top-[57px]");

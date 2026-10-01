@@ -1,53 +1,59 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "@/lib/qne/session-context";
-import type { InquiryPermission } from "./permissions";
+import { validateInquiryPermission, type InquiryPermission } from "./permissions";
 import { inquiryRequest } from "./client";
+import type { InquiryIdentity } from "./preferences";
+import { grantsKey } from "./view-state";
 export function useInquiryAccess() {
-  const { token, currentUser } = useSession(),
-    identity = `${currentUser?.tenantCode ?? ""}:${currentUser?.diagnostics?.matchedN3UserId ?? ""}`;
+  const { token, currentUser, currentUserReady, currentUserToken } = useSession();
+  const tenant = currentUser?.tenantCode,
+    user = currentUser?.diagnostics?.matchedN3UserId;
+  const identity = useMemo<InquiryIdentity | null>(
+    () =>
+      token && currentUserReady && currentUserToken === token && tenant && user
+        ? { tenantCode: tenant, userId: user }
+        : null,
+    [token, currentUserReady, currentUserToken, tenant, user],
+  );
+  const identityKey = identity ? JSON.stringify([identity.tenantCode, identity.userId]) : null;
   const [state, setState] = useState<{
-    token: string | null;
-    identity: string;
+    identity: string | null;
     access: InquiryPermission | null;
     error: string;
-  }>({ token: null, identity: "", access: null, error: "" });
+  }>({ identity: null, access: null, error: "" });
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    if (!token || !identity) return;
+    if (!token || !identityKey) return;
     let controller: AbortController;
     const load = () => {
       controller?.abort();
       controller = new AbortController();
       const signal = controller.signal;
-      // Revalidate in the background without removing a same-session view.
       setState((previous) => ({
-        token,
-        identity,
-        access: previous.token === token && previous.identity === identity ? previous.access : null,
+        identity: identityKey,
+        access: previous.identity === identityKey ? previous.access : null,
         error: "",
       }));
       void inquiryRequest("/api/inquiries/access", token, { signal })
         .then((r) => r.json())
         .then((body) => {
+          const validated = validateInquiryPermission(body.access);
+          if (!validated.ok) throw new Error("Unable to verify inquiry access.");
           if (!signal.aborted)
             setState((previous) => ({
-              token,
-              identity,
-              // Stable grants must not trigger a Job query again on window focus.
+              identity: identityKey,
               access:
-                previous.token === token &&
-                previous.identity === identity &&
-                JSON.stringify(previous.access) === JSON.stringify(body.access)
+                previous.identity === identityKey &&
+                grantsKey(previous.access) === grantsKey(validated.value)
                   ? previous.access
-                  : body.access,
+                  : validated.value,
               error: "",
             }));
         })
         .catch((error) => {
           if (!signal.aborted)
             setState({
-              token,
-              identity,
+              identity: identityKey,
               access: null,
               error: error instanceof Error ? error.message : "Unable to check inquiry access.",
             });
@@ -59,13 +65,21 @@ export function useInquiryAccess() {
       controller?.abort();
       window.removeEventListener("focus", load);
     };
-  }, [token, identity, revision]);
-  const current = state.token === token && state.identity === identity;
+  }, [token, identityKey, revision]);
+  const current = state.identity === identityKey && !!identityKey;
+  const reload = useCallback(() => setRevision((v) => v + 1), []);
+  const identityFailed =
+    !!token && currentUserReady && (!currentUser || (currentUserToken === token && !identity));
+  const identityError = identityFailed
+    ? "Unable to verify your Inquiry identity. Reopen ServiceHub from N3."
+    : "";
   return {
     access: current ? state.access : null,
-    error: current ? state.error : "",
-    reload: () => setRevision((v) => v + 1),
+    error: identityError || (current ? state.error : ""),
+    reload,
     token,
     identity,
+    identityKey,
+    identityFailed,
   };
 }

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DashboardInfo } from "./DashboardInfo";
 
 export type DashboardTone =
   | "blue"
@@ -75,39 +75,22 @@ export function DashboardHero({
     return (
       <header
         data-testid="compact-dashboard-header"
-        className="dashboard-enter rounded-lg border border-dashboard-blue/20 bg-dashboard-hero p-4 shadow-sm sm:p-6"
+        className="dashboard-enter rounded-lg border border-dashboard-blue/20 bg-dashboard-hero p-3 shadow-sm sm:p-4"
       >
         <p className="text-xs font-bold uppercase tracking-wide text-dashboard-blue">{eyebrow}</p>
         <div className="mt-2 flex min-w-0 items-start gap-2">
           <h1 className="min-w-0 break-words text-xl font-bold text-dashboard-ink sm:text-3xl">
             {title}
           </h1>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="Dashboard information"
-                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-dashboard-blue hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <span
-                  aria-hidden="true"
-                  className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold"
-                >
-                  i
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="max-w-[calc(100vw-2rem)] space-y-3 text-sm">
-              <p className="font-semibold">Dashboard information</p>
-              <p className="text-muted-foreground">{subtitle}</p>
-              <div className="text-xs">{meta}</div>
-            </PopoverContent>
-          </Popover>
+          <DashboardInfo label="Dashboard information">
+            <p className="text-muted-foreground">{subtitle}</p>
+            <div className="text-xs">{meta}</div>
+          </DashboardInfo>
         </div>
       </header>
     );
   return (
-    <header className="dashboard-enter relative overflow-hidden rounded-lg border border-dashboard-blue/20 bg-dashboard-hero p-4 shadow-sm sm:p-6">
+    <header className="dashboard-enter relative overflow-hidden rounded-lg border border-dashboard-blue/20 bg-dashboard-hero p-3 shadow-sm sm:p-4">
       <div className="relative grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-wide text-dashboard-blue">{eyebrow}</p>
@@ -160,9 +143,11 @@ export function DashboardSection({
 }) {
   return (
     <section className="min-w-0 space-y-3">
-      <div className="min-w-0">
+      <div className="flex min-w-0 items-center gap-1">
         <h2 className="text-base font-bold text-dashboard-ink">{title}</h2>
-        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <DashboardInfo label={`${title} information`}>{description}</DashboardInfo>
+        ) : null}
       </div>
       {children}
     </section>
@@ -188,37 +173,47 @@ export function DashboardStatCard({
 }) {
   const colors = toneClasses[tone];
   const body = (
-    <div
-      className={`relative h-full min-h-[132px] overflow-hidden rounded-lg border p-3 text-left shadow-sm transition sm:p-4 ${colors.card} ${active ? "ring-2 ring-dashboard-blue ring-offset-2" : ""}`}
-    >
-      <div className={`grid h-9 w-9 place-items-center rounded-md shadow-sm ${colors.icon}`}>
-        <Icon aria-hidden="true" className="h-4 w-4" />
+    <div className="flex min-h-[96px] flex-col justify-between gap-2 p-3 text-left">
+      <div className="flex min-w-0 items-center gap-2 pr-8">
+        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${colors.icon}`}>
+          <Icon aria-hidden="true" className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 break-words text-2xl font-bold text-dashboard-ink">{value}</div>
       </div>
-      <div className="mt-3 flex items-end justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-2xl font-bold text-dashboard-ink">{value}</div>
-          <div className="mt-0.5 text-xs font-bold text-dashboard-ink">{label}</div>
+      <div className="flex min-w-0 items-start gap-2">
+        <div className="min-w-0 flex-1 break-words text-xs font-bold text-dashboard-ink">
+          {label}
         </div>
         {onClick ? (
           <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
         ) : null}
       </div>
-      {meaning ? (
-        <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{meaning}</p>
-      ) : null}
-      <span className={`absolute inset-x-0 bottom-0 h-1 ${colors.bar}`} />
     </div>
   );
-  if (!onClick) return body;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className="dashboard-card block min-h-11 w-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    <div
+      data-dashboard-card
+      className={`dashboard-card relative h-full min-h-[96px] overflow-hidden rounded-lg border shadow-sm ${colors.card} ${active ? "ring-2 ring-dashboard-blue ring-offset-2" : ""}`}
     >
-      {body}
-    </button>
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          aria-pressed={active}
+          className="block h-full min-h-11 w-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        >
+          {body}
+        </button>
+      ) : (
+        body
+      )}
+      {meaning ? (
+        <div className="absolute right-0 top-0">
+          <DashboardInfo label={`${label} information`}>{meaning}</DashboardInfo>
+        </div>
+      ) : null}
+      <span className={`pointer-events-none absolute inset-x-0 bottom-0 h-1 ${colors.bar}`} />
+    </div>
   );
 }
 
@@ -253,7 +248,7 @@ export function DashboardSkeletonGrid({ count = 4 }: { count?: number }) {
       {Array.from({ length: count }, (_, i) => (
         <div
           key={i}
-          className="h-[132px] animate-pulse rounded-lg border bg-muted/60 motion-reduce:animate-none"
+          className="h-[96px] animate-pulse rounded-lg border bg-muted/60 motion-reduce:animate-none"
         />
       ))}
     </div>
