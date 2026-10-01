@@ -1,3 +1,5 @@
+import { useInquiryView } from "@/lib/qne/inquiry/InquiryViewProvider";
+import { JobReferences } from "@/components/qne/JobReferences";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -32,7 +34,6 @@ import {
   utcIsoToMyLocal,
   validateWindow,
 } from "@/lib/qne/service-jobs/scheduling";
-
 
 interface JobDetail {
   id: string;
@@ -129,6 +130,7 @@ function authHeaders(): Record<string, string> {
 function JobDetailPage() {
   const { jobId } = Route.useParams();
   const session = useSession();
+  const { markStale } = useInquiryView();
   const isAdmin = !!session.currentUser?.isAdministrator;
 
   const [job, setJob] = useState<JobDetail | null>(null);
@@ -139,7 +141,6 @@ function JobDetailPage() {
   const [showPicker, setShowPicker] = useState(false);
   // Timeline is a right-hand drawer; always closed on load.
   const [showTimeline, setShowTimeline] = useState(false);
-
 
   // Progressive loading:
   // - reload()   loads main job details first (blocks initial render),
@@ -177,9 +178,10 @@ function JobDetailPage() {
   }, [jobId, loadSecondary]);
 
   const reloadAll = useCallback(async () => {
+    markStale();
     await reload();
     await loadSecondary();
-  }, [reload, loadSecondary]);
+  }, [reload, loadSecondary, markStale]);
 
   useEffect(() => {
     void reload();
@@ -202,13 +204,9 @@ function JobDetailPage() {
   }
 
   const currentUserId =
-    session.currentUser?.diagnostics?.matchedN3UserId ??
-    session.currentUser?.userCode ??
-    null;
+    session.currentUser?.diagnostics?.matchedN3UserId ?? session.currentUser?.userCode ?? null;
   const isCreator =
-    !!job.created_by_user_id &&
-    !!currentUserId &&
-    job.created_by_user_id === currentUserId;
+    !!job.created_by_user_id && !!currentUserId && job.created_by_user_id === currentUserId;
 
   const pendingLock = job.status === "Pending Approval" && !isAdmin;
 
@@ -231,7 +229,9 @@ function JobDetailPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={job.status} />
-          <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${priorityTone(job.priority)}`}>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${priorityTone(job.priority)}`}
+          >
             {job.priority}
           </span>
           <span className="rounded-full border px-2 py-0.5 text-xs font-semibold uppercase">
@@ -251,13 +251,9 @@ function JobDetailPage() {
           >
             Timeline
           </button>
-          <Link
-            to="/support"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
+          <Link to="/support" className="text-sm text-muted-foreground hover:text-foreground">
             ← Workspace
           </Link>
-
         </div>
       </header>
 
@@ -283,7 +279,8 @@ function JobDetailPage() {
             </span>
           </div>
           <p className="mt-1 text-xs text-amber-800">
-            This Job is waiting for Owner/Admin approval. Operational updates are locked until approval.
+            This Job is waiting for Owner/Admin approval. Operational updates are locked until
+            approval.
           </p>
         </div>
       )}
@@ -315,22 +312,21 @@ function JobDetailPage() {
             job={job}
             canAssign={isAdmin && !job.is_deleted}
             currentUserId={currentUserId}
-            currentDisplayName={session.currentUser?.displayName || session.currentUser?.email || ""}
+            currentDisplayName={
+              session.currentUser?.displayName || session.currentUser?.email || ""
+            }
             onOpenPicker={() => setShowPicker(true)}
             onReload={reloadAll}
           />
         </div>
       </div>
 
-
       {(job.subscription_category_snapshot ||
         job.stock_code_snapshot ||
         job.entitlement_status_snapshot ||
         job.requires_approval ||
         job.approved_at ||
-        job.rejected_at) && (
-        <EntitlementCard job={job} isAdmin={isAdmin} />
-      )}
+        job.rejected_at) && <EntitlementCard job={job} isAdmin={isAdmin} />}
 
       <ScheduleCard
         job={job}
@@ -390,7 +386,6 @@ function JobDetailPage() {
           </div>
         </Section>
 
-
         <InternalNoteSection
           job={job}
           canEdit={isCreator && !job.is_deleted && !pendingLock}
@@ -415,9 +410,7 @@ function JobDetailPage() {
         <Kv k="Service address" v={job.service_address} multiline />
       </Section>
 
-      {isAdmin && (
-        <AdminDangerZone job={job} onReload={reloadAll} />
-      )}
+      {isAdmin && <AdminDangerZone job={job} onReload={reloadAll} />}
 
       {showPicker && (
         <TechnicianPicker
@@ -431,10 +424,7 @@ function JobDetailPage() {
         />
       )}
 
-      {showTimeline && (
-        <TimelineDrawer items={timeline} onClose={() => setShowTimeline(false)} />
-      )}
-
+      {showTimeline && <TimelineDrawer items={timeline} onClose={() => setShowTimeline(false)} />}
     </div>
   );
 }
@@ -456,7 +446,8 @@ function ScheduleCard({
   const initial = useMemo(() => {
     const s = splitLocal(utcIsoToMyLocal(job.scheduled_start_at));
     const e = splitLocal(utcIsoToMyLocal(job.scheduled_end_at));
-    if (s.date && s.time) return { s, e: e.date && e.time ? e : addMinutesLocal(s.date, s.time, 60) };
+    if (s.date && s.time)
+      return { s, e: e.date && e.time ? e : addMinutesLocal(s.date, s.time, 60) };
     const now = nextSlotNow();
     return { s: now, e: addMinutesLocal(now.date, now.time, 60) };
   }, [job.scheduled_start_at, job.scheduled_end_at]);
@@ -491,7 +482,6 @@ function ScheduleCard({
       setEndTime(shifted.time);
     }
   }
-
 
   async function submit(force: boolean) {
     setErr(null);
@@ -740,7 +730,9 @@ function EntitlementCard({ job, isAdmin }: { job: JobDetail; isAdmin: boolean })
           Entitlement &amp; Approval
         </h2>
         {job.entitlement_status_snapshot && (
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badge}`}>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badge}`}
+          >
             {job.entitlement_status_snapshot}
           </span>
         )}
@@ -765,13 +757,19 @@ function EntitlementCard({ job, isAdmin }: { job: JobDetail; isAdmin: boolean })
               {approvalLabel && <Kv k="Status" v={approvalLabel} />}
               {job.approval_reason && <Kv k="Reason" v={job.approval_reason} />}
               {job.approved_at && (
-                <Kv k="Approved" v={`${formatMYDateTime(job.approved_at)}${job.approved_by_name_snapshot ? ` · ${job.approved_by_name_snapshot}` : ""}`} />
+                <Kv
+                  k="Approved"
+                  v={`${formatMYDateTime(job.approved_at)}${job.approved_by_name_snapshot ? ` · ${job.approved_by_name_snapshot}` : ""}`}
+                />
               )}
               {(job.approval_remark_public ?? job.approval_note) && (
                 <Kv k="Remark" v={job.approval_remark_public ?? job.approval_note} multiline />
               )}
               {job.rejected_at && (
-                <Kv k="Rejected" v={`${formatMYDateTime(job.rejected_at)}${job.rejected_by_name_snapshot ? ` · ${job.rejected_by_name_snapshot}` : ""}`} />
+                <Kv
+                  k="Rejected"
+                  v={`${formatMYDateTime(job.rejected_at)}${job.rejected_by_name_snapshot ? ` · ${job.rejected_by_name_snapshot}` : ""}`}
+                />
               )}
               {job.rejection_reason && (
                 <Kv k="Rejection reason" v={job.rejection_reason} multiline />
@@ -931,17 +929,10 @@ function InternalNoteSection({
   );
 }
 
-function PriorityEditor({
-  job,
-  onDone,
-}: {
-  job: JobDetail;
-  onDone: () => Promise<void>;
-}) {
+function PriorityEditor({ job, onDone }: { job: JobDetail; onDone: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const locked =
-    job.is_deleted || job.status === "Completed" || job.status === "Cancelled";
+  const locked = job.is_deleted || job.status === "Completed" || job.status === "Cancelled";
 
   async function change(next: string) {
     if (next === job.priority || busy) return;
@@ -978,7 +969,9 @@ function PriorityEditor({
               onClick={() => change(p)}
               disabled={locked || busy}
               className={`min-h-9 rounded-full border px-3 py-1 text-xs font-semibold uppercase transition-colors disabled:opacity-50 ${
-                active ? priorityTone(p) + " ring-2 ring-offset-1 ring-blue-500" : "bg-white text-muted-foreground hover:bg-accent"
+                active
+                  ? priorityTone(p) + " ring-2 ring-offset-1 ring-blue-500"
+                  : "bg-white text-muted-foreground hover:bg-accent"
               }`}
             >
               {p}
@@ -991,22 +984,17 @@ function PriorityEditor({
           </span>
         )}
       </div>
-      {err && (
-        <span className="text-xs text-destructive sm:ml-2">{err}</span>
-      )}
+      {err && <span className="text-xs text-destructive sm:ml-2">{err}</span>}
     </div>
   );
 }
-
 
 /* ---------------- status ---------------- */
 
 function StatusBadge({ status }: { status: string }) {
   const tone = statusTone(status);
   return (
-    <span
-      className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${tone}`}
-    >
+    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${tone}`}>
       {status}
     </span>
   );
@@ -1038,13 +1026,7 @@ function statusTone(status: string): string {
 
 /* ---------------- workflow ---------------- */
 
-function WorkflowActions({
-  job,
-  onDone,
-}: {
-  job: JobDetail;
-  onDone: () => Promise<void>;
-}) {
+function WorkflowActions({ job, onDone }: { job: JobDetail; onDone: () => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   // WP3A — a waiting transition must collect a reference number first.
@@ -1065,8 +1047,6 @@ function WorkflowActions({
     // WP0E-R — cancellation lives in the dedicated CancellationPanel.
     return t;
   }, [job.status, job.requires_approval, job.assigned_user_id]);
-
-  if (transitions.length === 0) return null;
 
   async function transition(to: string, reason: string | null = null) {
     setBusy(to);
@@ -1116,6 +1096,15 @@ function WorkflowActions({
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Workflow
       </h2>
+      <div className="mb-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Current status</span>
+          <StatusBadge status={job.status} />
+        </div>
+        {waitingPartyForStatus(job.status) && (
+          <JobReferences job={job} party={waitingPartyForStatus(job.status)!} />
+        )}
+      </div>
       <div className="flex flex-wrap gap-2">
         {transitions.map((to) => (
           <button
@@ -1143,7 +1132,8 @@ function WorkflowActions({
       </div>
       {job.status === "Draft" && (
         <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-          Submitting a Draft with a technician assigned routes to <strong>Assigned</strong>; without one, to <strong>Open</strong>.
+          Submitting a Draft with a technician assigned routes to <strong>Assigned</strong>; without
+          one, to <strong>Open</strong>.
         </p>
       )}
       {err && (
@@ -1153,10 +1143,7 @@ function WorkflowActions({
       )}
 
       {waitingParty && (
-        <ModalShell
-          title={WAITING_REF_LABEL[waitingParty]}
-          onClose={() => setWaitingParty(null)}
-        >
+        <ModalShell title={WAITING_REF_LABEL[waitingParty]} onClose={() => setWaitingParty(null)}>
           <div data-testid="waiting-ref-prompt" className="min-w-0">
             <label
               className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
@@ -1226,7 +1213,6 @@ function ModalShell({
     </div>
   );
 }
-
 
 function actionLabel(from: string, to: string): string {
   if (from === "Draft" && to === "Open") return "Submit → Open";
@@ -1357,9 +1343,7 @@ function ApprovalPanel({
         </p>
       )}
       {err && (
-        <div className="mt-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">
-          {err}
-        </div>
+        <div className="mt-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{err}</div>
       )}
     </section>
   );
@@ -1415,7 +1399,6 @@ function PrimaryPicInfo() {
   );
 }
 
-
 function AssignmentSection({
   job,
   canAssign,
@@ -1445,7 +1428,11 @@ function AssignmentSection({
     job.assigned_user_id !== currentUserId;
 
   async function handleUnassign() {
-    if (!confirm(`Unassign ${job.assigned_user_name_snapshot ?? "technician"} from ${job.job_number}?`)) {
+    if (
+      !confirm(
+        `Unassign ${job.assigned_user_name_snapshot ?? "technician"} from ${job.job_number}?`,
+      )
+    ) {
       return;
     }
     setBusy(true);
@@ -1594,7 +1581,6 @@ function AssignmentSection({
   );
 }
 
-
 function TechnicianPicker({
   jobId,
   currentUserId,
@@ -1667,9 +1653,7 @@ function TechnicianPicker({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b p-4">
-          <h3 className="text-base font-semibold text-foreground">
-            Select technician
-          </h3>
+          <h3 className="text-base font-semibold text-foreground">Select technician</h3>
           <button
             type="button"
             onClick={onClose}
@@ -1693,9 +1677,7 @@ function TechnicianPicker({
           {loading ? (
             <p className="p-4 text-sm text-muted-foreground">Loading…</p>
           ) : rows.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">
-              No active technicians match.
-            </p>
+            <p className="p-4 text-sm text-muted-foreground">No active technicians match.</p>
           ) : (
             <ul className="divide-y">
               {rows.map((r) => {
@@ -1714,11 +1696,7 @@ function TechnicianPicker({
                             </span>
                           )}
                         </div>
-                        {sub && (
-                          <div className="truncate text-xs text-muted-foreground">
-                            {sub}
-                          </div>
-                        )}
+                        {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
                       </div>
                       <button
                         type="button"
@@ -1740,9 +1718,7 @@ function TechnicianPicker({
           )}
         </div>
         {err && (
-          <div className="border-t bg-destructive/10 px-4 py-2 text-sm text-destructive">
-            {err}
-          </div>
+          <div className="border-t bg-destructive/10 px-4 py-2 text-sm text-destructive">{err}</div>
         )}
       </div>
     </div>
@@ -1873,13 +1849,7 @@ function CommentsSection({
 
 /* ---------------- timeline ---------------- */
 
-function TimelineDrawer({
-  items,
-  onClose,
-}: {
-  items: TimelineItem[];
-  onClose: () => void;
-}) {
+function TimelineDrawer({ items, onClose }: { items: TimelineItem[]; onClose: () => void }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -1947,7 +1917,6 @@ function TimelineDrawer({
   );
 }
 
-
 function formatEvent(it: TimelineItem): string {
   switch (it.event) {
     case "status_changed":
@@ -1992,23 +1961,14 @@ function formatEvent(it: TimelineItem): string {
 
 function TimelineBody({ item }: { item: TimelineItem }) {
   if (!item.note) return null;
-  return (
-    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
-      {item.note}
-    </p>
-  );
+  return <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.note}</p>;
 }
 
 /* ---------------- danger zone ---------------- */
 
-function AdminDangerZone({
-  job,
-  onReload,
-}: {
-  job: JobDetail;
-  onReload: () => Promise<void>;
-}) {
+function AdminDangerZone({ job, onReload }: { job: JobDetail; onReload: () => Promise<void> }) {
   const navigate = useNavigate();
+  const { markStale } = useInquiryView();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [purgeOpen, setPurgeOpen] = useState(false);
@@ -2066,6 +2026,7 @@ function AdminDangerZone({
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? "Failed");
       setPurgeOpen(false);
+      markStale();
       navigate({ to: "/support" });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
@@ -2080,9 +2041,8 @@ function AdminDangerZone({
         Danger zone
       </h2>
       <p className="mb-3 text-xs text-red-900/80">
-        Soft-deleting is reversible via Restore. Permanent deletion removes the
-        job and all its history and cannot be undone. Job numbers are never
-        reused.
+        Soft-deleting is reversible via Restore. Permanent deletion removes the job and all its
+        history and cannot be undone. Job numbers are never reused.
       </p>
       <div className="flex flex-wrap gap-2">
         {!job.is_deleted ? (
@@ -2119,9 +2079,7 @@ function AdminDangerZone({
         </button>
       </div>
       {err && (
-        <div className="mt-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">
-          {err}
-        </div>
+        <div className="mt-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{err}</div>
       )}
 
       {purgeOpen && (
@@ -2139,9 +2097,8 @@ function AdminDangerZone({
             {!purgeConfirmed1 ? (
               <>
                 <p className="mt-2 text-sm text-foreground">
-                  This removes the job and its full history (comments,
-                  assignments, activity log). This action <strong>cannot be
-                  undone</strong>.
+                  This removes the job and its full history (comments, assignments, activity log).
+                  This action <strong>cannot be undone</strong>.
                 </p>
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
                   <button
@@ -2164,8 +2121,8 @@ function AdminDangerZone({
               <>
                 <p className="mt-2 text-sm text-foreground">
                   Type the job number{" "}
-                  <span className="font-mono font-semibold">{job.job_number}</span>{" "}
-                  below to confirm.
+                  <span className="font-mono font-semibold">{job.job_number}</span> below to
+                  confirm.
                 </p>
                 <input
                   autoFocus

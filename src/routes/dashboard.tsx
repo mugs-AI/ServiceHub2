@@ -1,15 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
-  CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   Clock,
   Flag,
-  LayoutList,
   ListTodo,
   PlayCircle,
-  Plus,
   RotateCcw,
   Truck,
   UserCheck,
@@ -25,7 +22,6 @@ import { StatusBadge, PriorityBadge, Skeleton } from "@/components/qne/badges";
 import { MyDayPanel } from "@/components/qne/DaySchedule";
 import { MY_WORK_CARDS, type MyWorkScope } from "@/lib/qne/dashboard/my-work-scope";
 import {
-  DashboardAction,
   DashboardHero,
   DashboardSection,
   DashboardSkeletonGrid,
@@ -313,9 +309,10 @@ function UserDashboard() {
   return (
     <div className="min-w-0 space-y-6">
       <DashboardHero
-        eyebrow="My operational workspace"
-        title={`${greeting(new Date())}, ${name}`}
-        subtitle={`${session?.companyName || "—"} · everything assigned to you, in one place.`}
+        compact
+        eyebrow={`${greeting(new Date())}, ${name}`}
+        title={session?.companyName || "—"}
+        subtitle="Everything assigned to you, in one place."
         meta={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>{formatMY(new Date().toISOString())}</span>
@@ -333,14 +330,6 @@ function UserDashboard() {
               {loading ? "Refreshing…" : "Refresh"}
             </button>
           </span>
-        }
-        actions={
-          <>
-            <DashboardAction to="/jobs/new" label="New Service Job" icon={Plus} primary />
-            <DashboardAction to="/support" label="Workspace" icon={LayoutList} />
-            <DashboardAction to="/jobs/pending" label="Pending Queue" icon={ClipboardCheck} />
-            <DashboardAction to="/calendar" label="Calendar" icon={CalendarDays} />
-          </>
         }
       />
 

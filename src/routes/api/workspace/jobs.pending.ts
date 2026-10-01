@@ -6,6 +6,7 @@
 // technician (or "__unassigned__"), from, to, status, q.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { pendingReferenceOr } from "@/lib/qne/service-jobs/pending-reference-search";
 import {
   ADMIN_DASHBOARD_QUEUE_KEYS,
   isAdminDashboardQueueKey,
@@ -120,7 +121,7 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           let query = supabaseAdmin
             .from("service_jobs")
             .select(
-              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, subscription_category_snapshot, stock_code_snapshot, entitlement_status_snapshot, entitlement_expiry_snapshot, assigned_user_id, assigned_user_name_snapshot, assigned_at, started_at, created_at, completed_at, completion_cycle",
+              "id, job_number, customer_code_snapshot, customer_name_snapshot, subject, status, priority, source, requires_approval, approval_reason, subscription_category_snapshot, stock_code_snapshot, entitlement_status_snapshot, entitlement_expiry_snapshot, assigned_user_id, assigned_user_name_snapshot, assigned_at, started_at, created_at, completed_at, completion_cycle, latest_customer_ref_no, latest_vendor_ref_no",
               { count: "exact" },
             )
             .eq("tenant_code", user.tenantCode)
@@ -184,12 +185,8 @@ export const Route = createFileRoute("/api/workspace/jobs/pending")({
           }
           if (from) query = query.gte("created_at", from);
           if (to) query = query.lte("created_at", to);
-          if (q) {
-            const like = `%${q.replace(/[%_,()]/g, "")}%`;
-            query = query.or(
-              `job_number.ilike.${like},subject.ilike.${like},customer_name_snapshot.ilike.${like}`,
-            );
-          }
+          const referenceSearch = q ? pendingReferenceOr(q) : null;
+          if (referenceSearch) query = query.or(referenceSearch);
 
           const isCompletedStatusList =
             queueType === "completed" ||

@@ -6,7 +6,7 @@ import { TabsProvider, type AppTab } from "@/lib/tabs";
 import { AppTabs } from "./AppTabs";
 import { DevLoginScreen } from "./DevLoginScreen";
 import { RelaunchNotice } from "./RelaunchNotice";
-import { useInquiryAccess } from "@/lib/qne/inquiry/use-inquiry-access";
+import { InquiryViewProvider, useInquiryView } from "@/lib/qne/inquiry/InquiryViewProvider";
 
 interface NavItem {
   to: string;
@@ -60,9 +60,11 @@ export function AuthGate({ children }: { children?: ReactNode }) {
   }
 
   return (
-    <AuthenticatedShell error={error} session={session}>
-      {children}
-    </AuthenticatedShell>
+    <InquiryViewProvider>
+      <AuthenticatedShell error={error} session={session}>
+        {children}
+      </AuthenticatedShell>
+    </InquiryViewProvider>
   );
 }
 
@@ -76,6 +78,7 @@ function AuthenticatedShell({
   children?: ReactNode;
 }) {
   const { currentUser } = useSession();
+  const { identityKey, access: inquiryAccess, clear: clearInquiry } = useInquiryView();
   const isAdmin = !!currentUser?.isAdministrator;
   const pinned = useMemo<AppTab[]>(
     () => [
@@ -112,7 +115,12 @@ function AuthenticatedShell({
   );
 
   return (
-    <TabsProvider pinned={pinned}>
+    <TabsProvider
+      pinned={pinned}
+      identityScope={identityKey}
+      inquiryAllowed={inquiryAccess ? inquiryAccess.can_view : null}
+      onCloseInquiry={clearInquiry}
+    >
       <div className="min-h-screen bg-background">
         <div data-testid="sticky-navigation" className="sticky top-0 z-40">
           <AppHeader />
@@ -136,7 +144,7 @@ function AuthenticatedShell({
 
 function AppHeader() {
   const { currentUser } = useSession();
-  const { access: inquiryAccess } = useInquiryAccess();
+  const { access: inquiryAccess } = useInquiryView();
   const canViewInquiry = inquiryAccess?.can_view === true;
   const isAdmin = !!currentUser?.isAdministrator;
   const nav = isAdmin ? ADMIN_NAV : USER_NAV;
@@ -277,6 +285,7 @@ function InquiryMenu() {
         <>
           <Link
             to="/reports/job-details"
+            resetScroll={false}
             onClick={close}
             className="block px-3 py-2 text-sm text-foreground hover:bg-accent"
           >

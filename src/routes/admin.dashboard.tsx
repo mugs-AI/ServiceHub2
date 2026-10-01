@@ -22,6 +22,7 @@ import {
 import { AdminOnly } from "@/components/qne/AdminOnly";
 import { formatMYDateTime } from "@/lib/format-date";
 import { StatCard } from "./dashboard";
+import { DashboardInfo } from "@/components/qne/dashboard/DashboardInfo";
 import { useSession } from "@/lib/qne/session-context";
 import { getStoredToken } from "@/lib/qne/tokens";
 import {
@@ -470,7 +471,16 @@ function HealthCard({ title, row, loading }: { title: string; row?: HealthRow; l
   return (
     <div className="min-w-0 rounded-lg border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 break-words text-sm font-semibold text-foreground">{title}</div>
+        <div className="flex min-w-0 items-center gap-1">
+          <div className="min-w-0 break-words text-sm font-semibold text-foreground">{title}</div>
+          <DashboardInfo label={`${title} information`}>
+            <p>
+              Last success:{" "}
+              {row?.last_successful_sync ? formatMYDateTime(row.last_successful_sync) : "—"}
+            </p>
+            {row?.error_message ? <p className="text-destructive">{row.error_message}</p> : null}
+          </DashboardInfo>
+        </div>
         <span
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${tone}`}
         >
@@ -478,12 +488,6 @@ function HealthCard({ title, row, loading }: { title: string; row?: HealthRow; l
           {loading ? "Loading" : status}
         </span>
       </div>
-      <div className="mt-2 text-xs text-muted-foreground">
-        Last success: {row?.last_successful_sync ? formatMYDateTime(row.last_successful_sync) : "—"}
-      </div>
-      {row?.error_message && (
-        <div className="mt-1 line-clamp-2 text-xs text-destructive">{row.error_message}</div>
-      )}
     </div>
   );
 }

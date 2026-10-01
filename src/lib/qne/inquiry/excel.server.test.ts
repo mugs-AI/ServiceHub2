@@ -19,6 +19,11 @@ function unzip(bytes: Uint8Array): Record<string, string> {
   return files;
 }
 describe("Job Details XLSX", () => {
+  it("preserves submitted column order", () => {
+    expect(
+      exportJobColumns(["subject", "job_number"], OWNER_ADMIN_ACCESS).map((c) => c.key),
+    ).toEqual(["subject", "job_number"]);
+  });
   it("creates an OOXML archive with literal strings, numeric cells, Malaysian dates and filters", () => {
     const cols = exportJobColumns(
         ["job_number", "subject", "created_at", "total_work_minutes"],

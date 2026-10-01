@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { qneGet } from "@/lib/qne/client";
 import { decodeJwtPayload } from "@/lib/qne/jwt";
@@ -56,13 +65,13 @@ export interface CurrentUserInfo {
   diagnostics: CurrentUserDiagnostics | null;
 }
 
-
 interface SessionContextValue {
   ready: boolean;
   token: string | null;
   session: SessionInfo | null;
   currentUser: CurrentUserInfo | null;
   currentUserReady: boolean;
+  currentUserToken: string | null;
   error: string | null;
   refresh: () => Promise<void>;
   applyToken: (token: string, session?: Partial<SessionInfo>) => Promise<void>;
@@ -93,37 +102,49 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
+  const [currentUserToken, setCurrentUserToken] = useState<string | null>(null);
   const [currentUserReady, setCurrentUserReady] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sessionRevision = useRef(0);
+  const userRevision = useRef(0);
 
   const loadCurrentUser = useCallback(async (tok: string): Promise<CurrentUserInfo | null> => {
+    if (tok !== getStoredToken()) return null;
+    const revision = ++userRevision.current;
+    const current = () => revision === userRevision.current && tok === getStoredToken();
     setCurrentUserReady(false);
     try {
       const res = await fetch("/api/session/me", {
         headers: { Authorization: `Bearer ${tok}` },
       });
+      if (!current()) return null;
       if (res.ok) {
         const user = (await res.json()) as CurrentUserInfo;
+        if (!current()) return null;
         setCurrentUser(user);
+        setCurrentUserToken(tok);
         return user;
       }
       setCurrentUser(null);
       return null;
     } catch {
-      setCurrentUser(null);
+      if (current()) setCurrentUser(null);
       return null;
     } finally {
-      setCurrentUserReady(true);
+      if (current()) setCurrentUserReady(true);
     }
   }, []);
 
   const loadSession = useCallback(async () => {
+    const revision = ++sessionRevision.current;
+    const requestedToken = getStoredToken();
     setError(null);
     const next = await runSessionLoad<SessionInfo, CurrentUserInfo>({
       getToken: getStoredToken,
       fetchBasicInfo: () => qneGet<unknown>("main", "/api/companyprofile/BasicInfo"),
-      fetchCurrentUser: loadCurrentUser,
+      fetchCurrentUser: (tok) =>
+        revision === sessionRevision.current ? loadCurrentUser(tok) : Promise.resolve(null),
       buildSession: normaliseBasicInfo,
       readJwtTenantCode: (tok) => {
         const claims = decodeJwtPayload(tok);
@@ -131,6 +152,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       readUserTenantCode: (user) => user.tenantCode ?? null,
     });
+    if (revision !== sessionRevision.current || requestedToken !== getStoredToken()) return;
     if (!next.tokenValid) {
       setToken(null);
       setSession(null);
@@ -164,6 +186,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onUnauthorized = () => {
+      sessionRevision.current++;
+      userRevision.current++;
+      setCurrentUserToken(null);
       setToken(null);
       setSession(null);
       setCurrentUser(null);
@@ -180,6 +205,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       session,
       currentUser,
       currentUserReady,
+      currentUserToken,
       error,
       refresh: loadSession,
       applyToken: async (newToken, hint) => {
@@ -195,6 +221,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await loadSession();
       },
       signOut: () => {
+        sessionRevision.current++;
+        userRevision.current++;
+        setCurrentUserToken(null);
         clearStoredToken();
         setToken(null);
         setSession(null);
@@ -202,7 +231,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setCurrentUserReady(true);
       },
     }),
-    [ready, token, session, currentUser, currentUserReady, error, loadSession],
+    [ready, token, session, currentUser, currentUserReady, currentUserToken, error, loadSession],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

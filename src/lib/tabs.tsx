@@ -8,182 +8,173 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-
+import {
+  INQUIRY_TAB,
+  openDynamicTab,
+  closeDynamicTab,
+  sanitizeDynamicTabs,
+  type DynamicTab,
+} from "./dynamic-tabs";
 export interface AppTab {
-  key: string;              // stable id
-  label: string;            // display label
-  href: string;             // navigable path
-  closable: boolean;
-  kind: "pinned" | "job";
-}
-
-interface TabsContextValue {
-  tabs: AppTab[];
-  activeKey: string | null;
-  /**
-   * Central open-or-focus helper. Opens the Job tab if absent, reuses it if it
-   * already exists, and (unless `focus: false`) makes it the active tab by
-   * navigating to it. Never creates a duplicate tab.
-   */
-  openJobTab: (jobId: string, jobNumber: string, opts?: { focus?: boolean }) => void;
-  activate: (key: string) => void;
-  close: (key: string) => void;
-}
-
-
-const TabsContext = createContext<TabsContextValue | null>(null);
-const STORAGE_KEY = "sh2:openTabs:v1";
-
-interface StoredTab {
   key: string;
   label: string;
   href: string;
+  closable: boolean;
+  kind: "pinned" | "job" | "inquiry";
 }
-
-function loadJobTabs(): StoredTab[] {
-  if (typeof window === "undefined") return [];
+interface TabsContextValue {
+  tabs: AppTab[];
+  activeKey: string | null;
+  openJobTab: (jobId: string, jobNumber: string, opts?: { focus?: boolean }) => void;
+  openInquiryTab: (opts?: { focus?: boolean }) => void;
+  activate: (key: string) => void;
+  close: (key: string) => void;
+}
+const TabsContext = createContext<TabsContextValue | null>(null);
+function storageKey(scope: string) {
+  return `sh2:openTabs:v2:${encodeURIComponent(scope)}`;
+}
+function load(scope: string, allowed: boolean): DynamicTab[] {
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return [];
-    return arr.filter(
-      (t): t is StoredTab =>
-        !!t && typeof t.key === "string" && typeof t.href === "string" && typeof t.label === "string",
+    return sanitizeDynamicTabs(
+      JSON.parse(window.sessionStorage.getItem(storageKey(scope)) ?? "[]"),
+      allowed,
     );
   } catch {
     return [];
   }
 }
-
-function saveJobTabs(tabs: StoredTab[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(tabs));
-  } catch {
-    /* ignore */
-  }
-}
-
 export function TabsProvider({
   pinned,
+  identityScope,
+  inquiryAllowed,
+  onCloseInquiry,
   children,
 }: {
   pinned: AppTab[];
+  identityScope: string | null;
+  inquiryAllowed: boolean | null;
+  onCloseInquiry: () => void;
   children: ReactNode;
 }) {
-  const router = useRouter();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [jobTabs, setJobTabs] = useState<StoredTab[]>(() => loadJobTabs());
-
-  useEffect(() => {
-    saveJobTabs(jobTabs);
-  }, [jobTabs]);
-
-  const openJobTab = useCallback(
-    (jobId: string, jobNumber: string, opts?: { focus?: boolean }) => {
-      const key = `job:${jobId}`;
-      const href = `/jobs/${jobId}`;
-      setJobTabs((prev) => {
-        const existing = prev.find((t) => t.key === key);
-        if (existing) {
-          // Reuse: only refresh the label if we learned a better one.
-          if (jobNumber && existing.label !== jobNumber) {
-            return prev.map((t) => (t.key === key ? { ...t, label: jobNumber } : t));
-          }
-          return prev;
-        }
-        return [...prev, { key, label: jobNumber || "Job", href }];
-      });
-      if (opts?.focus !== false && pathname !== href) {
-        void router.navigate({ to: href });
-      }
-    },
-    [pathname, router],
+  const router = useRouter(),
+    pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [state, setState] = useState<{ scope: string | null; tabs: DynamicTab[] }>({
+    scope: null,
+    tabs: [],
+  });
+  const dynamic = useMemo(
+    () =>
+      state.scope === identityScope && identityScope
+        ? sanitizeDynamicTabs(state.tabs, inquiryAllowed === true)
+        : [],
+    [state, identityScope, inquiryAllowed],
   );
-
-
+  useEffect(() => {
+    if (identityScope && state.scope !== identityScope)
+      setState({ scope: identityScope, tabs: load(identityScope, inquiryAllowed !== false) });
+    if (!identityScope && state.scope !== null) setState({ scope: null, tabs: [] });
+  }, [identityScope, inquiryAllowed, state.scope]);
+  useEffect(() => {
+    if (inquiryAllowed === false)
+      setState((previous) =>
+        previous.tabs.some((tab) => tab.kind === "inquiry")
+          ? { ...previous, tabs: sanitizeDynamicTabs(previous.tabs, false) }
+          : previous,
+      );
+  }, [inquiryAllowed]);
+  useEffect(() => {
+    // Unknown Inquiry grants must not erase a saved tab during a Job-page reload.
+    if (!identityScope || state.scope !== identityScope || inquiryAllowed === null) return;
+    try {
+      window.sessionStorage.setItem(storageKey(identityScope), JSON.stringify(dynamic));
+    } catch {
+      /* storage denied */
+    }
+  }, [identityScope, state.scope, dynamic, inquiryAllowed]);
+  const open = useCallback(
+    (tab: DynamicTab, opts?: { focus?: boolean }) => {
+      const safe = sanitizeDynamicTabs([tab], inquiryAllowed === true)[0];
+      if (!safe) return;
+      if (identityScope)
+        setState((previous) => ({
+          scope: identityScope,
+          tabs: openDynamicTab(
+            previous.scope === identityScope
+              ? sanitizeDynamicTabs(previous.tabs, inquiryAllowed !== false)
+              : load(identityScope, inquiryAllowed !== false),
+            safe,
+          ),
+        }));
+      if (opts?.focus !== false && pathname !== safe.href)
+        void router.navigate({ to: safe.href, resetScroll: safe.kind !== "inquiry" });
+    },
+    [identityScope, inquiryAllowed, pathname, router],
+  );
+  const openJobTab = useCallback(
+    (jobId: string, jobNumber: string, opts?: { focus?: boolean }) =>
+      open(
+        { key: `job:${jobId}`, href: `/jobs/${jobId}`, label: jobNumber || "Job", kind: "job" },
+        opts,
+      ),
+    [open],
+  );
+  const openInquiryTab = useCallback(
+    (opts?: { focus?: boolean }) => open(INQUIRY_TAB, opts),
+    [open],
+  );
+  useEffect(() => {
+    if (pathname === INQUIRY_TAB.href && inquiryAllowed) openInquiryTab({ focus: false });
+  }, [pathname, inquiryAllowed, openInquiryTab]);
+  const tabs = useMemo<AppTab[]>(
+    () => [...pinned, ...dynamic.map((t) => ({ ...t, closable: true }))],
+    [pinned, dynamic],
+  );
   const activate = useCallback(
     (key: string) => {
-      const all: AppTab[] = [
-        ...pinned,
-        ...jobTabs.map((t) => ({
-          key: t.key,
-          label: t.label,
-          href: t.href,
-          closable: true,
-          kind: "job" as const,
-        })),
-      ];
-      const t = all.find((x) => x.key === key);
-      if (t) router.navigate({ to: t.href });
+      const tab = tabs.find((t) => t.key === key);
+      if (tab) void router.navigate({ to: tab.href, resetScroll: tab.kind !== "inquiry" });
     },
-    [pinned, jobTabs, router],
+    [tabs, router],
   );
-
   const close = useCallback(
     (key: string) => {
-      setJobTabs((prev) => {
-        const idx = prev.findIndex((t) => t.key === key);
-        if (idx < 0) return prev;
-        const next = prev.filter((t) => t.key !== key);
-        // If closing the active tab, fall back to previous job tab or Workspace.
-        const active = pathname;
-        const closing = prev[idx];
-        if (closing && active === closing.href) {
-          const fallback = next[idx - 1] ?? next[0];
-          const to = fallback ? fallback.href : (pinned[1]?.href ?? pinned[0]?.href ?? "/");
-          router.navigate({ to });
-        }
-        return next;
-      });
+      const index = dynamic.findIndex((t) => t.key === key),
+        closing = dynamic[index];
+      if (!closing) return;
+      const next = dynamic.filter((t) => t.key !== key);
+      setState((previous) => ({
+        scope: identityScope,
+        tabs: closeDynamicTab(
+          previous.scope === identityScope ? previous.tabs : [],
+          key,
+          inquiryAllowed,
+        ),
+      }));
+      if (closing.kind === "inquiry") onCloseInquiry();
+      if (pathname === closing.href)
+        void router.navigate({
+          to: (next[index - 1] ?? next[0])?.href ?? pinned[1]?.href ?? "/support",
+        });
     },
-    [pathname, pinned, router],
+    [dynamic, identityScope, inquiryAllowed, onCloseInquiry, pathname, pinned, router],
   );
-
-  const tabs: AppTab[] = useMemo(
-    () => [
-      ...pinned,
-      ...jobTabs.map((t) => ({
-        key: t.key,
-        label: t.label,
-        href: t.href,
-        closable: true,
-        kind: "job" as const,
-      })),
-    ],
-    [pinned, jobTabs],
+  const activeKey = tabs.find((t) => t.href === pathname)?.key ?? null;
+  const value = useMemo(
+    () => ({ tabs, activeKey, openJobTab, openInquiryTab, activate, close }),
+    [tabs, activeKey, openJobTab, openInquiryTab, activate, close],
   );
-
-  const activeKey = useMemo(() => {
-    const exact = tabs.find((t) => t.href === pathname);
-    if (exact) return exact.key;
-    // Fallback: prefix match for job pages
-    const job = tabs.find(
-      (t) => t.kind === "job" && pathname.startsWith(t.href),
-    );
-    return job?.key ?? null;
-  }, [tabs, pathname]);
-
-  const value = useMemo<TabsContextValue>(
-    () => ({ tabs, activeKey, openJobTab, activate, close }),
-    [tabs, activeKey, openJobTab, activate, close],
-  );
-
   return <TabsContext.Provider value={value}>{children}</TabsContext.Provider>;
 }
-
 export function useTabs(): TabsContextValue {
-  const v = useContext(TabsContext);
-  if (!v) {
-    // Safe no-op fallback (e.g. rendered outside provider during tests).
-    return {
+  return (
+    useContext(TabsContext) ?? {
       tabs: [],
       activeKey: null,
       openJobTab: () => {},
+      openInquiryTab: () => {},
       activate: () => {},
       close: () => {},
-    };
-  }
-  return v;
+    }
+  );
 }
