@@ -1,7 +1,7 @@
 # SSH performance and interface programme — design review
 
 Date: 01/10/2026, Malaysia.
-Owner decision: APPROVE ALL at 08:58 Malaysia approves the conversational design and its amendments. This written specification is the next review artifact; it does not claim implementation, migration application or release.
+Owner decisions: APPROVE ALL at 08:58 Malaysia approved the conversational design and amendments. Continue at 09:11 Malaysia accepted this written programme and its three package specifications. This does not claim implementation, migration application or release.
 
 ## Intended outcome
 
@@ -51,4 +51,4 @@ WP5B Timeline History Inquiry remains a separate unbuilt deliverable. Package B 
 
 This branch contains design documents only. No product code, dependency, database, credential, N3 transaction or deployment changes are included.
 
-Written design review precedes the implementation plan under the brainstorming workflow. The plan must identify exact files, backend compatibility and meaningful checks; execution method is selected at that handoff. No migration may be applied until target identity and the exact candidate are verified and authorized. Main integration and public release must use the reviewed candidate and separate lane evidence.
+Written design review is complete. [Package A implementation plan](../plans/2026-10-01-dashboard-inquiry-state.md) is prepared for the next review and execution-method selection. B/C retain separate plan handoffs after their prerequisites. No migration may be applied until target identity and the exact candidate are verified and authorized. Main integration and public release must use the reviewed candidate and separate lane evidence.

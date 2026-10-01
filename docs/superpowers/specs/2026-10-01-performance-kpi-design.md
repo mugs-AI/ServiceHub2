@@ -1,6 +1,6 @@
 # Package B — performance evidence, reports and charts
 
-Date: 01/10/2026. Status: written design for review; conversational scope approved.
+Date: 01/10/2026. Status: written design approved through the owner's Continue at 09:11 Malaysia.
 Parent: [SSH performance programme](2026-10-01-performance-program-design.md).
 
 ## Purpose and metric contract

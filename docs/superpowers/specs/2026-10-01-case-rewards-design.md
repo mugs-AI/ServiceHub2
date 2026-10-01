@@ -1,6 +1,6 @@
 # Package C — points and commission allocation
 
-Date: 01/10/2026. Status: written design for review; conversational scope approved.
+Date: 01/10/2026. Status: written design approved through the owner's Continue at 09:11 Malaysia.
 Parent: [SSH performance programme](2026-10-01-performance-program-design.md).
 Dependency: B supplies normalized evidence and eligibility flags.
 
